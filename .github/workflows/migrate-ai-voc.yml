@@ -24,14 +24,13 @@ jobs:
           set -euo pipefail
           git clone --depth 1 https://github.com/woodeastern2-pixel/dex-java.git /tmp/dex-java
 
+          cp .github/workflows/migrate-ai-voc.yml /tmp/migrate-ai-voc.yml
           find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
           cp -a /tmp/dex-java/ai_voc_assistant/. .
 
           python3 - <<'PY'
           from pathlib import Path
 
-          # Rewrite repository/workspace references after moving from a monorepo
-          # subdirectory to the root of the standalone ModelY repository.
           for path in Path('.').rglob('*'):
               if not path.is_file() or '.git' in path.parts:
                   continue
@@ -65,25 +64,14 @@ jobs:
 
               if updated != text:
                   path.write_text(updated, encoding='utf-8')
-
-          # The workflows were nested inside ai_voc_assistant in dex-java. In
-          # ModelY the Flutter project is repository-root, so make CI root-aware.
-          workflow_specs = {
-              Path('.github/workflows/build-android-apk.yml'): (
-                  "    paths:\n      - 'ai_voc_assistant/**'\n      - '.github/workflows/build-android-apk.yml'\n",
-                  "    defaults:\n      run:\n        working-directory: ai_voc_assistant\n\n",
-              ),
-              Path('.github/workflows/build-windows-exe.yml'): (
-                  "    paths:\n      - 'ai_voc_assistant/**'\n      - '.github/workflows/build-windows-exe.yml'\n",
-                  "    defaults:\n      run:\n        working-directory: ai_voc_assistant\n\n",
-              ),
-          }
-          for path, removals in workflow_specs.items():
-              text = path.read_text(encoding='utf-8')
-              for block in removals:
-                  text = text.replace(block, '')
-              path.write_text(text, encoding='utf-8')
           PY
+
+          # Source workflows need GitHub App workflow permission to push.
+          # Keep them out of this bot commit; they are added separately after verification.
+          rm -f .github/workflows/build-android-apk.yml
+          rm -f .github/workflows/build-windows-exe.yml
+          mkdir -p .github/workflows
+          cp /tmp/migrate-ai-voc.yml .github/workflows/migrate-ai-voc.yml
 
       - name: Commit migration
         shell: bash
