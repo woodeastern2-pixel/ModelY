@@ -1,0 +1,96 @@
+name: Migrate AI VOC project
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/migrate-ai-voc.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout ModelY
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Copy AI VOC project from dex-java
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/woodeastern2-pixel/dex-java.git /tmp/dex-java
+
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -a /tmp/dex-java/ai_voc_assistant/. .
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          # Rewrite repository/workspace references after moving from a monorepo
+          # subdirectory to the root of the standalone ModelY repository.
+          for path in Path('.').rglob('*'):
+              if not path.is_file() or '.git' in path.parts:
+                  continue
+              try:
+                  text = path.read_text(encoding='utf-8')
+              except (UnicodeDecodeError, OSError):
+                  continue
+
+              updated = text.replace(
+                  'https://github.com/woodeastern2-pixel/dex-java/raw/main/ai_voc_assistant/',
+                  'https://github.com/woodeastern2-pixel/ModelY/raw/main/'
+              )
+              updated = updated.replace('/workspaces/dex-java/ai_voc_assistant', '/workspaces/ModelY')
+              updated = updated.replace('/workspaces/dex-java', '/workspaces/ModelY')
+              updated = updated.replace('ai_voc_assistant/release_artifacts/', 'release_artifacts/')
+              updated = updated.replace('ai_voc_assistant/build/', 'build/')
+
+              if path.as_posix() == 'scripts/build_release_artifacts.sh':
+                  updated = updated.replace(
+                      'LOCAL_FLUTTER="/workspaces/ModelY/.tools/flutter/bin/flutter"',
+                      'LOCAL_FLUTTER="$ROOT_DIR/.tools/flutter/bin/flutter"'
+                  )
+                  updated = updated.replace(
+                      'Install Flutter or place it at /workspaces/ModelY/.tools/flutter.',
+                      'Install Flutter or place it at $ROOT_DIR/.tools/flutter.'
+                  )
+                  updated = updated.replace(
+                      'export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-/workspaces/ModelY/android-sdk}"',
+                      'export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$ROOT_DIR/android-sdk}"'
+                  )
+
+              if updated != text:
+                  path.write_text(updated, encoding='utf-8')
+
+          # The workflows were nested inside ai_voc_assistant in dex-java. In
+          # ModelY the Flutter project is repository-root, so make CI root-aware.
+          workflow_specs = {
+              Path('.github/workflows/build-android-apk.yml'): (
+                  "    paths:\n      - 'ai_voc_assistant/**'\n      - '.github/workflows/build-android-apk.yml'\n",
+                  "    defaults:\n      run:\n        working-directory: ai_voc_assistant\n\n",
+              ),
+              Path('.github/workflows/build-windows-exe.yml'): (
+                  "    paths:\n      - 'ai_voc_assistant/**'\n      - '.github/workflows/build-windows-exe.yml'\n",
+                  "    defaults:\n      run:\n        working-directory: ai_voc_assistant\n\n",
+              ),
+          }
+          for path, removals in workflow_specs.items():
+              text = path.read_text(encoding='utf-8')
+              for block in removals:
+                  text = text.replace(block, '')
+              path.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Commit migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Migrate AI VOC project from dex-java to ModelY'
+          git push origin HEAD:main
