@@ -1,0 +1,53 @@
+name: Build Windows EXE
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Flutter version
+        run: flutter --version
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build Windows release
+        run: flutter build windows --release
+
+      - name: Package Windows artifacts
+        shell: pwsh
+        run: |
+          $releaseDir = "build/windows/x64/runner/Release"
+          $outDir = "release_artifacts/windows"
+          New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+
+          $zipName = "ai_voc_assistant-latest-windows-x64-release.zip"
+          $zipPath = Join-Path $outDir $zipName
+          if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
+
+          Compress-Archive -Path "$releaseDir/*" -DestinationPath $zipPath -CompressionLevel Optimal
+
+          $hashPath = Join-Path $outDir "$zipName.sha256"
+          $hash = (Get-FileHash $zipPath -Algorithm SHA256).Hash.ToLower()
+          "$hash  $zipName" | Set-Content $hashPath
+
+      - name: Archive Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai_voc_assistant-latest-windows-x64-release
+          path: |
+            release_artifacts/windows/ai_voc_assistant-latest-windows-x64-release.zip
+            release_artifacts/windows/ai_voc_assistant-latest-windows-x64-release.zip.sha256
