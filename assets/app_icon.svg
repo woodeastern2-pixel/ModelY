@@ -1,0 +1,61 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background gradient -->
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2563EB;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1E40AF;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="accentGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#F59E0B;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#D97706;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Main background circle -->
+  <circle cx="100" cy="100" r="100" fill="url(#bgGradient)"/>
+  
+  <!-- Subtle pattern overlay -->
+  <g opacity="0.1">
+    <circle cx="50" cy="50" r="40" fill="none" stroke="white" stroke-width="1"/>
+    <circle cx="150" cy="150" r="35" fill="none" stroke="white" stroke-width="1"/>
+  </g>
+  
+  <!-- Voice waveform - represents VOC -->
+  <g>
+    <!-- Center waveform bars -->
+    <rect x="60" y="90" width="4" height="20" fill="white" rx="2" opacity="0.8"/>
+    <rect x="70" y="75" width="4" height="50" fill="white" rx="2" opacity="0.9"/>
+    <rect x="80" y="85" width="4" height="30" fill="white" rx="2" opacity="0.8"/>
+    <rect x="90" y="70" width="4" height="60" fill="white" rx="2" opacity="1"/>
+    <rect x="100" y="75" width="4" height="50" fill="white" rx="2" opacity="0.95"/>
+    <rect x="110" y="80" width="4" height="40" fill="white" rx="2" opacity="0.9"/>
+    <rect x="120" y="90" width="4" height="20" fill="white" rx="2" opacity="0.8"/>
+  </g>
+  
+  <!-- AI Spark - upper right -->
+  <g filter="url(#glow)">
+    <!-- Main spark star -->
+    <polygon points="140,50 145,62 158,62 148,70 152,82 140,75 128,82 132,70 122,62 135,62" 
+             fill="url(#accentGradient)" opacity="0.95"/>
+    
+    <!-- Secondary spark glow -->
+    <circle cx="165" cy="45" r="6" fill="url(#accentGradient)" opacity="0.7"/>
+    <circle cx="155" cy="35" r="4" fill="#F59E0B" opacity="0.5"/>
+  </g>
+  
+  <!-- Microphone symbol hint (subtle) -->
+  <g opacity="0.2">
+    <path d="M 100 110 Q 95 115 95 122 L 105 122 Q 105 115 100 110" 
+          fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+  </g>
+  
+  <!-- Shine effect -->
+  <ellipse cx="70" cy="60" rx="25" ry="20" fill="white" opacity="0.15" filter="url(#glow)"/>
+</svg>

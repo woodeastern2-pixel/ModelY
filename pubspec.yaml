@@ -1,0 +1,58 @@
+name: ai_voc_assistant
+description: AI VOC Assistant - AI 기반 고객 VOC 분석 및 답변 추천 시스템
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Database
+  sqflite: ^2.3.2
+  sqflite_common_ffi: ^2.3.3
+  path: ^1.9.0
+  file_picker: ^8.3.7
+  archive: ^3.6.1
+  xml: ^6.5.0
+  crypto: ^3.0.3
+  syncfusion_flutter_pdf: ^28.2.12
+
+  # State Management
+  provider: ^6.1.2
+
+  # HTTP
+  http: ^1.2.1
+  excel: ^4.0.6
+  path_provider: ^2.1.4
+
+  # Charts
+  fl_chart: ^0.68.0
+
+  # Utils
+  intl: ^0.19.0
+  uuid: ^4.4.0
+  shared_preferences: ^2.3.1
+  flutter_plugin_android_lifecycle: 2.0.24
+  speech_to_text: ^7.0.0
+
+  # UI
+  cupertino_icons: ^1.0.6
+  flutter_spinkit: ^5.2.1
+  shimmer: ^3.0.0
+
+  # Math (for vector ops)
+  collection: ^1.18.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/icons/

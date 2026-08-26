@@ -200,7 +200,7 @@ uvicorn faiss_bridge_server:app --host 127.0.0.1 --port 8787
 
 ## 9. 빌드 가이드
 
-### 9.1 Android APK
+### 8.1 Android APK
 
 ```bash
 flutter build apk --release
@@ -210,7 +210,7 @@ flutter build apk --release
 
 - build/app/outputs/flutter-apk/app-release.apk
 
-### 9.1.1 고정 다운로드 링크 사용
+### 8.1.1 고정 다운로드 링크 사용
 
 항상 같은 링크로 최신 APK를 배포하려면 아래 스크립트를 사용하세요.
 
@@ -220,16 +220,16 @@ bash scripts/build_release_artifacts.sh
 
 이 스크립트는 arm64 전용 APK로 빌드해서 용량을 줄인 뒤 아래 파일을 갱신합니다.
 
-- ai_voc_assistant/release_artifacts/ai_voc_assistant-latest.apk
-- ai_voc_assistant/release_artifacts/ai_voc_assistant-arm64-v8a-release.apk
+- release_artifacts/ai_voc_assistant-latest.apk
+- release_artifacts/ai_voc_assistant-arm64-v8a-release.apk
 
 고정 GitHub 다운로드 링크:
 
-- https://github.com/woodeastern2-pixel/dex-java/raw/main/ai_voc_assistant/release_artifacts/ai_voc_assistant-latest.apk
+- https://github.com/woodeastern2-pixel/ModelY/raw/main/release_artifacts/ai_voc_assistant-latest.apk
 
 `ai_voc_assistant-latest.apk`는 기본적으로 arm64-v8a APK를 가리킵니다.
 
-### 9.2 Windows EXE
+### 8.2 Windows EXE
 
 ```bash
 flutter build windows --release
