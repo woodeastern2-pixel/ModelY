@@ -11,7 +11,7 @@ import '../voc/voc_list_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, this.screenOverrides})
-    : assert(screenOverrides == null || screenOverrides.length == 6);
+      : assert(screenOverrides == null || screenOverrides.length == 6);
 
   /// Allows the responsive shell to be exercised without production I/O.
   final List<Widget>? screenOverrides;
@@ -104,11 +104,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   List<Widget> get _cachedScreens => List<Widget>.generate(
-    _screens.length,
-    (index) => _visitedIndexes.contains(index)
-        ? _screens[index]
-        : const SizedBox.shrink(),
-  );
+        _screens.length,
+        (index) => _visitedIndexes.contains(index)
+            ? _screens[index]
+            : const SizedBox.shrink(),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -260,9 +260,8 @@ class _DesktopNavigation extends StatelessWidget {
             14,
           ),
           child: Column(
-            crossAxisAlignment: expanded
-                ? CrossAxisAlignment.start
-                : CrossAxisAlignment.center,
+            crossAxisAlignment:
+                expanded ? CrossAxisAlignment.start : CrossAxisAlignment.center,
             children: [
               _BrandMark(expanded: expanded, onTap: () => onSelect(0)),
               const SizedBox(height: AppSpacing.xl),
@@ -272,9 +271,9 @@ class _DesktopNavigation extends StatelessWidget {
                   child: Text(
                     'WORKSPACE',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: visual.navigationMuted,
-                      letterSpacing: 1.15,
-                    ),
+                          color: visual.navigationMuted,
+                          letterSpacing: 1.15,
+                        ),
                   ),
                 ),
                 const SizedBox(height: AppSpacing.xs),
@@ -385,9 +384,8 @@ class _BrandMark extends StatelessWidget {
       borderRadius: BorderRadius.circular(AppRadii.control),
       onTap: onTap,
       child: Row(
-        mainAxisAlignment: expanded
-            ? MainAxisAlignment.start
-            : MainAxisAlignment.center,
+        mainAxisAlignment:
+            expanded ? MainAxisAlignment.start : MainAxisAlignment.center,
         children: [
           Container(
             width: 42,
@@ -411,17 +409,17 @@ class _BrandMark extends StatelessWidget {
                   Text(
                     'AI VOC',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: visual.onNavigation,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.2,
-                    ),
+                          color: visual.onNavigation,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.2,
+                        ),
                   ),
                   Text(
                     'OPERATIONS',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: visual.navigationMuted,
-                      letterSpacing: 1.1,
-                    ),
+                          color: visual.navigationMuted,
+                          letterSpacing: 1.1,
+                        ),
                   ),
                 ],
               ),
@@ -460,12 +458,16 @@ class _WorkspaceStatus extends StatelessWidget {
                   children: [
                     Text(
                       'Local workspace',
-                      style: Theme.of(context).textTheme.labelMedium
+                      style: Theme.of(context)
+                          .textTheme
+                          .labelMedium
                           ?.copyWith(color: visual.onNavigation),
                     ),
                     Text(
                       '동기화 준비됨',
-                      style: Theme.of(context).textTheme.labelSmall
+                      style: Theme.of(context)
+                          .textTheme
+                          .labelSmall
                           ?.copyWith(color: visual.navigationMuted),
                     ),
                   ],

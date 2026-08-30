@@ -81,9 +81,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   child: LayoutBuilder(
                     builder: (context, constraints) {
                       final compact = constraints.maxWidth < 600;
-                      final pagePadding = compact
-                          ? AppSpacing.sm
-                          : AppSpacing.lg;
+                      final pagePadding =
+                          compact ? AppSpacing.sm : AppSpacing.lg;
                       return Padding(
                         padding: EdgeInsets.all(pagePadding),
                         child: Column(
@@ -219,7 +218,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     LinearProgressIndicator(
                       value:
                           (service.getCurrentStatus()?.progressPercent ?? 0) /
-                          100,
+                              100,
                     ),
                     const SizedBox(height: 12),
                     Text(service.getCurrentStatus()?.message ?? '시연 준비 중...'),
@@ -351,28 +350,29 @@ class _DashboardHero extends StatelessWidget {
                   Text(
                     'TODAY’S SIGNAL',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: const Color(0xFFB9BED0),
-                      letterSpacing: 1.2,
-                      fontWeight: FontWeight.w700,
-                    ),
+                          color: const Color(0xFFB9BED0),
+                          letterSpacing: 1.2,
+                          fontWeight: FontWeight.w700,
+                        ),
                   ),
                 ],
               ),
               const SizedBox(height: AppSpacing.md),
               Text(
                 title,
-                style:
-                    (compact
-                            ? Theme.of(context).textTheme.headlineMedium
-                            : Theme.of(context).textTheme.displaySmall)
-                        ?.copyWith(color: Colors.white),
+                style: (compact
+                        ? Theme.of(context).textTheme.headlineMedium
+                        : Theme.of(context).textTheme.displaySmall)
+                    ?.copyWith(color: Colors.white),
               ),
               const SizedBox(height: AppSpacing.xs),
               ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 620),
                 child: Text(
                   description,
-                  style: Theme.of(context).textTheme.bodyMedium
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
                       ?.copyWith(color: const Color(0xFFC7CBD8), height: 1.55),
                 ),
               ),
@@ -456,7 +456,9 @@ class _HeroPulse extends StatelessWidget {
         children: [
           Text(
             '현재 백로그',
-            style: Theme.of(context).textTheme.labelMedium
+            style: Theme.of(context)
+                .textTheme
+                .labelMedium
                 ?.copyWith(color: const Color(0xFFB9BED0)),
           ),
           const SizedBox(height: AppSpacing.xxs),
@@ -465,7 +467,9 @@ class _HeroPulse extends StatelessWidget {
             children: [
               Text(
                 vm.backlogVocs.toString(),
-                style: Theme.of(context).textTheme.displayMedium
+                style: Theme.of(context)
+                    .textTheme
+                    .displayMedium
                     ?.copyWith(color: Colors.white, height: 1),
               ),
               const SizedBox(width: AppSpacing.xs),
@@ -473,7 +477,9 @@ class _HeroPulse extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: 4),
                 child: Text(
                   '건',
-                  style: Theme.of(context).textTheme.bodyMedium
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
                       ?.copyWith(color: const Color(0xFFB9BED0)),
                 ),
               ),
@@ -521,13 +527,17 @@ class _HeroProgress extends StatelessWidget {
             Expanded(
               child: Text(
                 label,
-                style: Theme.of(context).textTheme.labelSmall
+                style: Theme.of(context)
+                    .textTheme
+                    .labelSmall
                     ?.copyWith(color: const Color(0xFFB9BED0)),
               ),
             ),
             Text(
               display,
-              style: Theme.of(context).textTheme.labelMedium
+              style: Theme.of(context)
+                  .textTheme
+                  .labelMedium
                   ?.copyWith(color: Colors.white),
             ),
           ],
@@ -566,16 +576,18 @@ class _SectionHeading extends StatelessWidget {
         Text(
           eyebrow,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: Theme.of(context).colorScheme.primary,
-            letterSpacing: 1.15,
-          ),
+                color: Theme.of(context).colorScheme.primary,
+                letterSpacing: 1.15,
+              ),
         ),
         const SizedBox(height: AppSpacing.xxs),
         Text(title, style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 2),
         Text(
           description,
-          style: Theme.of(context).textTheme.bodySmall
+          style: Theme.of(context)
+              .textTheme
+              .bodySmall
               ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
         ),
       ],
@@ -778,9 +790,7 @@ class _ExecutiveInsightsPanel extends StatelessWidget {
                   ),
                 ),
               const SizedBox(height: 6),
-              ...aiRecommendations
-                  .take(4)
-                  .map(
+              ...aiRecommendations.take(4).map(
                     (r) => Padding(
                       padding: const EdgeInsets.only(bottom: 4),
                       child: Text(
@@ -826,8 +836,8 @@ class _ExecutiveInsightsPanel extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                 ),
               ),
             ],
@@ -837,7 +847,9 @@ class _ExecutiveInsightsPanel extends StatelessWidget {
             value,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.titleMedium
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
                 ?.copyWith(color: color, fontWeight: FontWeight.w800),
           ),
           if (subtitle != null && subtitle.trim().isNotEmpty)
@@ -848,8 +860,8 @@ class _ExecutiveInsightsPanel extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
               ),
             ),
         ],
@@ -864,10 +876,10 @@ class _ExecutiveInsightsPanel extends StatelessWidget {
     NumberFormat won,
   ) {
     final hourlyCost = ((input?.hourlyLaborCost ?? 35.0) * 1400).round();
-    final maintenanceCost = ((input?.monthlyAiMaintenanceCost ?? 2500) * 1400)
-        .round();
-    final implementationCost = ((input?.aiImplementationCost ?? 50000) * 1400)
-        .round();
+    final maintenanceCost =
+        ((input?.monthlyAiMaintenanceCost ?? 2500) * 1400).round();
+    final implementationCost =
+        ((input?.aiImplementationCost ?? 50000) * 1400).round();
 
     return Container(
       width: double.infinity,
@@ -1018,8 +1030,8 @@ class _OperationalMetricCards extends StatelessWidget {
         final crossCount = constraints.maxWidth >= 1100
             ? 5
             : constraints.maxWidth >= 700
-            ? 3
-            : 2;
+                ? 3
+                : 2;
         return GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -1082,8 +1094,7 @@ class _SummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isClickable =
-        data.statusFilter.isNotEmpty ||
+    final isClickable = data.statusFilter.isNotEmpty ||
         data.label == '전체 VOC' ||
         data.label == '지식베이스';
 
@@ -1116,8 +1127,9 @@ class _SummaryCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
                     ),
                   ),
                   if (isClickable)
@@ -1133,9 +1145,9 @@ class _SummaryCard extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.7,
-                ),
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.7,
+                    ),
               ),
             ],
           ),
@@ -1170,8 +1182,8 @@ class _CategorySection extends StatelessWidget {
     final end = totalPages == 0
         ? 0
         : (start + pageSize > entries.length
-              ? entries.length
-              : start + pageSize);
+            ? entries.length
+            : start + pageSize);
     final visibleEntries = totalPages == 0
         ? <MapEntry<String, int>>[]
         : entries.sublist(start, end);

@@ -56,40 +56,40 @@ UiHarness createUiHarness({
 
 class HarnessDashboardViewModel extends DashboardViewModel {
   HarnessDashboardViewModel()
-    : super(
-        _HarnessVocRepository(),
-        _HarnessKnowledgeRepository(),
-        SettingsViewModel(_HarnessSettingsRepository()),
-      );
+      : super(
+          _HarnessVocRepository(),
+          _HarnessKnowledgeRepository(),
+          SettingsViewModel(_HarnessSettingsRepository()),
+        );
 
   @override
   Future<void> loadDashboard() async {}
 
   @override
   Map<String, int> get vocByStatus => const {
-    'OPEN': 20,
-    'IN_PROGRESS': 10,
-    'RESOLVED': 98,
-  };
+        'OPEN': 20,
+        'IN_PROGRESS': 10,
+        'RESOLVED': 98,
+      };
 
   @override
   Map<String, int> get vocByCategory => const {
-    '기능 문의': 38,
-    '계정·권한': 27,
-    '결제': 24,
-    '장애': 21,
-    '사용 방법': 18,
-  };
+        '기능 문의': 38,
+        '계정·권한': 27,
+        '결제': 24,
+        '장애': 21,
+        '사용 방법': 18,
+      };
 
   @override
   List<Map<String, dynamic>> get monthlyStats => const [
-    {'month': '2026-03', 'total': 84, 'resolved': 62},
-    {'month': '2026-04', 'total': 91, 'resolved': 69},
-    {'month': '2026-05', 'total': 103, 'resolved': 78},
-    {'month': '2026-06', 'total': 96, 'resolved': 80},
-    {'month': '2026-07', 'total': 118, 'resolved': 91},
-    {'month': '2026-08', 'total': 128, 'resolved': 98},
-  ];
+        {'month': '2026-03', 'total': 84, 'resolved': 62},
+        {'month': '2026-04', 'total': 91, 'resolved': 69},
+        {'month': '2026-05', 'total': 103, 'resolved': 78},
+        {'month': '2026-06', 'total': 96, 'resolved': 80},
+        {'month': '2026-07', 'total': 118, 'resolved': 91},
+        {'month': '2026-08', 'total': 128, 'resolved': 98},
+      ];
 
   @override
   int get totalVocs => 128;
@@ -111,11 +111,11 @@ class HarnessDashboardViewModel extends DashboardViewModel {
 
   @override
   List<Map<String, dynamic>> get assigneeStats => const [
-    {'assignee': '김민준', 'handled': 34},
-    {'assignee': '이서연', 'handled': 29},
-    {'assignee': '박지훈', 'handled': 24},
-    {'assignee': '최유진', 'handled': 20},
-  ];
+        {'assignee': '김민준', 'handled': 34},
+        {'assignee': '이서연', 'handled': 29},
+        {'assignee': '박지훈', 'handled': 24},
+        {'assignee': '최유진', 'handled': 20},
+      ];
 
   @override
   double get reopenRate => 0.047;
@@ -143,16 +143,16 @@ class HarnessDashboardViewModel extends DashboardViewModel {
 
   @override
   RoiResult get roiResult => RoiResult(
-    monthlySavingsHours: 219,
-    monthlySavingsCost: 7665,
-    monthlyNetSavingsCost: 5165,
-    yearlySavingsCost: 61980,
-    implementationPaybackMonths: 9.7,
-    productivityGainPercent: 72,
-    roi: 77.5,
-    aiEffectiveness: 84.4,
-    recommendation: 'AI 적용 범위를 확대하세요.',
-  );
+        monthlySavingsHours: 219,
+        monthlySavingsCost: 7665,
+        monthlyNetSavingsCost: 5165,
+        yearlySavingsCost: 61980,
+        implementationPaybackMonths: 9.7,
+        productivityGainPercent: 72,
+        roi: 77.5,
+        aiEffectiveness: 84.4,
+        recommendation: 'AI 적용 범위를 확대하세요.',
+      );
 
   @override
   double get aiOverallAccuracy => 0.914;
@@ -165,24 +165,24 @@ class HarnessDashboardViewModel extends DashboardViewModel {
 
   @override
   List<String> get executiveAiRecommendations => const [
-    '로그인 지연 문의를 우선 FAQ로 승격하세요.',
-    '미처리 VOC 20건의 담당자 배분을 오늘 안에 완료하세요.',
-    '답변 채택률이 높은 템플릿을 계정·권한 카테고리에 확장하세요.',
-  ];
+        '로그인 지연 문의를 우선 FAQ로 승격하세요.',
+        '미처리 VOC 20건의 담당자 배분을 오늘 안에 완료하세요.',
+        '답변 채택률이 높은 템플릿을 계정·권한 카테고리에 확장하세요.',
+      ];
 
   @override
   DateTime get executiveAiUpdatedAt => DateTime(2026, 8, 30, 9, 30);
 
   @override
   RoiCalculatorInput get roiInputSnapshot => RoiCalculatorInput(
-    monthlyVocVolume: 128,
-    avgHandleTimeHours: 2.43,
-    hourlyLaborCost: 35,
-    aiImplementationCost: 50000,
-    monthlyAiMaintenanceCost: 2500,
-    automationRate: 0.72,
-    aiAccuracyRate: 0.914,
-  );
+        monthlyVocVolume: 128,
+        avgHandleTimeHours: 2.43,
+        hourlyLaborCost: 35,
+        aiImplementationCost: 50000,
+        monthlyAiMaintenanceCost: 2500,
+        automationRate: 0.72,
+        aiAccuracyRate: 0.914,
+      );
 
   @override
   bool get isLoading => false;

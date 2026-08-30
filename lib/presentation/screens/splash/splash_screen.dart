@@ -99,20 +99,20 @@ class _SplashScreenState extends State<SplashScreen>
                     const SizedBox(height: AppSpacing.lg),
                     Text(
                       'AI VOC',
-                      style: Theme.of(context).textTheme.headlineLarge
-                          ?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -0.8,
-                          ),
+                      style:
+                          Theme.of(context).textTheme.headlineLarge?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.8,
+                              ),
                     ),
                     const SizedBox(height: AppSpacing.xxs),
                     Text(
                       'OPERATIONS ASSISTANT',
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: const Color(0xFF9EA5B8),
-                        letterSpacing: 1.8,
-                      ),
+                            color: const Color(0xFF9EA5B8),
+                            letterSpacing: 1.8,
+                          ),
                     ),
                     const SizedBox(height: AppSpacing.xxl),
                     SizedBox(
@@ -135,7 +135,9 @@ class _SplashScreenState extends State<SplashScreen>
                               textAlign: TextAlign.center,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.bodySmall
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
                                   ?.copyWith(color: const Color(0xFFB9BED0)),
                             ),
                           ),

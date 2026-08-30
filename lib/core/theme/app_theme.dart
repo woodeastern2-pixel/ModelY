@@ -18,52 +18,40 @@ class AppTheme {
     final muted = visual.mutedSurface;
     final outline = isDark ? AppPalette.darkOutline : const Color(0xFFD9DCE5);
 
-    final scheme =
-        ColorScheme.fromSeed(
-          seedColor: AppPalette.indigo,
-          brightness: brightness,
-        ).copyWith(
-          primary: primary,
-          onPrimary: Colors.white,
-          primaryContainer: isDark
-              ? const Color(0xFF30326E)
-              : const Color(0xFFE8E8FF),
-          onPrimaryContainer: isDark
-              ? const Color(0xFFF0F0FF)
-              : const Color(0xFF30316F),
-          secondary: isDark ? const Color(0xFF55CDBE) : AppPalette.teal,
-          onSecondary: isDark ? const Color(0xFF062E29) : Colors.white,
-          secondaryContainer: isDark
-              ? const Color(0xFF163D3A)
-              : const Color(0xFFDDF6F1),
-          onSecondaryContainer: isDark
-              ? const Color(0xFFC8FFF7)
-              : const Color(0xFF095B52),
-          tertiary: isDark ? const Color(0xFFF2B45F) : AppPalette.amber,
-          error: isDark ? const Color(0xFFFF8C8C) : AppPalette.red,
-          surface: surface,
-          onSurface: onSurface,
-          surfaceContainerLowest: isDark
-              ? const Color(0xFF0B0E15)
-              : Colors.white,
-          surfaceContainerLow: isDark
-              ? const Color(0xFF111520)
-              : const Color(0xFFFAFAFC),
-          surfaceContainer: muted,
-          surfaceContainerHigh: isDark
-              ? const Color(0xFF22283A)
-              : const Color(0xFFE9EBF1),
-          surfaceContainerHighest: isDark
-              ? const Color(0xFF2A3145)
-              : const Color(0xFFE1E4EC),
-          onSurfaceVariant: isDark
-              ? const Color(0xFFB8BECD)
-              : const Color(0xFF626879),
-          outline: outline,
-          outlineVariant: isDark
-              ? const Color(0xFF252B3B)
-              : const Color(0xFFE8EAF0),
-        );
+    final scheme = ColorScheme.fromSeed(
+      seedColor: AppPalette.indigo,
+      brightness: brightness,
+    ).copyWith(
+      primary: primary,
+      onPrimary: Colors.white,
+      primaryContainer:
+          isDark ? const Color(0xFF30326E) : const Color(0xFFE8E8FF),
+      onPrimaryContainer:
+          isDark ? const Color(0xFFF0F0FF) : const Color(0xFF30316F),
+      secondary: isDark ? const Color(0xFF55CDBE) : AppPalette.teal,
+      onSecondary: isDark ? const Color(0xFF062E29) : Colors.white,
+      secondaryContainer:
+          isDark ? const Color(0xFF163D3A) : const Color(0xFFDDF6F1),
+      onSecondaryContainer:
+          isDark ? const Color(0xFFC8FFF7) : const Color(0xFF095B52),
+      tertiary: isDark ? const Color(0xFFF2B45F) : AppPalette.amber,
+      error: isDark ? const Color(0xFFFF8C8C) : AppPalette.red,
+      surface: surface,
+      onSurface: onSurface,
+      surfaceContainerLowest: isDark ? const Color(0xFF0B0E15) : Colors.white,
+      surfaceContainerLow:
+          isDark ? const Color(0xFF111520) : const Color(0xFFFAFAFC),
+      surfaceContainer: muted,
+      surfaceContainerHigh:
+          isDark ? const Color(0xFF22283A) : const Color(0xFFE9EBF1),
+      surfaceContainerHighest:
+          isDark ? const Color(0xFF2A3145) : const Color(0xFFE1E4EC),
+      onSurfaceVariant:
+          isDark ? const Color(0xFFB8BECD) : const Color(0xFF626879),
+      outline: outline,
+      outlineVariant:
+          isDark ? const Color(0xFF252B3B) : const Color(0xFFE8EAF0),
+    );
 
     final textTheme = _textTheme(onSurface);
 
