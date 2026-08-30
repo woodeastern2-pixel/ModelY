@@ -8,7 +8,15 @@ import 'package:ai_voc_assistant/presentation/screens/home/home_screen.dart';
 import 'package:ai_voc_assistant/presentation/viewmodels/dashboard_viewmodel.dart';
 import 'package:ai_voc_assistant/presentation/viewmodels/settings_viewmodel.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+
+Future<void> loadUiHarnessFonts() async {
+  final loader = FontLoader('Pretendard')
+    ..addFont(rootBundle.load('assets/fonts/Pretendard-Regular.otf'))
+    ..addFont(rootBundle.load('assets/fonts/Pretendard-Bold.otf'));
+  await loader.load();
+}
 
 class UiHarness {
   UiHarness({required this.viewModel, required this.widget});

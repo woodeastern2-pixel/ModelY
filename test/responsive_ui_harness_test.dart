@@ -5,6 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'support/ui_harness.dart';
 
 void main() {
+  setUpAll(loadUiHarnessFonts);
+
   final profiles = <_ViewportProfile>[
     const _ViewportProfile('compact-android', Size(360, 640), 1),
     const _ViewportProfile('galaxy-s24', Size(384, 854), 1),

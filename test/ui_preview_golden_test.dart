@@ -7,6 +7,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'support/ui_harness.dart';
 
 void main() {
+  setUpAll(loadUiHarnessFonts);
+
   final previews = <(String, Size, ThemeMode)>[
     ('phone-light', const Size(390, 844), ThemeMode.light),
     ('tablet-light', const Size(1024, 768), ThemeMode.light),
