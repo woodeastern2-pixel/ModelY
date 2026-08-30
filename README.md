@@ -26,8 +26,11 @@ UI 변경은 10개 화면·텍스트 배율 조합의 반응형 하네스와 실
 
 ```bash
 flutter test --exclude-tags=golden
-flutter test --update-goldens test/ui_preview_golden_test.dart
+flutter test test/ui_preview_golden_test.dart
 ```
+
+의도적으로 디자인 기준 이미지를 갱신할 때만 `--update-goldens`를 사용하고,
+모바일·태블릿·데스크톱 결과를 시각 검수한 뒤 함께 커밋합니다.
 
 ## 1. 주요 기능 구현 상태
 
