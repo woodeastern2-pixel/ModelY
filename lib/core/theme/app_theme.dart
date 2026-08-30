@@ -62,6 +62,7 @@ class AppTheme {
       extensions: [visual],
       scaffoldBackgroundColor: visual.canvas,
       canvasColor: visual.canvas,
+      fontFamily: 'Pretendard',
       visualDensity: VisualDensity.standard,
       splashFactory: InkSparkle.splashFactory,
       textTheme: textTheme,
@@ -310,7 +311,8 @@ class AppTheme {
         fontWeight: weight,
         height: height,
         letterSpacing: letterSpacing,
-        fontFamilyFallback: const ['Pretendard', 'Noto Sans KR', 'Segoe UI'],
+        fontFamily: 'Pretendard',
+        fontFamilyFallback: const ['Noto Sans KR', 'Segoe UI'],
       );
     }
 

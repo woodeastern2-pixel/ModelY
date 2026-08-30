@@ -1,7 +1,7 @@
 name: ai_voc_assistant
 description: AI VOC Assistant - AI 기반 고객 VOC 분석 및 답변 추천 시스템
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.1.0+2
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -56,3 +56,10 @@ flutter:
   assets:
     - assets/images/
     - assets/icons/
+  fonts:
+    - family: Pretendard
+      fonts:
+        - asset: assets/fonts/Pretendard-Regular.otf
+          weight: 400
+        - asset: assets/fonts/Pretendard-Bold.otf
+          weight: 700
