@@ -650,9 +650,10 @@ class _Filters extends StatelessWidget {
                 ),
               ),
               SizedBox(
-                width: 104,
+                width: 128,
                 child: DropdownButtonFormField<int>(
                   initialValue: pageSize,
+                  isExpanded: true,
                   decoration: const InputDecoration(labelText: '표시'),
                   items: const [
                     DropdownMenuItem(value: 25, child: Text('25건')),

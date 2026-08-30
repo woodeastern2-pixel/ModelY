@@ -43,14 +43,24 @@ void main() {
           await tester.scrollUntilVisible(
             find.byKey(const Key('voc-queue-table')),
             240,
-            scrollable: find.byKey(const Key('voc-queue-scroll')),
+            scrollable: find
+                .descendant(
+                  of: find.byKey(const Key('voc-queue-scroll')),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
           );
           expect(find.byKey(const Key('voc-queue-table')), findsOneWidget);
         } else {
           await tester.scrollUntilVisible(
             find.byKey(const Key('voc-queue-card-voc-1042')),
             240,
-            scrollable: find.byKey(const Key('voc-queue-scroll')),
+            scrollable: find
+                .descendant(
+                  of: find.byKey(const Key('voc-queue-scroll')),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
           );
           expect(
             find.byKey(const Key('voc-queue-card-voc-1042')),
@@ -76,7 +86,12 @@ void main() {
         await tester.scrollUntilVisible(
           find.byKey(const Key('copilot-session-list')),
           240,
-          scrollable: find.byKey(const Key('copilot-home-scroll')),
+          scrollable: find
+              .descendant(
+                of: find.byKey(const Key('copilot-home-scroll')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
         );
         expect(find.byKey(const Key('copilot-session-list')), findsOneWidget);
         expect(tester.takeException(), isNull);
