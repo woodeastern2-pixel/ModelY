@@ -64,10 +64,8 @@ jobs:
       - name: Verify UI previews against approved baselines
         run: flutter test test/ui_preview_golden_test.dart
 
-      - name: Render workspace preview candidates
-        run: >-
-          flutter test --update-goldens
-          test/workspace_ui_preview_golden_test.dart
+      - name: Verify workspace previews against approved baselines
+        run: flutter test test/workspace_ui_preview_golden_test.dart
 
       - name: Upload phone, tablet and desktop previews
         uses: actions/upload-artifact@v4
