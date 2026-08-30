@@ -12,10 +12,15 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 Future<void> loadUiHarnessFonts() async {
-  final loader = FontLoader('Pretendard')
+  final productFontLoader = FontLoader('Pretendard')
     ..addFont(rootBundle.load('assets/fonts/Pretendard-Regular.otf'))
     ..addFont(rootBundle.load('assets/fonts/Pretendard-Bold.otf'));
-  await loader.load();
+  final materialIconsLoader = FontLoader('MaterialIcons')
+    ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'));
+  await Future.wait([
+    productFontLoader.load(),
+    materialIconsLoader.load(),
+  ]);
 }
 
 class UiHarness {
