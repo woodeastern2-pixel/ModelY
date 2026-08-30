@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/constants/app_constants.dart';
+import '../../../core/theme/app_tokens.dart';
 import '../../../domain/entities/response_entity.dart';
 import '../../../domain/entities/voc_entity.dart';
 import '../../viewmodels/ai_viewmodel.dart';
@@ -12,6 +13,7 @@ import '../../viewmodels/settings_viewmodel.dart';
 import '../../viewmodels/voc_viewmodel.dart';
 import '../../widgets/priority_chip.dart';
 import '../../widgets/voc_status_chip.dart';
+import '../../widgets/workspace_ui.dart';
 import 'ai_answer_screen.dart';
 
 class VocDetailScreen extends StatefulWidget {
@@ -38,7 +40,8 @@ class _VocDetailScreenState extends State<VocDetailScreen> {
       builder: (context, vm, _) {
         final voc = vm.selectedVoc;
         if (voc == null || voc.id != widget.vocId) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const Scaffold(
+              body: Center(child: CircularProgressIndicator()));
         }
         final jiraConfigured = context.watch<JiraViewModel>().isConfigured;
 
@@ -46,8 +49,9 @@ class _VocDetailScreenState extends State<VocDetailScreen> {
           builder: (context, constraints) {
             final desktop = constraints.maxWidth >= 1000;
             return Scaffold(
+              backgroundColor: context.visualColors.canvas,
               appBar: AppBar(
-                title: Text(voc.title, overflow: TextOverflow.ellipsis),
+                title: const Text('VOC 상세'),
                 actions: [
                   PopupMenuButton<String>(
                     tooltip: 'VOC 작업',
@@ -60,9 +64,11 @@ class _VocDetailScreenState extends State<VocDetailScreen> {
                           child: Text('처리중으로 변경'),
                         ),
                       if (voc.status != AppConstants.vocStatusResolved)
-                        const PopupMenuItem(value: 'resolve', child: Text('해결 완료')),
+                        const PopupMenuItem(
+                            value: 'resolve', child: Text('해결 완료')),
                       if (voc.status != AppConstants.vocStatusRejected)
-                        const PopupMenuItem(value: 'reject', child: Text('반려 처리')),
+                        const PopupMenuItem(
+                            value: 'reject', child: Text('반려 처리')),
                       const PopupMenuDivider(),
                       const PopupMenuItem(value: 'delete', child: Text('삭제')),
                     ],
@@ -82,11 +88,65 @@ class _VocDetailScreenState extends State<VocDetailScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        WorkspaceHero(
+                          key: const Key('voc-detail-hero'),
+                          eyebrow: 'CUSTOMER SIGNAL',
+                          title: voc.title,
+                          description: _vocExcerpt(voc.content),
+                          icon: Icons.campaign_outlined,
+                          metrics: [
+                            WorkspaceMetric(
+                              label: '상태',
+                              value: _statusName(voc.status),
+                            ),
+                            WorkspaceMetric(
+                              label: '우선순위',
+                              value: _priorityName(voc.priority),
+                              color: voc.priority == AppConstants.priorityHigh
+                                  ? const Color(0xFFFF8B8B)
+                                  : null,
+                            ),
+                            WorkspaceMetric(
+                              label: '카테고리',
+                              value: voc.category,
+                              color: const Color(0xFFBFC2FF),
+                            ),
+                          ],
+                          actions: [
+                            FilledButton.icon(
+                              key: const Key('voc-detail-ai-answer'),
+                              onPressed: () {
+                                context.read<AiViewModel>().clearResults();
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => AiAnswerScreen(
+                                      vocId: voc.id,
+                                      vocTitle: voc.title,
+                                      vocContent: voc.content,
+                                      category: voc.category,
+                                      customer: voc.customer,
+                                      project: voc.project,
+                                    ),
+                                  ),
+                                );
+                              },
+                              style: FilledButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                foregroundColor: AppPalette.ink,
+                              ),
+                              icon: const Icon(Icons.auto_awesome_rounded),
+                              label: const Text('AI 답변 만들기'),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.md),
                         if (desktop)
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              SizedBox(width: 430, child: _VocSummaryCard(voc: voc)),
+                              SizedBox(
+                                  width: 430, child: _VocSummaryCard(voc: voc)),
                               const SizedBox(width: 16),
                               Expanded(child: _VocContentCard(voc: voc)),
                             ],
@@ -127,7 +187,8 @@ class _VocDetailScreenState extends State<VocDetailScreen> {
                             ],
                           )
                         else ...[
-                          _CollaborationActions(voc: voc, responses: vm.responses),
+                          _CollaborationActions(
+                              voc: voc, responses: vm.responses),
                           if (jiraConfigured) ...[
                             const SizedBox(height: 12),
                             _JiraSection(
@@ -230,19 +291,25 @@ class _VocDetailScreenState extends State<VocDetailScreen> {
             child: SingleChildScrollView(
               child: Column(
                 children: [
-                  TextField(controller: customer, decoration: const InputDecoration(labelText: '고객명')),
+                  TextField(
+                      controller: customer,
+                      decoration: const InputDecoration(labelText: '고객명')),
                   const SizedBox(height: 10),
-                  TextField(controller: project, decoration: const InputDecoration(labelText: '프로젝트')),
+                  TextField(
+                      controller: project,
+                      decoration: const InputDecoration(labelText: '프로젝트')),
                   const SizedBox(height: 10),
                   if (categories.isNotEmpty)
                     DropdownButtonFormField<String>(
                       initialValue: category,
                       decoration: const InputDecoration(labelText: '카테고리'),
                       items: categories
-                          .map((item) => DropdownMenuItem(value: item, child: Text(item)))
+                          .map((item) =>
+                              DropdownMenuItem(value: item, child: Text(item)))
                           .toList(),
                       onChanged: (value) {
-                        if (value != null) setDialogState(() => category = value);
+                        if (value != null)
+                          setDialogState(() => category = value);
                       },
                     ),
                   const SizedBox(height: 10),
@@ -259,21 +326,28 @@ class _VocDetailScreenState extends State<VocDetailScreen> {
                     },
                   ),
                   const SizedBox(height: 10),
-                  TextField(controller: title, decoration: const InputDecoration(labelText: '제목')),
+                  TextField(
+                      controller: title,
+                      decoration: const InputDecoration(labelText: '제목')),
                   const SizedBox(height: 10),
                   TextField(
                     controller: content,
                     minLines: 5,
                     maxLines: 9,
-                    decoration: const InputDecoration(labelText: '내용', alignLabelWithHint: true),
+                    decoration: const InputDecoration(
+                        labelText: '내용', alignLabelWithHint: true),
                   ),
                 ],
               ),
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('취소')),
-            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('저장')),
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('취소')),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('저장')),
           ],
         ),
       ),
@@ -311,6 +385,40 @@ class _VocDetailScreenState extends State<VocDetailScreen> {
   }
 }
 
+String _vocExcerpt(String content) {
+  final normalized = content.replaceAll(RegExp(r'\s+'), ' ').trim();
+  if (normalized.length <= 150) return normalized;
+  return '${normalized.substring(0, 150)}…';
+}
+
+String _statusName(String status) {
+  switch (status) {
+    case AppConstants.vocStatusOpen:
+      return '접수';
+    case AppConstants.vocStatusInProgress:
+      return '처리중';
+    case AppConstants.vocStatusResolved:
+      return '해결';
+    case AppConstants.vocStatusRejected:
+      return '반려';
+    default:
+      return status;
+  }
+}
+
+String _priorityName(String priority) {
+  switch (priority) {
+    case AppConstants.priorityHigh:
+      return '긴급';
+    case AppConstants.priorityMedium:
+      return '보통';
+    case AppConstants.priorityLow:
+      return '낮음';
+    default:
+      return priority;
+  }
+}
+
 class _VocSummaryCard extends StatelessWidget {
   const _VocSummaryCard({required this.voc});
   final VocEntity voc;
@@ -329,7 +437,9 @@ class _VocSummaryCard extends StatelessWidget {
             children: [
               VocStatusChip(status: voc.status),
               PriorityChip(priority: voc.priority),
-              Chip(label: Text(voc.category), visualDensity: VisualDensity.compact),
+              Chip(
+                  label: Text(voc.category),
+                  visualDensity: VisualDensity.compact),
             ],
           ),
           const SizedBox(height: 14),
@@ -433,7 +543,9 @@ class _IntelligencePanelState extends State<_IntelligencePanel> {
     if (!mounted) return;
     setState(() => _running = false);
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(result == null ? 'AI 분석에 실패했습니다.' : 'AI 분석 결과를 갱신했습니다.')),
+      SnackBar(
+          content:
+              Text(result == null ? 'AI 분석에 실패했습니다.' : 'AI 분석 결과를 갱신했습니다.')),
     );
   }
 
@@ -461,9 +573,7 @@ class _IntelligencePanelState extends State<_IntelligencePanel> {
       ),
       _MetricData(
         'JIRA 판단',
-        voc.jiraScore == null
-            ? '분석 전'
-            : (voc.jiraRequired ? '필요' : '불필요'),
+        voc.jiraScore == null ? '분석 전' : (voc.jiraRequired ? '필요' : '불필요'),
         voc.jiraScore,
       ),
     ];
@@ -475,7 +585,10 @@ class _IntelligencePanelState extends State<_IntelligencePanel> {
       trailing: OutlinedButton.icon(
         onPressed: _running ? null : _run,
         icon: _running
-            ? const SizedBox(width: 15, height: 15, child: CircularProgressIndicator(strokeWidth: 2))
+            ? const SizedBox(
+                width: 15,
+                height: 15,
+                child: CircularProgressIndicator(strokeWidth: 2))
             : const Icon(Icons.refresh_outlined, size: 18),
         label: Text(_running ? '분석 중' : 'AI 분석 실행'),
       ),
@@ -484,14 +597,17 @@ class _IntelligencePanelState extends State<_IntelligencePanel> {
         children: [
           LayoutBuilder(
             builder: (context, constraints) {
-              final columns = widget.desktop ? (constraints.maxWidth > 1200 ? 4 : 3) : 2;
+              final columns =
+                  widget.desktop ? (constraints.maxWidth > 1200 ? 4 : 3) : 2;
               const gap = 10.0;
-              final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
+              final width =
+                  (constraints.maxWidth - gap * (columns - 1)) / columns;
               return Wrap(
                 spacing: gap,
                 runSpacing: gap,
                 children: metrics
-                    .map((item) => SizedBox(width: width, child: _MetricTile(data: item)))
+                    .map((item) =>
+                        SizedBox(width: width, child: _MetricTile(data: item)))
                     .toList(),
               );
             },
@@ -535,7 +651,10 @@ class _MetricTile extends StatelessWidget {
         children: [
           Text(
             data.label,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(color: cs.onSurfaceVariant),
+            style: Theme.of(context)
+                .textTheme
+                .labelMedium
+                ?.copyWith(color: cs.onSurfaceVariant),
           ),
           const SizedBox(height: 5),
           Text(
@@ -547,7 +666,10 @@ class _MetricTile extends StatelessWidget {
           const SizedBox(height: 3),
           Text(
             confidence,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: cs.onSurfaceVariant),
           ),
         ],
       ),
@@ -573,7 +695,9 @@ class _ReasonBox extends StatelessWidget {
         children: [
           Icon(Icons.lightbulb_outline, size: 19, color: cs.secondary),
           const SizedBox(width: 9),
-          Expanded(child: Text('판단 근거 · $text', style: const TextStyle(height: 1.45))),
+          Expanded(
+              child:
+                  Text('판단 근거 · $text', style: const TextStyle(height: 1.45))),
         ],
       ),
     );
@@ -644,7 +768,8 @@ class _RejectBanner extends StatelessWidget {
 }
 
 class _ResponsesWorkspace extends StatefulWidget {
-  const _ResponsesWorkspace({required this.voc, required this.vm, required this.desktop});
+  const _ResponsesWorkspace(
+      {required this.voc, required this.vm, required this.desktop});
   final VocEntity voc;
   final VocViewModel vm;
   final bool desktop;
@@ -673,14 +798,17 @@ class _ResponsesWorkspaceState extends State<_ResponsesWorkspace> {
               response: response,
               onEdit: response.isDraft
                   ? () async {
-                      final edited = await _editResponse(context, response.content);
+                      final edited =
+                          await _editResponse(context, response.content);
                       if (edited == null) return;
                       final updated = await widget.vm.updateResponseContent(
                         responseId: response.id,
                         content: edited,
                       );
                       if (updated != null && context.mounted) {
-                        await context.read<IntegrationViewModel>().forwardVocChangeToPeerApps(
+                        await context
+                            .read<IntegrationViewModel>()
+                            .forwardVocChangeToPeerApps(
                               voc: widget.vm.selectedVoc ?? widget.voc,
                               event: 'response.updated',
                               response: updated,
@@ -696,12 +824,16 @@ class _ResponsesWorkspaceState extends State<_ResponsesWorkspace> {
                         orElse: () => response,
                       );
                       if (!context.mounted) return;
-                      await context.read<IntegrationViewModel>().forwardVocChangeToPeerApps(
+                      await context
+                          .read<IntegrationViewModel>()
+                          .forwardVocChangeToPeerApps(
                             voc: widget.vm.selectedVoc ?? widget.voc,
                             event: 'response.approved',
                             response: stored,
                           );
-                      await context.read<IntegrationViewModel>().publishApprovedToConfluence(
+                      await context
+                          .read<IntegrationViewModel>()
+                          .publishApprovedToConfluence(
                             voc: widget.voc,
                             approvedAnswer: stored.content,
                           );
@@ -738,7 +870,9 @@ class _ResponsesWorkspaceState extends State<_ResponsesWorkspace> {
                   content: text,
                 );
                 if (!context.mounted) return;
-                await context.read<IntegrationViewModel>().forwardVocChangeToPeerApps(
+                await context
+                    .read<IntegrationViewModel>()
+                    .forwardVocChangeToPeerApps(
                       voc: widget.vm.selectedVoc ?? widget.voc,
                       event: 'response.created',
                       response: created,
@@ -790,8 +924,11 @@ class _ResponsesWorkspaceState extends State<_ResponsesWorkspace> {
           child: TextField(controller: controller, minLines: 5, maxLines: 9),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('취소')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, controller.text.trim()), child: const Text('저장')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('취소')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+              child: const Text('저장')),
         ],
       ),
     );
@@ -809,7 +946,8 @@ class _EmptyResponses extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 24),
       child: Column(
         children: [
-          Icon(Icons.chat_bubble_outline, size: 34, color: Theme.of(context).colorScheme.outline),
+          Icon(Icons.chat_bubble_outline,
+              size: 34, color: Theme.of(context).colorScheme.outline),
           const SizedBox(height: 8),
           const Text('등록된 답변이 없습니다.'),
         ],
@@ -842,7 +980,8 @@ class _ResponseCard extends StatelessWidget {
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 if (response.aiGenerated)
-                  const Chip(label: Text('AI'), visualDensity: VisualDensity.compact),
+                  const Chip(
+                      label: Text('AI'), visualDensity: VisualDensity.compact),
                 Chip(
                   label: Text(approved ? '승인됨' : 'Draft'),
                   visualDensity: VisualDensity.compact,
@@ -867,10 +1006,12 @@ class _ResponseCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            SelectableText(response.content, style: const TextStyle(height: 1.55)),
+            SelectableText(response.content,
+                style: const TextStyle(height: 1.55)),
             if (approved && response.approvedBy != null) ...[
               const SizedBox(height: 8),
-              Text('승인: ${response.approvedBy}', style: Theme.of(context).textTheme.bodySmall),
+              Text('승인: ${response.approvedBy}',
+                  style: Theme.of(context).textTheme.bodySmall),
             ],
           ],
         ),
@@ -897,7 +1038,8 @@ class _CollaborationActions extends StatelessWidget {
     responseToShare ??= responses.isEmpty ? null : responses.first;
     final answer = responseToShare?.content ?? '';
     final urgent = (voc.urgency ?? '').toLowerCase();
-    final isUrgent = urgent == 'high' || urgent == 'critical' || urgent.contains('긴급');
+    final isUrgent =
+        urgent == 'high' || urgent == 'critical' || urgent.contains('긴급');
     return _Panel(
       title: '협업 연동',
       subtitle: '필요한 경우에만 외부 채널로 공유합니다.',
@@ -909,46 +1051,55 @@ class _CollaborationActions extends StatelessWidget {
           OutlinedButton.icon(
             onPressed: !isUrgent || vm.isLoading
                 ? null
-                : () => context.read<IntegrationViewModel>().notifyUrgentVocToTeams(voc),
+                : () => context
+                    .read<IntegrationViewModel>()
+                    .notifyUrgentVocToTeams(voc),
             icon: const Icon(Icons.notifications_active_outlined),
             label: const Text('Teams 긴급 알림'),
           ),
           OutlinedButton.icon(
             onPressed: answer.isEmpty || vm.isLoading
                 ? null
-                : () => context.read<IntegrationViewModel>().shareAiAnswerToTeams(
-                      voc: voc,
-                      answer: answer,
-                    ),
+                : () =>
+                    context.read<IntegrationViewModel>().shareAiAnswerToTeams(
+                          voc: voc,
+                          answer: answer,
+                        ),
             icon: const Icon(Icons.share_outlined),
             label: const Text('Teams 답변 공유'),
           ),
           OutlinedButton.icon(
             onPressed: vm.isLoading
                 ? null
-                : () => context.read<IntegrationViewModel>().shareVocToSlack(voc: voc),
+                : () => context
+                    .read<IntegrationViewModel>()
+                    .shareVocToSlack(voc: voc),
             icon: const Icon(Icons.forum_outlined),
             label: const Text('Slack VOC 공유'),
           ),
           OutlinedButton.icon(
             onPressed: answer.isEmpty || vm.isLoading
                 ? null
-                : () => context.read<IntegrationViewModel>().shareAiAnswerToSlack(
-                      voc: voc,
-                      answer: answer,
-                    ),
+                : () =>
+                    context.read<IntegrationViewModel>().shareAiAnswerToSlack(
+                          voc: voc,
+                          answer: answer,
+                        ),
             icon: const Icon(Icons.chat_bubble_outline),
             label: const Text('Slack 답변 공유'),
           ),
           if (vm.error != null)
             SizedBox(
               width: double.infinity,
-              child: Text(vm.error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              child: Text(vm.error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error)),
             ),
           if (vm.success != null)
             SizedBox(
               width: double.infinity,
-              child: Text(vm.success!, style: TextStyle(color: Theme.of(context).colorScheme.primary)),
+              child: Text(vm.success!,
+                  style:
+                      TextStyle(color: Theme.of(context).colorScheme.primary)),
             ),
         ],
       ),
@@ -957,7 +1108,8 @@ class _CollaborationActions extends StatelessWidget {
 }
 
 class _JiraSection extends StatelessWidget {
-  const _JiraSection({required this.vocId, required this.vocTitle, required this.vocContent});
+  const _JiraSection(
+      {required this.vocId, required this.vocTitle, required this.vocContent});
   final String vocId;
   final String vocTitle;
   final String vocContent;
@@ -969,7 +1121,9 @@ class _JiraSection extends StatelessWidget {
         if (!vm.isConfigured) return const SizedBox.shrink();
         return _Panel(
           title: 'JIRA 연동',
-          subtitle: vm.vocLinks.isEmpty ? '연결된 JIRA 이슈가 없습니다.' : '${vm.vocLinks.length}개 이슈 연결됨',
+          subtitle: vm.vocLinks.isEmpty
+              ? '연결된 JIRA 이슈가 없습니다.'
+              : '${vm.vocLinks.length}개 이슈 연결됨',
           icon: Icons.task_alt_outlined,
           trailing: OutlinedButton.icon(
             onPressed: vm.isLoading ? null : () => _create(context, vm),
@@ -1058,13 +1212,19 @@ class _Panel extends StatelessWidget {
                     children: [
                       Text(
                         title,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w800),
                       ),
                       if (subtitle != null) ...[
                         const SizedBox(height: 2),
                         Text(
                           subtitle!,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: cs.onSurfaceVariant),
                         ),
                       ],
                     ],
@@ -1102,10 +1262,15 @@ class _MetaRow extends StatelessWidget {
             width: 86,
             child: Text(
               label,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: cs.onSurfaceVariant),
             ),
           ),
-          Expanded(child: Text(value, style: const TextStyle(fontWeight: FontWeight.w600))),
+          Expanded(
+              child: Text(value,
+                  style: const TextStyle(fontWeight: FontWeight.w600))),
         ],
       ),
     );

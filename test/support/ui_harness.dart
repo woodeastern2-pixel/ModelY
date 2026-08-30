@@ -1,12 +1,18 @@
 import 'package:ai_voc_assistant/core/theme/app_theme.dart';
+import 'package:ai_voc_assistant/core/constants/app_constants.dart';
+import 'package:ai_voc_assistant/domain/entities/voc_entity.dart';
 import 'package:ai_voc_assistant/domain/repositories/knowledge_base_repository.dart';
 import 'package:ai_voc_assistant/domain/repositories/settings_repository.dart';
 import 'package:ai_voc_assistant/domain/repositories/voc_repository.dart';
 import 'package:ai_voc_assistant/domain/services/executive_dashboard_service.dart';
 import 'package:ai_voc_assistant/presentation/screens/dashboard/dashboard_screen.dart';
+import 'package:ai_voc_assistant/presentation/screens/chat/ai_chat_screen.dart';
 import 'package:ai_voc_assistant/presentation/screens/home/home_screen.dart';
+import 'package:ai_voc_assistant/presentation/screens/voc/voc_list_screen.dart';
+import 'package:ai_voc_assistant/presentation/viewmodels/ai_viewmodel.dart';
 import 'package:ai_voc_assistant/presentation/viewmodels/dashboard_viewmodel.dart';
 import 'package:ai_voc_assistant/presentation/viewmodels/settings_viewmodel.dart';
+import 'package:ai_voc_assistant/presentation/viewmodels/voc_viewmodel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -29,6 +35,171 @@ class UiHarness {
   final HarnessDashboardViewModel viewModel;
   final Widget widget;
 }
+
+enum WorkspaceHarnessView { vocQueue, copilot }
+
+class WorkspaceHarness {
+  WorkspaceHarness({
+    required this.vocViewModel,
+    required this.settingsViewModel,
+    required this.widget,
+  });
+
+  final VocViewModel vocViewModel;
+  final SettingsViewModel settingsViewModel;
+  final Widget widget;
+
+  void dispose() {
+    vocViewModel.dispose();
+    settingsViewModel.dispose();
+  }
+}
+
+WorkspaceHarness createWorkspaceHarness({
+  required WorkspaceHarnessView view,
+  ThemeMode themeMode = ThemeMode.light,
+  double textScale = 1,
+}) {
+  final vocViewModel = VocViewModel(
+    _HarnessVocRepository(_workspaceVocs),
+  );
+  final settingsViewModel = SettingsViewModel(_HarnessSettingsRepository());
+  final screen = switch (view) {
+    WorkspaceHarnessView.vocQueue => const VocListScreen(),
+    WorkspaceHarnessView.copilot => AiChatScreen(
+        previewSessions: _copilotSessions,
+      ),
+  };
+
+  final app = MultiProvider(
+    providers: [
+      ChangeNotifierProvider<VocViewModel>.value(value: vocViewModel),
+      ChangeNotifierProvider<SettingsViewModel>.value(
+        value: settingsViewModel,
+      ),
+    ],
+    child: MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: themeMode,
+      builder: (context, child) {
+        final media = MediaQuery.of(context);
+        return MediaQuery(
+          data: media.copyWith(textScaler: TextScaler.linear(textScale)),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
+      home: RepaintBoundary(
+        key: const Key('workspace-preview-root'),
+        child: screen,
+      ),
+    ),
+  );
+
+  return WorkspaceHarness(
+    vocViewModel: vocViewModel,
+    settingsViewModel: settingsViewModel,
+    widget: app,
+  );
+}
+
+final _workspaceVocs = <VocEntity>[
+  VocEntity(
+    id: 'voc-1042',
+    title: '로그인 후 대시보드 로딩이 지연됩니다',
+    content: '오늘 오전부터 로그인 완료 후 대시보드가 뜨기까지 20초 이상 걸립니다.',
+    category: '장애',
+    customer: '에이프릴 커머스',
+    project: 'Commerce Cloud | CC | 1042',
+    priority: AppConstants.priorityHigh,
+    status: AppConstants.vocStatusOpen,
+    businessType: '기술 지원',
+    department: '플랫폼팀',
+    assignee: '김민준',
+    createdAt: DateTime(2026, 8, 30, 9, 10),
+    updatedAt: DateTime(2026, 8, 30, 9, 32),
+  ),
+  VocEntity(
+    id: 'voc-1041',
+    title: '엔터프라이즈 SSO 계정 권한 변경 문의',
+    content: '신규 조직 관리자의 SSO 권한 변경 절차와 적용 시점을 확인해 주세요.',
+    category: '계정·권한',
+    customer: '노스스타 금융',
+    project: 'Enterprise Hub | EH | 1041',
+    priority: AppConstants.priorityMedium,
+    status: AppConstants.vocStatusInProgress,
+    businessType: '운영 문의',
+    department: '보안팀',
+    assignee: '이서연',
+    createdAt: DateTime(2026, 8, 29, 16, 20),
+    updatedAt: DateTime(2026, 8, 30, 8, 45),
+  ),
+  VocEntity(
+    id: 'voc-1039',
+    title: '월별 청구서에 부가세 표기가 누락됩니다',
+    content: '법인 월별 청구서 PDF에서 부가세 항목이 보이지 않아 회계 처리가 어렵습니다.',
+    category: '결제',
+    customer: '파인랩',
+    project: 'Billing | BL | 1039',
+    priority: AppConstants.priorityHigh,
+    status: AppConstants.vocStatusResolved,
+    businessType: '결제 문의',
+    assignee: '박지훈',
+    createdAt: DateTime(2026, 8, 28, 11, 4),
+    updatedAt: DateTime(2026, 8, 29, 18, 14),
+  ),
+  VocEntity(
+    id: 'voc-1037',
+    title: '데이터 내보내기 필터 조건 저장 요청',
+    content: '매번 반복하는 CSV 내보내기 필터를 작업자별로 저장할 수 있으면 좋겠습니다.',
+    category: '기능 문의',
+    customer: '모노 리테일',
+    project: 'Analytics | AN | 1037',
+    priority: AppConstants.priorityLow,
+    status: AppConstants.vocStatusOpen,
+    businessType: '기능 개선',
+    createdAt: DateTime(2026, 8, 27, 14, 2),
+    updatedAt: DateTime(2026, 8, 28, 9, 16),
+  ),
+  VocEntity(
+    id: 'voc-1035',
+    title: '초보 관리자용 권한 설정 가이드가 필요합니다',
+    content: '처음 배포하는 관리자가 따라 할 수 있는 권한 설정 안내를 찾고 있습니다.',
+    category: '사용 방법',
+    customer: '하루 모빌리티',
+    project: 'Admin | AD | 1035',
+    priority: AppConstants.priorityMedium,
+    status: AppConstants.vocStatusResolved,
+    businessType: '사용 문의',
+    createdAt: DateTime(2026, 8, 26, 10, 28),
+    updatedAt: DateTime(2026, 8, 27, 12, 40),
+  ),
+];
+
+final _copilotSessions = <AiChatSessionSummary>[
+  AiChatSessionSummary(
+    sessionId: 'session-1',
+    title: '로그인 지연 VOC 원인과 우선순위',
+    preview: '오전 접수 건 중 엔터프라이즈 고객 영향을 우선 분석했습니다.',
+    messageCount: 8,
+    updatedAt: DateTime(2026, 8, 30, 10, 5),
+  ),
+  AiChatSessionSummary(
+    sessionId: 'session-2',
+    title: '주간 고객 이슈 경영진 보고',
+    preview: '핵심 이슈, 고객 영향, 권고 조치 순으로 요약했습니다.',
+    messageCount: 5,
+    updatedAt: DateTime(2026, 8, 29, 17, 42),
+  ),
+  AiChatSessionSummary(
+    sessionId: 'session-3',
+    title: '반복 결제 문의 패턴 분석',
+    preview: '청구서 표기와 관련된 반복 패턴 3개를 확인했습니다.',
+    messageCount: 11,
+    updatedAt: DateTime(2026, 8, 28, 13, 18),
+  ),
+];
 
 UiHarness createUiHarness({
   ThemeMode themeMode = ThemeMode.light,
@@ -251,6 +422,13 @@ class _HarnessSettingsRepository implements SettingsRepository {
 }
 
 class _HarnessVocRepository implements VocRepository {
+  const _HarnessVocRepository([this.vocs = const []]);
+
+  final List<VocEntity> vocs;
+
+  @override
+  Future<List<VocEntity>> getAllVocs() async => List.of(vocs);
+
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

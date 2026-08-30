@@ -40,12 +40,20 @@ jobs:
           dart format --output=none --set-exit-if-changed
           lib/core/theme/app_theme.dart
           lib/core/theme/app_tokens.dart
+          lib/presentation/widgets/workspace_ui.dart
+          lib/presentation/screens/chat/ai_chat_screen.dart
           lib/presentation/screens/dashboard/dashboard_screen.dart
           lib/presentation/screens/home/home_screen.dart
           lib/presentation/screens/splash/splash_screen.dart
+          lib/presentation/screens/voc/ai_answer_screen_v2.dart
+          lib/presentation/screens/voc/voc_detail_screen_v2.dart
+          lib/presentation/screens/voc/voc_list_screen_v5.dart
+          lib/presentation/screens/voc/voc_register_screen.dart
           test/responsive_ui_harness_test.dart
           test/support/ui_harness.dart
           test/ui_preview_golden_test.dart
+          test/workspace_responsive_harness_test.dart
+          test/workspace_ui_preview_golden_test.dart
 
       - name: Static analysis
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
@@ -55,6 +63,11 @@ jobs:
 
       - name: Verify UI previews against approved baselines
         run: flutter test test/ui_preview_golden_test.dart
+
+      - name: Render workspace preview candidates
+        run: >-
+          flutter test --update-goldens
+          test/workspace_ui_preview_golden_test.dart
 
       - name: Upload phone, tablet and desktop previews
         uses: actions/upload-artifact@v4
