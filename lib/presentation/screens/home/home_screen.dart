@@ -1,68 +1,78 @@
 import 'package:flutter/material.dart';
-import '../dashboard/dashboard_screen.dart';
+
+import '../../../core/theme/app_tokens.dart';
 import '../chat/ai_chat_screen.dart';
-import '../voc/voc_list_screen.dart';
-import '../knowledge_base/knowledge_base_screen.dart';
+import '../dashboard/dashboard_screen.dart';
 import '../jira/jira_screen.dart';
-import '../settings/settings_screen_ax.dart';
+import '../knowledge_base/knowledge_base_screen.dart';
 import '../privacy/privacy_trust_screen.dart';
+import '../settings/settings_screen_ax.dart';
+import '../voc/voc_list_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({super.key, this.screenOverrides})
+      : assert(screenOverrides == null || screenOverrides.length == 6);
+
+  /// Allows the responsive shell to be exercised without production I/O.
+  final List<Widget>? screenOverrides;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  static const int _privacySelection = 99;
+
   int _selectedIndex = 0;
   final Set<int> _visitedIndexes = {0};
 
-  final _screens = const [
-    DashboardScreen(),
-    VocListScreen(),
-    AiChatScreen(),
-    KnowledgeBaseScreen(),
-    JiraScreen(),
-    SettingsScreenAx(),
-  ];
+  List<Widget> get _screens =>
+      widget.screenOverrides ??
+      const [
+        DashboardScreen(),
+        VocListScreen(),
+        AiChatScreen(),
+        KnowledgeBaseScreen(),
+        JiraScreen(),
+        SettingsScreenAx(),
+      ];
 
-  final _destinations = const [
+  static const _destinations = [
     _NavItem(
-      icon: Icons.dashboard_outlined,
-      selectedIcon: Icons.dashboard,
+      icon: Icons.space_dashboard_outlined,
+      selectedIcon: Icons.space_dashboard_rounded,
       label: '대시보드',
-      hint: 'KPI / 추이 / 운영 인사이트',
+      mobileLabel: '홈',
     ),
     _NavItem(
       icon: Icons.inbox_outlined,
-      selectedIcon: Icons.inbox,
+      selectedIcon: Icons.inbox_rounded,
       label: 'VOC 관리',
-      hint: '등록 / 검색 / 처리흐름',
+      mobileLabel: 'VOC',
     ),
     _NavItem(
-      icon: Icons.chat_bubble_outline,
-      selectedIcon: Icons.chat_bubble,
-      label: 'AI Chat',
-      hint: 'AI 질의 / 답변 초안 생성',
+      icon: Icons.auto_awesome_outlined,
+      selectedIcon: Icons.auto_awesome_rounded,
+      label: 'AI 코파일럿',
+      mobileLabel: 'AI',
     ),
     _NavItem(
-      icon: Icons.book_outlined,
-      selectedIcon: Icons.book,
+      icon: Icons.menu_book_outlined,
+      selectedIcon: Icons.menu_book_rounded,
       label: '지식베이스',
-      hint: '매뉴얼 / FAQ / 문서자산',
+      mobileLabel: '지식',
     ),
     _NavItem(
-      icon: Icons.link_outlined,
-      selectedIcon: Icons.link,
+      icon: Icons.account_tree_outlined,
+      selectedIcon: Icons.account_tree_rounded,
       label: '업무 협업툴',
-      hint: 'JIRA/Redmine/Notion 연동',
+      mobileLabel: '협업',
     ),
     _NavItem(
-      icon: Icons.settings_outlined,
-      selectedIcon: Icons.settings,
+      icon: Icons.tune_outlined,
+      selectedIcon: Icons.tune_rounded,
       label: '설정',
-      hint: '시스템 / 동기화 / 운영옵션',
+      mobileLabel: '설정',
     ),
   ];
 
@@ -75,9 +85,22 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _openPrivacyTrust() {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const PrivacyTrustScreen()),
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const PrivacyTrustScreen()));
+  }
+
+  Future<void> _openMoreMenu() async {
+    final selection = await showModalBottomSheet<int>(
+      context: context,
+      builder: (context) =>
+          _MobileMoreSheet(selectedIndex: _selectedIndex, items: _destinations),
     );
+    if (!mounted || selection == null) return;
+    if (selection == _privacySelection) {
+      _openPrivacyTrust();
+      return;
+    }
+    _selectScreen(selection);
   }
 
   List<Widget> get _cachedScreens => List<Widget>.generate(
@@ -89,151 +112,113 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isWide = screenWidth >= 1100;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < AppBreakpoints.mobile) {
+          return _buildMobileShell();
+        }
+        return _buildDesktopShell(
+          expanded: constraints.maxWidth >= AppBreakpoints.expandedNavigation,
+          extraWide: constraints.maxWidth >= AppBreakpoints.wideContent,
+        );
+      },
+    );
+  }
 
-    if (isWide) {
-      final sideNavWidth = screenWidth >= 1800
-          ? 312.0
-          : screenWidth >= 1500
-              ? 292.0
-              : 268.0;
-      final shellPadding = screenWidth >= 1800
-          ? const EdgeInsets.fromLTRB(18, 16, 18, 16)
-          : screenWidth >= 1500
-              ? const EdgeInsets.fromLTRB(16, 14, 16, 14)
-              : const EdgeInsets.fromLTRB(14, 12, 16, 12);
-      final topGap = screenWidth >= 1500 ? 16.0 : 10.0;
-      final shellBorderColor = Theme.of(context)
-          .colorScheme
-          .outline
-          .withValues(alpha: isDark ? 0.38 : 0.28);
-      final shellShadow = isDark
-          ? const [
-              BoxShadow(
-                color: Color(0x2A000000),
-                blurRadius: 28,
-                offset: Offset(0, 12),
-              ),
-            ]
-          : const [
-              BoxShadow(
-                color: Color(0x140F172A),
-                blurRadius: 24,
-                offset: Offset(0, 10),
-              ),
-            ];
-
-      return Scaffold(
-        body: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: isDark
-                  ? const [
-                      Color(0xFF0A1220),
-                      Color(0xFF0B1424),
-                      Color(0xFF0D1A28),
-                    ]
-                  : const [
-                      Color(0xFFF3F8FF),
-                      Color(0xFFF7FAFD),
-                      Color(0xFFF2FBF9),
-                    ],
+  Widget _buildMobileShell() {
+    final bottomIndex = _selectedIndex <= 3 ? _selectedIndex : 4;
+    return Scaffold(
+      key: const Key('app-shell-mobile'),
+      backgroundColor: context.visualColors.canvas,
+      body: IndexedStack(index: _selectedIndex, children: _cachedScreens),
+      bottomNavigationBar: DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border(
+            top: BorderSide(
+              color: Theme.of(context).colorScheme.outlineVariant,
             ),
           ),
-          child: Row(
-            children: [
-              _DesktopSideNav(
-                width: sideNavWidth,
-                items: _destinations,
-                selectedIndex: _selectedIndex,
-                onSelect: _selectScreen,
+        ),
+        child: NavigationBar(
+          key: const Key('app-shell-mobile-nav'),
+          selectedIndex: bottomIndex,
+          onDestinationSelected: (index) {
+            if (index <= 3) {
+              _selectScreen(index);
+            } else {
+              _openMoreMenu();
+            }
+          },
+          destinations: [
+            for (var index = 0; index < 4; index++)
+              NavigationDestination(
+                key: Key('mobile-nav-$index'),
+                icon: Icon(_destinations[index].icon),
+                selectedIcon: Icon(_destinations[index].selectedIcon),
+                label: _destinations[index].mobileLabel,
               ),
-              Expanded(
-                child: Padding(
-                  padding: shellPadding,
-                  child: Column(
-                    children: [
-                      _DesktopTopBar(
-                        currentLabel: _destinations[_selectedIndex].label,
-                        currentHint: _destinations[_selectedIndex].hint,
-                        compact: screenWidth < 1320,
-                        onPrivacyTap: _openPrivacyTrust,
-                      ),
-                      SizedBox(height: topGap),
-                      Expanded(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.surface,
-                            borderRadius: BorderRadius.circular(24),
-                            border: Border.all(color: shellBorderColor),
-                            boxShadow: shellShadow,
-                          ),
-                          clipBehavior: Clip.antiAlias,
-                          child: IndexedStack(
-                            index: _selectedIndex,
-                            children: _cachedScreens,
-                          ),
-                        ),
-                      ),
-                    ],
+            const NavigationDestination(
+              key: Key('mobile-nav-more'),
+              icon: Icon(Icons.grid_view_outlined),
+              selectedIcon: Icon(Icons.grid_view_rounded),
+              label: '더보기',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDesktopShell({required bool expanded, required bool extraWide}) {
+    final colors = Theme.of(context).colorScheme;
+    final padding = extraWide ? AppSpacing.lg : AppSpacing.sm;
+    return Scaffold(
+      key: Key(expanded ? 'app-shell-wide' : 'app-shell-rail'),
+      backgroundColor: context.visualColors.canvas,
+      body: Row(
+        children: [
+          _DesktopNavigation(
+            expanded: expanded,
+            selectedIndex: _selectedIndex,
+            items: _destinations,
+            onSelect: _selectScreen,
+            onPrivacyTap: _openPrivacyTrust,
+          ),
+          Expanded(
+            child: SafeArea(
+              left: false,
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  padding,
+                  padding,
+                  padding,
+                  padding,
+                ),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: context.visualColors.elevatedSurface,
+                    borderRadius: BorderRadius.circular(AppRadii.panel),
+                    border: Border.all(color: colors.outlineVariant),
+                    boxShadow: Theme.of(context).brightness == Brightness.light
+                        ? const [
+                            BoxShadow(
+                              color: Color(0x0A10131F),
+                              blurRadius: 24,
+                              offset: Offset(0, 8),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(AppRadii.panel - 1),
+                    child: IndexedStack(
+                      index: _selectedIndex,
+                      children: _cachedScreens,
+                    ),
                   ),
                 ),
               ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('AI VOC Assistant'),
-        actions: [
-          IconButton(
-            onPressed: _openPrivacyTrust,
-            tooltip: '개인정보 · AI 데이터 보호',
-            icon: const Icon(Icons.verified_user_outlined),
-          ),
-        ],
-      ),
-      body: IndexedStack(index: _selectedIndex, children: _cachedScreens),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: _selectScreen,
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.dashboard_outlined),
-            selectedIcon: Icon(Icons.dashboard),
-            label: '대시보드',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.inbox_outlined),
-            selectedIcon: Icon(Icons.inbox),
-            label: 'VOC',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.chat_bubble_outline),
-            selectedIcon: Icon(Icons.chat_bubble),
-            label: 'Chat',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.book_outlined),
-            selectedIcon: Icon(Icons.book),
-            label: '지식베이스',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.link_outlined),
-            selectedIcon: Icon(Icons.link),
-            label: '협업툴',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
-            label: '설정',
+            ),
           ),
         ],
       ),
@@ -241,289 +226,377 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class _DesktopTopBar extends StatelessWidget {
-  final String currentLabel;
-  final String currentHint;
-  final bool compact;
-  final VoidCallback onPrivacyTap;
-
-  const _DesktopTopBar({
-    required this.currentLabel,
-    required this.currentHint,
-    required this.compact,
+class _DesktopNavigation extends StatelessWidget {
+  const _DesktopNavigation({
+    required this.expanded,
+    required this.selectedIndex,
+    required this.items,
+    required this.onSelect,
     required this.onPrivacyTap,
   });
 
-  @override
-  Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final period = now.hour < 12 ? 'AM' : 'PM';
-    final hh = now.hour % 12 == 0 ? 12 : now.hour % 12;
-    final mm = now.minute.toString().padLeft(2, '0');
-    final stamp = '$period $hh:$mm';
-
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      height: compact ? 74 : 84,
-      padding: EdgeInsets.symmetric(
-        horizontal: compact ? 14 : 22,
-        vertical: compact ? 10 : 14,
-      ),
-      decoration: BoxDecoration(
-        color: isDark
-            ? Theme.of(context).colorScheme.surfaceContainerHigh
-            : Colors.white.withValues(alpha: 0.8),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.26),
-        ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  currentLabel,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.2,
-                        fontSize: compact ? 20 : null,
-                      ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  currentHint,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurfaceVariant
-                            .withValues(alpha: 0.9),
-                      ),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            onPressed: onPrivacyTap,
-            tooltip: '개인정보 · AI 데이터 보호',
-            icon: const Icon(Icons.verified_user_outlined),
-          ),
-          const SizedBox(width: 4),
-          if (!compact) ...[
-            const _TopPill(
-              icon: Icons.sync_outlined,
-              label: 'In-App Sync',
-              tone: Color(0xFF0E9F6E),
-            ),
-            const SizedBox(width: 10),
-          ],
-          _TopPill(
-            icon: Icons.schedule,
-            label: compact ? '최근 동기화 $stamp' : stamp,
-            tone: const Color(0xFF2563EB),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TopPill extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color tone;
-
-  const _TopPill({
-    required this.icon,
-    required this.label,
-    required this.tone,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: tone.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: tone.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: tone),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: tone,
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DesktopSideNav extends StatelessWidget {
-  final double width;
-  final List<_NavItem> items;
+  final bool expanded;
   final int selectedIndex;
+  final List<_NavItem> items;
   final ValueChanged<int> onSelect;
-
-  const _DesktopSideNav({
-    required this.width,
-    required this.items,
-    required this.selectedIndex,
-    required this.onSelect,
-  });
+  final VoidCallback onPrivacyTap;
 
   @override
   Widget build(BuildContext context) {
+    final visual = context.visualColors;
+    final primary = Theme.of(context).colorScheme.primary;
+    final width = expanded ? 252.0 : 84.0;
+
     return Container(
+      key: Key(expanded ? 'desktop-nav-expanded' : 'desktop-nav-compact'),
       width: width,
-      decoration: BoxDecoration(
-        color: const Color(0xFF0B253D),
-        border: Border(
-          right: BorderSide(
-            color: Colors.white.withValues(alpha: 0.08),
-          ),
-        ),
-      ),
+      color: visual.navigation,
       child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+          padding: EdgeInsets.fromLTRB(
+            expanded ? 14 : 10,
+            16,
+            expanded ? 14 : 10,
+            14,
+          ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment:
+                expanded ? CrossAxisAlignment.start : CrossAxisAlignment.center,
             children: [
-              Material(
-                color: Colors.transparent,
-                borderRadius: BorderRadius.circular(16),
-                clipBehavior: Clip.antiAlias,
-                child: Ink(
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF1D4ED8), Color(0xFF0EA5A5)],
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: InkWell(
-                    onTap: () => onSelect(0),
-                    child: Padding(
-                      padding: const EdgeInsets.all(14),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 42,
-                            height: 42,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.22),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(
-                              Icons.auto_awesome,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'AI VOC Assistant',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                SizedBox(height: 2),
-                                Text(
-                                  'Enterprise Console',
-                                  style: TextStyle(
-                                    color: Color(0xFFDBEAFE),
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+              _BrandMark(expanded: expanded, onTap: () => onSelect(0)),
+              const SizedBox(height: AppSpacing.xl),
+              if (expanded) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Text(
+                    'WORKSPACE',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: visual.navigationMuted,
+                          letterSpacing: 1.15,
+                        ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                'WORKSPACE',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: const Color(0xFF93C5FD),
-                      letterSpacing: 1.0,
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
-              const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.xs),
+              ],
               Expanded(
                 child: ListView.separated(
+                  padding: EdgeInsets.zero,
                   itemCount: items.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 4),
-                  itemBuilder: (context, i) {
-                    final item = items[i];
-                    final selected = i == selectedIndex;
-                    final iconColor = selected
-                        ? const Color(0xFFDBEAFE)
-                        : const Color(0xFFBFDBFE);
-                    return Material(
-                      color: selected
-                          ? Colors.white.withValues(alpha: 0.14)
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(12),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: () => onSelect(i),
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                          child: Row(
-                            children: [
-                              Icon(
-                                selected ? item.selectedIcon : item.icon,
-                                color: iconColor,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  item.label,
-                                  style: TextStyle(
-                                    color: selected
-                                        ? Colors.white
-                                        : const Color(0xFFE2E8F0),
-                                    fontSize: 13.5,
-                                    fontWeight: selected
-                                        ? FontWeight.w700
-                                        : FontWeight.w600,
-                                  ),
+                  separatorBuilder: (_, __) =>
+                      const SizedBox(height: AppSpacing.xxs),
+                  itemBuilder: (context, index) {
+                    final item = items[index];
+                    final selected = selectedIndex == index;
+                    final tile = Semantics(
+                      selected: selected,
+                      button: true,
+                      label: item.label,
+                      child: Material(
+                        key: Key('desktop-nav-$index'),
+                        color: selected
+                            ? primary.withValues(alpha: 0.18)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(AppRadii.control),
+                        clipBehavior: Clip.antiAlias,
+                        child: InkWell(
+                          onTap: () => onSelect(index),
+                          child: SizedBox(
+                            height: 48,
+                            child: Row(
+                              mainAxisAlignment: expanded
+                                  ? MainAxisAlignment.start
+                                  : MainAxisAlignment.center,
+                              children: [
+                                if (expanded)
+                                  const SizedBox(width: AppSpacing.sm),
+                                Icon(
+                                  selected ? item.selectedIcon : item.icon,
+                                  size: 21,
+                                  color: selected
+                                      ? const Color(0xFFB7B8FF)
+                                      : visual.navigationMuted,
                                 ),
-                              ),
-                            ],
+                                if (expanded) ...[
+                                  const SizedBox(width: AppSpacing.sm),
+                                  Expanded(
+                                    child: Text(
+                                      item.label,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .labelLarge
+                                          ?.copyWith(
+                                            color: selected
+                                                ? visual.onNavigation
+                                                : visual.navigationMuted,
+                                            fontWeight: selected
+                                                ? FontWeight.w700
+                                                : FontWeight.w600,
+                                          ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: AppSpacing.sm),
+                                ],
+                              ],
+                            ),
                           ),
                         ),
                       ),
                     );
+                    return expanded
+                        ? tile
+                        : Tooltip(message: item.label, child: tile);
                   },
+                ),
+              ),
+              if (expanded)
+                _WorkspaceStatus(onPrivacyTap: onPrivacyTap)
+              else ...[
+                IconButton(
+                  key: const Key('desktop-privacy'),
+                  onPressed: onPrivacyTap,
+                  tooltip: '개인정보 · AI 데이터 보호',
+                  color: visual.navigationMuted,
+                  icon: const Icon(Icons.shield_outlined),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                const _StatusDot(),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BrandMark extends StatelessWidget {
+  const _BrandMark({required this.expanded, required this.onTap});
+
+  final bool expanded;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final visual = context.visualColors;
+    return InkWell(
+      borderRadius: BorderRadius.circular(AppRadii.control),
+      onTap: onTap,
+      child: Row(
+        mainAxisAlignment:
+            expanded ? MainAxisAlignment.start : MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: AppPalette.indigo,
+              borderRadius: BorderRadius.circular(AppRadii.control),
+            ),
+            child: const Icon(
+              Icons.graphic_eq_rounded,
+              color: Colors.white,
+              size: 24,
+            ),
+          ),
+          if (expanded) ...[
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'AI VOC',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: visual.onNavigation,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.2,
+                        ),
+                  ),
+                  Text(
+                    'OPERATIONS',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: visual.navigationMuted,
+                          letterSpacing: 1.1,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _WorkspaceStatus extends StatelessWidget {
+  const _WorkspaceStatus({required this.onPrivacyTap});
+
+  final VoidCallback onPrivacyTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final visual = context.visualColors;
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              const _StatusDot(),
+              const SizedBox(width: AppSpacing.xs),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Local workspace',
+                      style: Theme.of(context)
+                          .textTheme
+                          .labelMedium
+                          ?.copyWith(color: visual.onNavigation),
+                    ),
+                    Text(
+                      '동기화 준비됨',
+                      style: Theme.of(context)
+                          .textTheme
+                          .labelSmall
+                          ?.copyWith(color: visual.navigationMuted),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
+          const SizedBox(height: AppSpacing.xs),
+          SizedBox(
+            width: double.infinity,
+            child: TextButton.icon(
+              key: const Key('desktop-privacy'),
+              onPressed: onPrivacyTap,
+              style: TextButton.styleFrom(
+                foregroundColor: visual.navigationMuted,
+                alignment: Alignment.centerLeft,
+              ),
+              icon: const Icon(Icons.shield_outlined, size: 18),
+              label: const Text('데이터 보호'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatusDot extends StatelessWidget {
+  const _StatusDot();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 9,
+      height: 9,
+      decoration: BoxDecoration(
+        color: context.visualColors.success,
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: context.visualColors.success.withValues(alpha: 0.5),
+            blurRadius: 8,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MobileMoreSheet extends StatelessWidget {
+  const _MobileMoreSheet({required this.selectedIndex, required this.items});
+
+  final int selectedIndex;
+  final List<_NavItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          AppSpacing.sm,
+          AppSpacing.md,
+          AppSpacing.lg,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(AppRadii.control),
+                  ),
+                  child: Icon(
+                    Icons.grid_view_rounded,
+                    color: Theme.of(context).colorScheme.primary,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Text(
+                    '더보기',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  tooltip: '닫기',
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            ListTile(
+              key: const Key('more-collaboration'),
+              selected: selectedIndex == 4,
+              selectedTileColor: Theme.of(context).colorScheme.primaryContainer,
+              leading: Icon(items[4].icon),
+              title: Text(items[4].label),
+              subtitle: const Text('JIRA · Redmine · Notion 연동'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.pop(context, 4),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            ListTile(
+              key: const Key('more-settings'),
+              selected: selectedIndex == 5,
+              selectedTileColor: Theme.of(context).colorScheme.primaryContainer,
+              leading: Icon(items[5].icon),
+              title: Text(items[5].label),
+              subtitle: const Text('AI · 동기화 · 화면 설정'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.pop(context, 5),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            ListTile(
+              key: const Key('more-privacy'),
+              leading: const Icon(Icons.shield_outlined),
+              title: const Text('개인정보 · AI 데이터 보호'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.pop(context, 99),
+            ),
+          ],
         ),
       ),
     );
@@ -531,15 +604,15 @@ class _DesktopSideNav extends StatelessWidget {
 }
 
 class _NavItem {
-  final IconData icon;
-  final IconData selectedIcon;
-  final String label;
-  final String hint;
-
   const _NavItem({
     required this.icon,
     required this.selectedIcon,
     required this.label,
-    required this.hint,
+    required this.mobileLabel,
   });
+
+  final IconData icon;
+  final IconData selectedIcon;
+  final String label;
+  final String mobileLabel;
 }

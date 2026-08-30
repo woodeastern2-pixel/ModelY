@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/theme/app_tokens.dart';
 import '../../viewmodels/integration_viewmodel.dart';
 import '../home/home_screen.dart';
 
@@ -22,14 +23,16 @@ class _SplashScreenState extends State<SplashScreen>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 720),
     );
-    _fadeAnim = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeIn),
-    );
-    _scaleAnim = Tween<double>(begin: 0.7, end: 1).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.elasticOut),
-    );
+    _fadeAnim = Tween<double>(
+      begin: 0,
+      end: 1,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+    _scaleAnim = Tween<double>(
+      begin: 0.92,
+      end: 1,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
     _controller.forward();
     _navigate();
   }
@@ -46,9 +49,8 @@ class _SplashScreenState extends State<SplashScreen>
     }
 
     if (!mounted) return;
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const HomeScreen()),
-    );
+    Navigator.of(context)
+        .pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
   }
 
   @override
@@ -59,63 +61,92 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final integrationVm = context.watch<IntegrationViewModel>();
     final bootstrapStatus = integrationVm.bootstrapStatus;
     return Scaffold(
-      backgroundColor: colorScheme.primary,
-      body: Center(
-        child: FadeTransition(
-          opacity: _fadeAnim,
-          child: ScaleTransition(
-            scale: _scaleAnim,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 96,
-                  height: 96,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: Icon(
-                    Icons.support_agent,
-                    size: 56,
-                    color: colorScheme.primary,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  'AI VOC Assistant',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
+      backgroundColor: AppPalette.navigation,
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            child: FadeTransition(
+              opacity: _fadeAnim,
+              child: ScaleTransition(
+                scale: _scaleAnim,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 82,
+                      height: 82,
+                      decoration: BoxDecoration(
+                        color: AppPalette.indigo,
+                        borderRadius: BorderRadius.circular(AppRadii.panel),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x405B5CE2),
+                            blurRadius: 28,
+                            offset: Offset(0, 12),
+                          ),
+                        ],
                       ),
+                      child: const Icon(
+                        Icons.graphic_eq_rounded,
+                        size: 42,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    Text(
+                      'AI VOC',
+                      style:
+                          Theme.of(context).textTheme.headlineLarge?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.8,
+                              ),
+                    ),
+                    const SizedBox(height: AppSpacing.xxs),
+                    Text(
+                      'OPERATIONS ASSISTANT',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: const Color(0xFF9EA5B8),
+                            letterSpacing: 1.8,
+                          ),
+                    ),
+                    const SizedBox(height: AppSpacing.xxl),
+                    SizedBox(
+                      width: 280,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              color: Color(0xFFB7B8FF),
+                              strokeWidth: 2,
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Flexible(
+                            child: Text(
+                              bootstrapStatus ?? '워크스페이스를 준비하는 중입니다',
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(color: const Color(0xFFB9BED0)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'AI 기반 고객 VOC 분석 시스템',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(color: Colors.white70),
-                ),
-                const SizedBox(height: 48),
-                const CircularProgressIndicator(
-                  color: Colors.white,
-                  strokeWidth: 2,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  bootstrapStatus ?? '앱을 준비하는 중입니다...',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: Colors.white70),
-                ),
-              ],
+              ),
             ),
           ),
         ),

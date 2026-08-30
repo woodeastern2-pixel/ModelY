@@ -52,3 +52,6 @@ release_artifacts.tar.gz
 
 # Local release binaries live in one stable folder and are not committed.
 release_artifacts/latest/
+
+# Paperthin iteration casebooks are local working memory.
+.re0/

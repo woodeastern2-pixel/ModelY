@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/constants/app_constants.dart';
+import '../../../core/theme/app_tokens.dart';
 import '../../../core/utils/voc_category_catalog.dart';
 import '../../../domain/entities/voc_entity.dart';
 import '../../viewmodels/ai_viewmodel.dart';
@@ -11,6 +12,7 @@ import '../../viewmodels/dashboard_viewmodel.dart';
 import '../../viewmodels/integration_viewmodel.dart';
 import '../../viewmodels/settings_viewmodel.dart';
 import '../../viewmodels/voc_viewmodel.dart';
+import '../../widgets/workspace_ui.dart';
 import 'voc_detail_screen.dart';
 
 class VocRegisterScreen extends StatefulWidget {
@@ -205,7 +207,89 @@ class _VocRegisterScreenState extends State<VocRegisterScreen> {
         ? _selectedProjectName
         : (projectNames.isEmpty ? '' : projectNames.first);
 
+    final vocContent = _SectionCard(
+      key: const Key('voc-register-content'),
+      title: 'VOC 내용',
+      subtitle: '제목과 내용을 입력하면 등록 직후 AI가 분류·긴급도·담당 정보를 분석합니다.',
+      icon: Icons.edit_note_rounded,
+      child: Column(
+        children: [
+          _buildTextField(
+            controller: _titleController,
+            label: 'VOC 제목 *',
+            icon: Icons.title,
+            minLength: 4,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          TextFormField(
+            controller: _contentController,
+            minLines: 8,
+            maxLines: 14,
+            decoration: const InputDecoration(
+              labelText: 'VOC 내용 *',
+              hintText: '고객이 겪은 문제와 기대하는 결과를 구체적으로 적어 주세요.',
+              alignLabelWithHint: true,
+            ),
+            validator: (v) => v == null || v.trim().isEmpty
+                ? 'VOC 내용을 입력해 주세요'
+                : v.trim().length < 10
+                    ? 'VOC 내용은 최소 10자 이상 입력해 주세요'
+                    : null,
+          ),
+        ],
+      ),
+    );
+
+    final contextInformation = _SectionCard(
+      key: const Key('voc-register-context'),
+      title: '문맥 정보',
+      subtitle: '고객과 프로젝트 정보를 연결하면 후속 대응이 더 빨라집니다.',
+      icon: Icons.account_tree_outlined,
+      child: _ResponsiveGrid(
+        minItemWidth: 300,
+        children: [
+          _buildTextField(
+            controller: _customerController,
+            label: '고객명 (선택)',
+            icon: Icons.person_outline,
+            required: false,
+          ),
+          _selectField(
+            label: '업무 구분 (선택)',
+            icon: Icons.work_outline,
+            value: businessTypeValue,
+            items: businessTypes,
+            onChanged: (v) => setState(() => _selectedBusinessType = v),
+          ),
+          _selectField(
+            label: '프로젝트명 (선택)',
+            icon: Icons.folder_outlined,
+            value: projectNameValue,
+            items: projectNames,
+            onChanged: (v) => setState(() => _selectedProjectName = v),
+          ),
+          _selectField(
+            label: '프로젝트 코드 (선택)',
+            icon: Icons.qr_code_2_outlined,
+            value: projectCodes.contains(_selectedProjectCode)
+                ? _selectedProjectCode
+                : '',
+            items: projectCodes,
+            onChanged: (v) => setState(() => _selectedProjectCode = v),
+          ),
+          _buildTextField(
+            controller: _vocNumberController,
+            label: 'VOC 번호 (선택)',
+            hint: '예: 12345',
+            icon: Icons.confirmation_number_outlined,
+            required: false,
+          ),
+        ],
+      ),
+    );
+
     return Scaffold(
+      backgroundColor: context.visualColors.canvas,
       appBar: AppBar(title: const Text('VOC 등록')),
       body: LayoutBuilder(
         builder: (context, constraints) {
@@ -221,89 +305,43 @@ class _VocRegisterScreenState extends State<VocRegisterScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _RegisterIntro(desktop: desktop),
-                      const SizedBox(height: 18),
-                      _SectionCard(
-                        title: '기본 정보',
-                        subtitle: 'VOC가 어디에서 발생했는지 식별하기 위한 정보입니다. 선택 항목은 비워둘 수 있습니다.',
-                        child: _ResponsiveGrid(
-                          minItemWidth: 360,
-                          children: [
-                            _buildTextField(
-                              controller: _customerController,
-                              label: '고객명 (선택)',
-                              icon: Icons.person_outline,
-                              required: false,
-                            ),
-                            _selectField(
-                              label: '업무 구분 (선택)',
-                              icon: Icons.work_outline,
-                              value: businessTypeValue,
-                              items: businessTypes,
-                              onChanged: (v) => setState(() => _selectedBusinessType = v),
-                            ),
-                            _selectField(
-                              label: '프로젝트명 (선택)',
-                              icon: Icons.folder_outlined,
-                              value: projectNameValue,
-                              items: projectNames,
-                              onChanged: (v) => setState(() => _selectedProjectName = v),
-                            ),
-                            _selectField(
-                              label: '프로젝트 코드 (선택)',
-                              icon: Icons.qr_code_2_outlined,
-                              value: projectCodes.contains(_selectedProjectCode)
-                                  ? _selectedProjectCode
-                                  : '',
-                              items: projectCodes,
-                              onChanged: (v) => setState(() => _selectedProjectCode = v),
-                            ),
-                            _buildTextField(
-                              controller: _vocNumberController,
-                              label: 'VOC 번호 (선택)',
-                              hint: '예: 12345',
-                              icon: Icons.confirmation_number_outlined,
-                              required: false,
-                            ),
-                          ],
-                        ),
+                      const WorkspaceHero(
+                        key: Key('voc-register-hero'),
+                        eyebrow: 'NEW CUSTOMER SIGNAL',
+                        title: '고객의 목소리를, 실행 가능한 신호로.',
+                        description:
+                            '필수 내용에 집중하세요. 등록 후 AI가 긴급도와 분류, 담당 후보를 백그라운드에서 분석합니다.',
+                        icon: Icons.add_comment_outlined,
+                        metrics: [
+                          WorkspaceMetric(label: '필수 항목', value: '2'),
+                          WorkspaceMetric(
+                            label: '후속 분석',
+                            value: 'AI',
+                            color: Color(0xFFBFC2FF),
+                          ),
+                          WorkspaceMetric(
+                            label: '처리 방식',
+                            value: '비동기',
+                            color: Color(0xFF55CDBE),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 16),
-                      _SectionCard(
-                        title: 'VOC 내용',
-                        subtitle: '제목과 내용을 입력하면 등록 직후 AI가 분류·긴급도·담당 정보를 백그라운드에서 분석합니다.',
-                        child: Column(
+                      const SizedBox(height: AppSpacing.md),
+                      if (desktop)
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _buildTextField(
-                              controller: _titleController,
-                              label: 'VOC 제목 *',
-                              icon: Icons.title,
-                              minLength: 4,
-                            ),
-                            const SizedBox(height: 14),
-                            TextFormField(
-                              controller: _contentController,
-                              minLines: desktop ? 8 : 6,
-                              maxLines: desktop ? 12 : 10,
-                              decoration: const InputDecoration(
-                                labelText: 'VOC 내용 *',
-                                hintText: '고객 문의나 이슈 내용을 구체적으로 입력해 주세요.',
-                                alignLabelWithHint: true,
-                                prefixIcon: Padding(
-                                  padding: EdgeInsets.only(bottom: 120),
-                                  child: Icon(Icons.description_outlined),
-                                ),
-                              ),
-                              validator: (v) => v == null || v.trim().isEmpty
-                                  ? 'VOC 내용을 입력해 주세요'
-                                  : v.trim().length < 10
-                                      ? 'VOC 내용은 최소 10자 이상 입력해 주세요'
-                                      : null,
-                            ),
+                            Expanded(flex: 7, child: vocContent),
+                            const SizedBox(width: AppSpacing.md),
+                            Expanded(flex: 5, child: contextInformation),
                           ],
-                        ),
-                      ),
-                      const SizedBox(height: 18),
+                        )
+                      else ...[
+                        vocContent,
+                        const SizedBox(height: AppSpacing.md),
+                        contextInformation,
+                      ],
+                      const SizedBox(height: AppSpacing.lg),
                       _SubmitBar(
                         saving: _isSaving,
                         desktop: desktop,
@@ -333,7 +371,8 @@ class _VocRegisterScreenState extends State<VocRegisterScreen> {
       decoration: InputDecoration(labelText: label, prefixIcon: Icon(icon)),
       items: [
         const DropdownMenuItem(value: '', child: Text('선택 안함')),
-        ...items.map((item) => DropdownMenuItem(value: item, child: Text(item))),
+        ...items
+            .map((item) => DropdownMenuItem(value: item, child: Text(item))),
       ],
       onChanged: (v) => onChanged(v ?? ''),
     );
@@ -395,90 +434,28 @@ class _VocRegisterScreenState extends State<VocRegisterScreen> {
   }
 }
 
-class _RegisterIntro extends StatelessWidget {
-  const _RegisterIntro({required this.desktop});
-  final bool desktop;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      padding: EdgeInsets.all(desktop ? 22 : 18),
-      decoration: BoxDecoration(
-        color: cs.primaryContainer.withValues(alpha: .22),
-        border: Border.all(color: cs.primary.withValues(alpha: .12)),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              color: cs.primary.withValues(alpha: .1),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(Icons.add_comment_outlined, color: cs.primary),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('새 VOC 등록',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleLarge
-                        ?.copyWith(fontWeight: FontWeight.w800)),
-                const SizedBox(height: 4),
-                Text(
-                  '필수 내용만 입력하면 바로 등록됩니다. AI 분석과 답변 초안은 저장 후 백그라운드에서 처리됩니다.',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: cs.onSurfaceVariant),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _SectionCard extends StatelessWidget {
-  const _SectionCard({required this.title, required this.subtitle, required this.child});
+  const _SectionCard({
+    super.key,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.child,
+  });
+
   final String title;
   final String subtitle;
+  final IconData icon;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title,
-                style: Theme.of(context)
-                    .textTheme
-                    .titleMedium
-                    ?.copyWith(fontWeight: FontWeight.w800)),
-            const SizedBox(height: 4),
-            Text(subtitle,
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.copyWith(color: cs.onSurfaceVariant)),
-            const SizedBox(height: 18),
-            child,
-          ],
-        ),
-      ),
+    return WorkspacePanel(
+      title: title,
+      description: subtitle,
+      icon: icon,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: child,
     );
   }
 }
@@ -492,11 +469,14 @@ class _ResponsiveGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(builder: (context, constraints) {
       final twoColumns = constraints.maxWidth >= minItemWidth * 2 + 14;
-      final width = twoColumns ? (constraints.maxWidth - 14) / 2 : constraints.maxWidth;
+      final width =
+          twoColumns ? (constraints.maxWidth - 14) / 2 : constraints.maxWidth;
       return Wrap(
         spacing: 14,
         runSpacing: 14,
-        children: children.map((child) => SizedBox(width: width, child: child)).toList(),
+        children: children
+            .map((child) => SizedBox(width: width, child: child))
+            .toList(),
       );
     });
   }

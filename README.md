@@ -12,6 +12,26 @@
 - Integration: JIRA REST API
 - Target: Android APK, Windows EXE
 
+## UI Renewal 1.1
+
+운영자가 오늘 처리할 신호를 빠르게 판단하도록 화면 구조를 새로 정리했습니다.
+
+- Paperthin 원칙: 한 화면 한 헤더, 얇은 경계, 절제된 반경, 단일 인디고 강조색
+- 반응형 셸: 모바일 하단 내비게이션, 태블릿 축약 레일, 데스크톱 확장 사이드바
+- 운영 대시보드: 미처리 VOC, 해결률, AI 활용률, 우선 액션을 첫 화면에 배치
+- 접근성: 라이트/다크 테마, 44px 이상 터치 영역, 확대 글자 대응
+- 타이포그래피: Pretendard를 앱에 포함해 Android와 Windows에서 일관되게 표시
+
+UI 변경은 10개 화면·텍스트 배율 조합의 반응형 하네스와 실제 렌더 프리뷰로 검증합니다.
+
+```bash
+flutter test --exclude-tags=golden
+flutter test test/ui_preview_golden_test.dart
+```
+
+의도적으로 디자인 기준 이미지를 갱신할 때만 `--update-goldens`를 사용하고,
+모바일·태블릿·데스크톱 결과를 시각 검수한 뒤 함께 커밋합니다.
+
 ## 1. 주요 기능 구현 상태
 
 - VOC 등록: 고객명, 프로젝트명, 카테고리, 제목, 내용, 우선순위 저장
@@ -71,6 +91,7 @@ ai_voc_assistant/
       widgets/
     main.dart
   assets/
+    fonts/
     images/
     icons/
   scripts/

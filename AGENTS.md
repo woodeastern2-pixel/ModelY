@@ -25,6 +25,12 @@
 
 정적 분석 warning/deprecated가 기존부터 존재하는 경우에는 새 오류가 추가되지 않았는지 구분해 보고한다.
 
+UI를 변경한 경우에는 추가로 아래 항목을 완료한다.
+
+9. `test/responsive_ui_harness_test.dart`의 10개 화면·텍스트 배율 조합 통과
+10. `test/ui_preview_golden_test.dart`로 모바일·태블릿·데스크톱 승인 기준 이미지 비교
+11. 라이트·다크 테마, 단일 헤더, 내비게이션 도달성, 오버플로 부재를 시각 검수
+
 ## 빌드 정책
 
 ### Windows

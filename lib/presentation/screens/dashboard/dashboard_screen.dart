@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
+
+import '../../../core/theme/app_tokens.dart';
 import '../../../core/utils/voc_category_catalog.dart';
 import '../../../data/services/demo_mode_service.dart';
 import '../../../data/services/sample_voc_generator.dart';
@@ -23,33 +25,46 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _showCategorySection = false;
   int _categoryPage = 0;
 
+  Future<void> _openRegister() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const VocRegisterScreen()),
+    );
+    if (!mounted) return;
+    context.read<DashboardViewModel>().loadDashboard();
+    context.read<VocViewModel>().loadVocs();
+  }
+
+  Future<void> _openVocList({String initialStatus = ''}) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => VocListScreen(initialStatus: initialStatus),
+      ),
+    );
+    if (!mounted) return;
+    context.read<DashboardViewModel>().loadDashboard();
+    context.read<VocViewModel>().loadVocs();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('대시보드'),
+        title: const Text('운영 대시보드'),
         actions: [
           IconButton(
             icon: const Icon(Icons.play_circle_fill_outlined),
-            tooltip: 'Demo Mode',
+            tooltip: '데모 데이터 실행',
             onPressed: () => _showDemoModeDialog(context),
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
+            tooltip: '새로고침',
             onPressed: () => context.read<DashboardViewModel>().loadDashboard(),
           ),
+          const SizedBox(width: AppSpacing.xs),
         ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const VocRegisterScreen()),
-        ).then((_) {
-          context.read<DashboardViewModel>().loadDashboard();
-          context.read<VocViewModel>().loadVocs();
-        }),
-        icon: const Icon(Icons.add),
-        label: const Text('VOC 등록'),
       ),
       body: Consumer<DashboardViewModel>(
         builder: (context, vm, _) {
@@ -60,72 +75,109 @@ class _DashboardScreenState extends State<DashboardScreen> {
             onRefresh: vm.loadDashboard,
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (vm.error != null) ...[
-                    _DashboardErrorBanner(onRetry: vm.loadDashboard),
-                    const SizedBox(height: 12),
-                  ],
-                  _CoreKpiCards(vm: vm),
-                  if (vm.isLoading) ...[
-                    const SizedBox(height: 8),
-                    const LinearProgressIndicator(minHeight: 2),
-                  ],
-                  const SizedBox(height: 16),
-                  _OperationalNoticePanel(vm: vm),
-                  const SizedBox(height: 16),
-                  _ExecutiveInsightsPanel(vm: vm),
-                  const SizedBox(height: 24),
-                  Text('운영 상세 지표',
-                      style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 12),
-                  _OperationalMetricCards(vm: vm),
-                  const SizedBox(height: 24),
-                  // 카테고리별 분포
-                  _CategorySection(
-                    data: vm.vocByCategory,
-                    expanded: _showCategorySection,
-                    page: _categoryPage,
-                    onToggle: () {
-                      setState(() {
-                        _showCategorySection = !_showCategorySection;
-                        if (!_showCategorySection) {
-                          _categoryPage = 0;
-                        }
-                      });
-                    },
-                    onPageChanged: (page) {
-                      setState(() => _categoryPage = page);
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1480),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final compact = constraints.maxWidth < 600;
+                      final pagePadding =
+                          compact ? AppSpacing.sm : AppSpacing.lg;
+                      return Padding(
+                        padding: EdgeInsets.all(pagePadding),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (vm.error != null) ...[
+                              _DashboardErrorBanner(onRetry: vm.loadDashboard),
+                              const SizedBox(height: AppSpacing.sm),
+                            ],
+                            _DashboardHero(
+                              vm: vm,
+                              onRegister: _openRegister,
+                              onOpenVocs: () => _openVocList(),
+                            ),
+                            if (vm.isLoading) ...[
+                              const SizedBox(height: AppSpacing.xs),
+                              const LinearProgressIndicator(minHeight: 2),
+                            ],
+                            const SizedBox(height: AppSpacing.md),
+                            _CoreKpiCards(vm: vm),
+                            const SizedBox(height: AppSpacing.xl),
+                            const _SectionHeading(
+                              eyebrow: 'AI BRIEF',
+                              title: '오늘의 운영 인사이트',
+                              description: '실제 저장 데이터와 AI 운영 지표를 함께 봅니다.',
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                            _ExecutiveInsightsPanel(vm: vm),
+                            const SizedBox(height: AppSpacing.xl),
+                            const _SectionHeading(
+                              eyebrow: 'OPERATIONS',
+                              title: '상세 운영 지표',
+                              description: '처리 흐름과 자동화 성과를 항목별로 확인합니다.',
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                            _OperationalMetricCards(vm: vm),
+                            const SizedBox(height: AppSpacing.xl),
+                            _CategorySection(
+                              data: vm.vocByCategory,
+                              expanded: _showCategorySection,
+                              page: _categoryPage,
+                              onToggle: () {
+                                setState(() {
+                                  _showCategorySection = !_showCategorySection;
+                                  if (!_showCategorySection) {
+                                    _categoryPage = 0;
+                                  }
+                                });
+                              },
+                              onPageChanged: (page) {
+                                setState(() => _categoryPage = page);
+                              },
+                            ),
+                            if (vm.monthlyStats.isNotEmpty) ...[
+                              const SizedBox(height: AppSpacing.xl),
+                              const _SectionHeading(
+                                eyebrow: 'TREND',
+                                title: '월별 VOC 추이',
+                                description: '전체 접수와 해결 흐름을 월 단위로 비교합니다.',
+                              ),
+                              const SizedBox(height: AppSpacing.sm),
+                              Card(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(AppSpacing.md),
+                                  child: _MonthlyChart(stats: vm.monthlyStats),
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: AppSpacing.xl),
+                            const _SectionHeading(
+                              eyebrow: 'TEAM',
+                              title: '담당자별 처리 현황',
+                              description: '담당자별 처리량을 빠르게 비교합니다.',
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                            Card(
+                              child: Padding(
+                                padding: const EdgeInsets.all(AppSpacing.md),
+                                child: vm.assigneeStats.isNotEmpty
+                                    ? _AssigneeChart(stats: vm.assigneeStats)
+                                    : Text(
+                                        '담당자 처리 데이터가 아직 충분하지 않습니다. VOC를 처리하면 차트가 표시됩니다.',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall,
+                                      ),
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.xl),
+                          ],
+                        ),
+                      );
                     },
                   ),
-                  const SizedBox(height: 24),
-                  // 월별 추이
-                  if (vm.monthlyStats.isNotEmpty) ...[
-                    Text('월별 VOC 추이',
-                        style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: 12),
-                    _MonthlyChart(stats: vm.monthlyStats),
-                    const SizedBox(height: 24),
-                  ],
-                  if (vm.assigneeStats.isNotEmpty) ...[
-                    Text('담당자별 처리 현황',
-                        style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: 12),
-                    _AssigneeChart(stats: vm.assigneeStats),
-                  ] else ...[
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Text(
-                          '담당자 처리 데이터가 아직 충분하지 않습니다. VOC를 등록/처리하면 차트가 표시됩니다.',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
+                ),
               ),
             ),
           );
@@ -227,72 +279,318 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 }
 
-class _OperationalNoticePanel extends StatelessWidget {
+class _DashboardHero extends StatelessWidget {
+  const _DashboardHero({
+    required this.vm,
+    required this.onRegister,
+    required this.onOpenVocs,
+  });
+
   final DashboardViewModel vm;
-  const _OperationalNoticePanel({required this.vm});
+  final Future<void> Function() onRegister;
+  final Future<void> Function() onOpenVocs;
 
   @override
   Widget build(BuildContext context) {
-    final backlog = vm.openVocs + vm.inProgressVocs;
-    final highBacklog = backlog >= 30;
-    final lowResolution = vm.resolutionRate < 0.6;
-
-    Color color;
-    IconData icon;
-    String title;
-    String message;
+    final needsAttention =
+        vm.totalVocs > 0 && (vm.backlogRate >= 0.35 || vm.resolutionRate < 0.6);
+    final String title;
+    final String description;
+    final Color signal;
 
     if (vm.totalVocs == 0) {
-      color = Colors.blueGrey;
-      icon = Icons.insights_outlined;
-      title = '오늘의 AI 인사이트 · 분석 준비';
-      message = '아직 분석할 VOC가 없습니다. 첫 VOC를 등록하거나 Demo Mode에서 시연 데이터를 준비해보세요.';
-    } else if (highBacklog || lowResolution) {
-      color = Colors.orange;
-      icon = Icons.warning_amber_rounded;
-      title = '오늘의 AI 인사이트 · 운영 주의';
-      message = '미처리/처리중 VOC가 $backlog건입니다. 처리 우선순위 재점검과 담당자 재배분을 권장합니다.';
+      title = '첫 VOC부터 흐름을 만드세요.';
+      description = '고객의 목소리를 등록하면 AI가 분류하고, 답변과 다음 업무를 연결합니다.';
+      signal = const Color(0xFF9FA1FF);
+    } else if (needsAttention) {
+      title = '백로그를 먼저 정리할 때입니다.';
+      description = '미처리·처리중 VOC ${vm.backlogVocs}건을 우선순위에 맞춰 다시 배분해 보세요.';
+      signal = const Color(0xFFF2B45F);
     } else {
-      color = Colors.teal;
-      icon = Icons.check_circle_outline;
-      title = '오늘의 AI 인사이트 · 운영 안정';
-      message = '현재 처리 흐름이 안정적입니다. AI 추천 답변 채택률을 높이면 추가 효율 개선이 가능합니다.';
+      title = 'VOC 흐름이 안정적입니다.';
+      description = '현재 해결률을 유지하면서 AI 답변 채택률을 한 단계 더 높여보세요.';
+      signal = const Color(0xFF57D1C0);
     }
 
     return Container(
+      key: const Key('dashboard-hero'),
       width: double.infinity,
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.35)),
+        color: Theme.of(context).brightness == Brightness.dark
+            ? const Color(0xFF202536)
+            : const Color(0xFF171A2B),
+        borderRadius: BorderRadius.circular(AppRadii.panel),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: color),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 760;
+          final copy = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: signal,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: signal.withValues(alpha: 0.45),
+                          blurRadius: 10,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
+                  Text(
+                    'TODAY’S SIGNAL',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: const Color(0xFFB9BED0),
+                          letterSpacing: 1.2,
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                title,
+                style: (compact
+                        ? Theme.of(context).textTheme.headlineMedium
+                        : Theme.of(context).textTheme.displaySmall)
+                    ?.copyWith(color: Colors.white),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 620),
+                child: Text(
+                  description,
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
+                      ?.copyWith(color: const Color(0xFFC7CBD8), height: 1.55),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              Wrap(
+                spacing: AppSpacing.xs,
+                runSpacing: AppSpacing.xs,
+                children: [
+                  FilledButton.icon(
+                    key: const Key('dashboard-register'),
+                    onPressed: () => onRegister(),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: AppPalette.ink,
+                    ),
+                    icon: const Icon(Icons.add_rounded, size: 19),
+                    label: Text(compact ? '새 VOC' : '새 VOC 등록'),
+                  ),
+                  OutlinedButton.icon(
+                    key: const Key('dashboard-open-vocs'),
+                    onPressed: () => onOpenVocs(),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.32),
+                      ),
+                    ),
+                    icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+                    label: Text(compact ? 'VOC 보기' : '전체 VOC 보기'),
+                  ),
+                ],
+              ),
+            ],
+          );
+
+          final pulse = _HeroPulse(vm: vm, signal: signal);
+          if (compact) {
+            return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: color,
-                        fontWeight: FontWeight.w700,
-                      ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  message,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
+                copy,
+                const SizedBox(height: AppSpacing.lg),
+                pulse,
               ],
-            ),
+            );
+          }
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: copy),
+              const SizedBox(width: AppSpacing.xl),
+              SizedBox(width: 286, child: pulse),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _HeroPulse extends StatelessWidget {
+  const _HeroPulse({required this.vm, required this.signal});
+
+  final DashboardViewModel vm;
+  final Color signal;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.065),
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '현재 백로그',
+            style: Theme.of(context)
+                .textTheme
+                .labelMedium
+                ?.copyWith(color: const Color(0xFFB9BED0)),
+          ),
+          const SizedBox(height: AppSpacing.xxs),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                vm.backlogVocs.toString(),
+                style: Theme.of(context)
+                    .textTheme
+                    .displayMedium
+                    ?.copyWith(color: Colors.white, height: 1),
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(
+                  '건',
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
+                      ?.copyWith(color: const Color(0xFFB9BED0)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          _HeroProgress(
+            label: '해결률',
+            value: vm.resolutionRate.clamp(0.0, 1.0).toDouble(),
+            display: '${(vm.resolutionRate * 100).toStringAsFixed(0)}%',
+            color: signal,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _HeroProgress(
+            label: 'AI 활용률',
+            value: vm.aiUsageRate.clamp(0.0, 1.0).toDouble(),
+            display: '${(vm.aiUsageRate * 100).toStringAsFixed(0)}%',
+            color: const Color(0xFF9FA1FF),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _HeroProgress extends StatelessWidget {
+  const _HeroProgress({
+    required this.label,
+    required this.value,
+    required this.display,
+    required this.color,
+  });
+
+  final String label;
+  final double value;
+  final String display;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: Theme.of(context)
+                    .textTheme
+                    .labelSmall
+                    ?.copyWith(color: const Color(0xFFB9BED0)),
+              ),
+            ),
+            Text(
+              display,
+              style: Theme.of(context)
+                  .textTheme
+                  .labelMedium
+                  ?.copyWith(color: Colors.white),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(99),
+          child: LinearProgressIndicator(
+            value: value,
+            minHeight: 5,
+            color: color,
+            backgroundColor: Colors.white.withValues(alpha: 0.12),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SectionHeading extends StatelessWidget {
+  const _SectionHeading({
+    required this.eyebrow,
+    required this.title,
+    required this.description,
+  });
+
+  final String eyebrow;
+  final String title;
+  final String description;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          eyebrow,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+                letterSpacing: 1.15,
+              ),
+        ),
+        const SizedBox(height: AppSpacing.xxs),
+        Text(title, style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 2),
+        Text(
+          description,
+          style: Theme.of(context)
+              .textTheme
+              .bodySmall
+              ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+        ),
+      ],
     );
   }
 }
@@ -336,8 +634,11 @@ class _ExecutiveInsightsPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final roi = vm.roiResult;
     final roiInput = vm.roiInputSnapshot;
-    final won =
-        NumberFormat.currency(locale: 'ko_KR', symbol: '₩', decimalDigits: 0);
+    final won = NumberFormat.currency(
+      locale: 'ko_KR',
+      symbol: '₩',
+      decimalDigits: 0,
+    );
     final trendPct = vm.monthlyVocTrendPercent * 100;
     final aiUpdatedAt = vm.executiveAiUpdatedAt;
     final aiRecommendations = vm.executiveAiRecommendations;
@@ -350,11 +651,16 @@ class _ExecutiveInsightsPanel extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.auto_awesome,
-                    size: 20, color: Theme.of(context).colorScheme.primary),
+                Icon(
+                  Icons.auto_awesome_rounded,
+                  size: 20,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
                 const SizedBox(width: 8),
-                Text('Executive Insight',
-                    style: Theme.of(context).textTheme.titleMedium),
+                Text(
+                  'AI 운영 요약',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
               ],
             ),
             const SizedBox(height: 4),
@@ -471,8 +777,10 @@ class _ExecutiveInsightsPanel extends StatelessWidget {
             ),
             if (aiRecommendations.isNotEmpty) ...[
               const SizedBox(height: 14),
-              Text('AI 실시간 개선 권장사항',
-                  style: Theme.of(context).textTheme.titleSmall),
+              Text(
+                'AI 실시간 개선 권장사항',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
               if (aiUpdatedAt != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 2, bottom: 6),
@@ -498,39 +806,62 @@ class _ExecutiveInsightsPanel extends StatelessWidget {
     );
   }
 
-  Widget _metricChip(BuildContext context, String label, String value,
-      IconData icon, Color color,
-      {String? subtitle}) {
+  Widget _metricChip(
+    BuildContext context,
+    String label,
+    String value,
+    IconData icon,
+    Color color, {
+    String? subtitle,
+  }) {
+    final compact = MediaQuery.sizeOf(context).width < 600;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      width: compact ? double.infinity : 240,
+      padding: const EdgeInsets.all(AppSpacing.sm),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withOpacity(0.25)),
+        color: color.withValues(alpha: 0.075),
+        borderRadius: BorderRadius.circular(AppRadii.control),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisSize: MainAxisSize.min,
             children: [
               Icon(icon, size: 16, color: color),
               const SizedBox(width: 6),
-              Text(
-                '$label: $value',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: color,
-                      fontWeight: FontWeight.w600,
-                    ),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                ),
               ),
             ],
           ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(color: color, fontWeight: FontWeight.w800),
+          ),
           if (subtitle != null && subtitle.trim().isNotEmpty)
             Padding(
-              padding: const EdgeInsets.only(top: 4),
+              padding: const EdgeInsets.only(top: AppSpacing.xxs),
               child: Text(
                 subtitle,
-                style: Theme.of(context).textTheme.bodySmall,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
               ),
             ),
         ],
@@ -555,7 +886,7 @@ class _ExecutiveInsightsPanel extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(10),
-        color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.35),
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -602,40 +933,52 @@ class _CoreKpiCards extends StatelessWidget {
   Widget build(BuildContext context) {
     final cards = [
       _CardData(
-          '전체 VOC', vm.totalVocs.toString(), Icons.inbox, Colors.blue, ''),
-      _CardData('미처리', vm.openVocs.toString(), Icons.fiber_new, Colors.orange,
-          'OPEN'),
+        '전체 VOC',
+        vm.totalVocs.toString(),
+        Icons.inbox_rounded,
+        AppPalette.indigo,
+        '',
+      ),
+      _CardData(
+        '미처리',
+        vm.openVocs.toString(),
+        Icons.bolt_rounded,
+        AppPalette.amber,
+        'OPEN',
+      ),
       _CardData(
         '해결률',
         '${(vm.resolutionRate * 100).toStringAsFixed(1)}%',
-        Icons.percent,
-        Colors.teal,
+        Icons.task_alt_rounded,
+        AppPalette.teal,
         '',
       ),
       _CardData(
         'AI 활용률',
         '${(vm.aiUsageRate * 100).toStringAsFixed(1)}%',
-        Icons.auto_awesome,
-        Colors.deepPurple,
+        Icons.auto_awesome_rounded,
+        const Color(0xFF7A5AF8),
         '',
       ),
     ];
 
-    return LayoutBuilder(builder: (context, constraints) {
-      final crossCount = constraints.maxWidth >= 1000 ? 4 : 2;
-      return GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: crossCount,
-          childAspectRatio: constraints.maxWidth >= 1000 ? 1.7 : 1.45,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-        ),
-        itemCount: cards.length,
-        itemBuilder: (_, i) => _SummaryCard(data: cards[i], vm: vm),
-      );
-    });
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final crossCount = constraints.maxWidth >= 1000 ? 4 : 2;
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossCount,
+            mainAxisExtent: constraints.maxWidth < 520 ? 118 : 126,
+            crossAxisSpacing: AppSpacing.sm,
+            mainAxisSpacing: AppSpacing.sm,
+          ),
+          itemCount: cards.length,
+          itemBuilder: (_, i) => _SummaryCard(data: cards[i], vm: vm),
+        );
+      },
+    );
   }
 }
 
@@ -646,23 +989,39 @@ class _OperationalMetricCards extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cards = [
-      _CardData('처리중', vm.inProgressVocs.toString(), Icons.pending,
-          Colors.purple, 'IN_PROGRESS'),
-      _CardData('해결', vm.resolvedVocs.toString(), Icons.check_circle,
-          Colors.green, 'RESOLVED'),
-      _CardData('지식베이스', vm.kbCount.toString(), Icons.book, Colors.indigo, ''),
+      _CardData(
+        '처리중',
+        vm.inProgressVocs.toString(),
+        Icons.pending_actions,
+        AppPalette.amber,
+        'IN_PROGRESS',
+      ),
+      _CardData(
+        '해결',
+        vm.resolvedVocs.toString(),
+        Icons.check_circle_rounded,
+        AppPalette.teal,
+        'RESOLVED',
+      ),
+      _CardData(
+        '지식베이스',
+        vm.kbCount.toString(),
+        Icons.menu_book_rounded,
+        AppPalette.indigo,
+        '',
+      ),
       _CardData(
         '중복 감소율',
         '${(vm.duplicateReductionRate * 100).toStringAsFixed(1)}%',
-        Icons.content_copy,
-        Colors.cyan,
+        Icons.copy_all_rounded,
+        const Color(0xFF0D8FA3),
         '',
       ),
       _CardData(
         '평균 처리시간',
         '${(vm.avgProcessMinutes / 60).toStringAsFixed(1)}h',
-        Icons.schedule,
-        Colors.brown,
+        Icons.schedule_rounded,
+        const Color(0xFF747B8E),
         '',
       ),
     ];
@@ -678,9 +1037,9 @@ class _OperationalMetricCards extends StatelessWidget {
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossCount,
-            childAspectRatio: 1.65,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
+            mainAxisExtent: 118,
+            crossAxisSpacing: AppSpacing.sm,
+            mainAxisSpacing: AppSpacing.sm,
           ),
           itemCount: cards.length,
           itemBuilder: (_, i) => _SummaryCard(data: cards[i], vm: vm),
@@ -697,7 +1056,12 @@ class _CardData {
   final Color color;
   final String statusFilter;
   const _CardData(
-      this.label, this.value, this.icon, this.color, this.statusFilter);
+    this.label,
+    this.value,
+    this.icon,
+    this.color,
+    this.statusFilter,
+  );
 }
 
 class _SummaryCard extends StatelessWidget {
@@ -720,9 +1084,7 @@ class _SummaryCard extends StatelessWidget {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => VocListScreen(
-          initialStatus: data.statusFilter,
-        ),
+        builder: (_) => VocListScreen(initialStatus: data.statusFilter),
       ),
     ).then((_) {
       vm.loadDashboard();
@@ -736,35 +1098,55 @@ class _SummaryCard extends StatelessWidget {
         data.label == '전체 VOC' ||
         data.label == '지식베이스';
 
-    return InkWell(
-      onTap: isClickable ? () => _navigateToFilteredList(context) : null,
-      borderRadius: BorderRadius.circular(12),
-      child: Card(
+    return Card(
+      key: Key('dashboard-metric-${data.label}'),
+      child: InkWell(
+        onTap: isClickable ? () => _navigateToFilteredList(context) : null,
+        borderRadius: BorderRadius.circular(AppRadii.card),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(AppSpacing.md),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
                 children: [
-                  Icon(data.icon, color: data.color, size: 20),
-                  const SizedBox(width: 8),
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: data.color.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(AppRadii.small),
+                    ),
+                    child: Icon(data.icon, color: data.color, size: 18),
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
                   Expanded(
                     child: Text(
                       data.label,
-                      style: Theme.of(context).textTheme.bodySmall,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
                     ),
                   ),
+                  if (isClickable)
+                    Icon(
+                      Icons.arrow_outward_rounded,
+                      size: 16,
+                      color: Theme.of(context).colorScheme.outline,
+                    ),
                 ],
               ),
               Text(
                 data.value,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: data.color,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.7,
                     ),
               ),
             ],
@@ -822,8 +1204,9 @@ class _CategorySection extends StatelessWidget {
                 ),
                 TextButton.icon(
                   onPressed: onToggle,
-                  icon:
-                      Icon(expanded ? Icons.visibility_off : Icons.visibility),
+                  icon: Icon(
+                    expanded ? Icons.visibility_off : Icons.visibility,
+                  ),
                   label: Text(expanded ? '숨기기' : '보기'),
                 ),
               ],
@@ -977,11 +1360,7 @@ class _CategoryChart extends StatelessWidget {
         if (useColumnLayout) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              chart,
-              const SizedBox(height: 8),
-              legend,
-            ],
+            children: [chart, const SizedBox(height: 8), legend],
           );
         }
 
@@ -1064,10 +1443,12 @@ class _MonthlyChart extends StatelessWidget {
                 ),
               ),
             ),
-            topTitles:
-                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            rightTitles:
-                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
           ),
           borderData: FlBorderData(show: false),
           gridData: const FlGridData(show: true),
@@ -1128,10 +1509,12 @@ class _AssigneeChart extends StatelessWidget {
             leftTitles: const AxisTitles(
               sideTitles: SideTitles(showTitles: true, reservedSize: 28),
             ),
-            rightTitles:
-                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            topTitles:
-                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
           ),
         ),
       ),

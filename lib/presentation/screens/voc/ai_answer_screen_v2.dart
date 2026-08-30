@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/theme/app_tokens.dart';
 import '../../../core/utils/user_facing_text.dart';
 import '../../../core/utils/voc_display_utils.dart';
 import '../../../domain/entities/knowledge_base_entity.dart';
 import '../../viewmodels/ai_viewmodel.dart';
 import '../../viewmodels/integration_viewmodel.dart';
 import '../../viewmodels/voc_viewmodel.dart';
+import '../../widgets/workspace_ui.dart';
 
 class AiAnswerScreen extends StatefulWidget {
   const AiAnswerScreen({
@@ -66,7 +68,8 @@ class _AiAnswerScreenState extends State<AiAnswerScreen> {
     if (text.trim().isEmpty) return;
     await Clipboard.setData(ClipboardData(text: text));
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
     }
   }
 
@@ -141,6 +144,7 @@ class _AiAnswerScreenState extends State<AiAnswerScreen> {
       builder: (context, constraints) {
         final desktop = constraints.maxWidth >= 1050;
         return Scaffold(
+          backgroundColor: context.visualColors.canvas,
           appBar: AppBar(title: const Text('AI 답변 추천')),
           body: Consumer<AiViewModel>(
             builder: (context, vm, _) {
@@ -157,9 +161,44 @@ class _AiAnswerScreenState extends State<AiAnswerScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        _VocHeader(
+                        WorkspaceHero(
+                          key: const Key('ai-answer-hero'),
+                          eyebrow: 'ANSWER STUDIO',
                           title: widget.vocTitle,
-                          content: widget.vocContent,
+                          description: _answerExcerpt(widget.vocContent),
+                          icon: Icons.auto_awesome_rounded,
+                          metrics: [
+                            WorkspaceMetric(
+                              label: '근거 후보',
+                              value: '${vm.similarVocs.length}',
+                            ),
+                            WorkspaceMetric(
+                              label: '카테고리',
+                              value: widget.category,
+                              color: const Color(0xFFBFC2FF),
+                            ),
+                            WorkspaceMetric(
+                              label: '고객',
+                              value: widget.customer.trim().isEmpty
+                                  ? '미지정'
+                                  : widget.customer,
+                              color: const Color(0xFF55CDBE),
+                            ),
+                          ],
+                          actions: [
+                            FilledButton.icon(
+                              key: const Key('ai-answer-regenerate'),
+                              onPressed: vm.isSearching || vm.isGenerating
+                                  ? null
+                                  : _runPipeline,
+                              style: FilledButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                foregroundColor: AppPalette.ink,
+                              ),
+                              icon: const Icon(Icons.refresh_rounded),
+                              label: const Text('근거 다시 분석'),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 16),
                         if (desktop)
@@ -171,7 +210,8 @@ class _AiAnswerScreenState extends State<AiAnswerScreen> {
                                 child: _CaseNavigator(
                                   vm: vm,
                                   selectedIndex: _selectedCase,
-                                  onSelected: (index) => setState(() => _selectedCase = index),
+                                  onSelected: (index) =>
+                                      setState(() => _selectedCase = index),
                                 ),
                               ),
                               const SizedBox(width: 16),
@@ -181,13 +221,15 @@ class _AiAnswerScreenState extends State<AiAnswerScreen> {
                                   answer: _answer,
                                   selectedCase: _selectedCase,
                                   onRegenerate: _runPipeline,
-                                  onCopy: () => _copy(_answer, 'AI 추천 답변을 복사했습니다.'),
+                                  onCopy: () =>
+                                      _copy(_answer, 'AI 추천 답변을 복사했습니다.'),
                                   onAdopt: _adopting ? null : _adopt,
                                   adopting: _adopting,
                                   feedbackType: _feedbackType,
                                   feedbackController: _feedbackController,
                                   feedbackSaving: _feedbackSaving,
-                                  onFeedbackTypeChanged: (value) => setState(() => _feedbackType = value),
+                                  onFeedbackTypeChanged: (value) =>
+                                      setState(() => _feedbackType = value),
                                   onFeedbackSave: _saveFeedback,
                                 ),
                               ),
@@ -197,7 +239,8 @@ class _AiAnswerScreenState extends State<AiAnswerScreen> {
                           _CaseNavigator(
                             vm: vm,
                             selectedIndex: _selectedCase,
-                            onSelected: (index) => setState(() => _selectedCase = index),
+                            onSelected: (index) =>
+                                setState(() => _selectedCase = index),
                           ),
                           const SizedBox(height: 14),
                           _AnswerWorkspace(
@@ -211,7 +254,8 @@ class _AiAnswerScreenState extends State<AiAnswerScreen> {
                             feedbackType: _feedbackType,
                             feedbackController: _feedbackController,
                             feedbackSaving: _feedbackSaving,
-                            onFeedbackTypeChanged: (value) => setState(() => _feedbackType = value),
+                            onFeedbackTypeChanged: (value) =>
+                                setState(() => _feedbackType = value),
                             onFeedbackSave: _saveFeedback,
                           ),
                         ],
@@ -228,52 +272,17 @@ class _AiAnswerScreenState extends State<AiAnswerScreen> {
   }
 }
 
-class _VocHeader extends StatelessWidget {
-  const _VocHeader({required this.title, required this.content});
-  final String title;
-  final String content;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: cs.primaryContainer.withValues(alpha: .25),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: cs.primary.withValues(alpha: .14)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: cs.primaryContainer,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(Icons.support_agent_outlined, color: cs.onPrimaryContainer),
-          ),
-          const SizedBox(width: 13),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
-                const SizedBox(height: 5),
-                Text(content, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(height: 1.45)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+String _answerExcerpt(String content) {
+  final normalized = content.replaceAll(RegExp(r'\s+'), ' ').trim();
+  if (normalized.length <= 160) return normalized;
+  return '${normalized.substring(0, 160)}…';
 }
 
 class _CaseNavigator extends StatelessWidget {
-  const _CaseNavigator({required this.vm, required this.selectedIndex, required this.onSelected});
+  const _CaseNavigator(
+      {required this.vm,
+      required this.selectedIndex,
+      required this.onSelected});
   final AiViewModel vm;
   final int selectedIndex;
   final ValueChanged<int> onSelected;
@@ -301,7 +310,8 @@ class _CaseNavigator extends StatelessWidget {
                         kb.project == 'manual-upload' ||
                         kb.question.contains('매뉴얼 섹션');
                     return Padding(
-                      padding: EdgeInsets.only(bottom: index == vm.similarVocs.length - 1 ? 0 : 8),
+                      padding: EdgeInsets.only(
+                          bottom: index == vm.similarVocs.length - 1 ? 0 : 8),
                       child: _CaseRow(
                         selected: selected,
                         title: kb.question,
@@ -351,9 +361,19 @@ class _CaseRow extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: fg, fontWeight: FontWeight.w700)),
+                    Text(title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style:
+                            TextStyle(color: fg, fontWeight: FontWeight.w700)),
                     const SizedBox(height: 4),
-                    Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: selected ? cs.onPrimaryContainer : cs.onSurfaceVariant)),
+                    Text(subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: selected
+                                ? cs.onPrimaryContainer
+                                : cs.onSurfaceVariant)),
                   ],
                 ),
               ),
@@ -413,9 +433,16 @@ class _AnswerWorkspace extends StatelessWidget {
           trailing: Wrap(
             spacing: 4,
             children: [
-              if (vm.answerResult != null) _ScoreBadge(score: vm.answerResult!.confidence),
-              IconButton(onPressed: answer.trim().isEmpty ? null : onCopy, tooltip: '답변 복사', icon: const Icon(Icons.copy_outlined)),
-              IconButton(onPressed: vm.isGenerating ? null : onRegenerate, tooltip: '재생성', icon: const Icon(Icons.refresh)),
+              if (vm.answerResult != null)
+                _ScoreBadge(score: vm.answerResult!.confidence),
+              IconButton(
+                  onPressed: answer.trim().isEmpty ? null : onCopy,
+                  tooltip: '답변 복사',
+                  icon: const Icon(Icons.copy_outlined)),
+              IconButton(
+                  onPressed: vm.isGenerating ? null : onRegenerate,
+                  tooltip: '재생성',
+                  icon: const Icon(Icons.refresh)),
             ],
           ),
           child: vm.isGenerating
@@ -437,12 +464,20 @@ class _AnswerWorkspace extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         SelectableText(
-                          answer.trim().isEmpty ? '생성된 답변이 없습니다.' : UserFacingText.fromAi(answer),
-                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.65),
+                          answer.trim().isEmpty
+                              ? '생성된 답변이 없습니다.'
+                              : UserFacingText.fromAi(answer),
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyLarge
+                              ?.copyWith(height: 1.65),
                         ),
-                        if (vm.answerResult?.notes.trim().isNotEmpty == true) ...[
+                        if (vm.answerResult?.notes.trim().isNotEmpty ==
+                            true) ...[
                           const SizedBox(height: 12),
-                          _NoteBox(text: UserFacingText.fromAi(vm.answerResult!.notes)),
+                          _NoteBox(
+                              text: UserFacingText.fromAi(
+                                  vm.answerResult!.notes)),
                         ],
                         const SizedBox(height: 16),
                         Align(
@@ -450,7 +485,11 @@ class _AnswerWorkspace extends StatelessWidget {
                           child: FilledButton.icon(
                             onPressed: answer.trim().isEmpty ? null : onAdopt,
                             icon: adopting
-                                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2))
                                 : const Icon(Icons.check_circle_outline),
                             label: const Text('답변 채택'),
                           ),
@@ -496,16 +535,20 @@ class _SelectedEvidence extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(kb.question, style: const TextStyle(fontWeight: FontWeight.w800)),
+          Text(kb.question,
+              style: const TextStyle(fontWeight: FontWeight.w800)),
           const SizedBox(height: 10),
-          SelectableText(UserFacingText.fromAi(kb.answer), style: const TextStyle(height: 1.55)),
+          SelectableText(UserFacingText.fromAi(kb.answer),
+              style: const TextStyle(height: 1.55)),
           const SizedBox(height: 10),
           Wrap(
             spacing: 12,
             runSpacing: 6,
             children: [
-              Text('유사도 ${(item.similarityScore * 100).toStringAsFixed(1)}%', style: Theme.of(context).textTheme.bodySmall),
-              Text('채택률 ${rate.toStringAsFixed(1)}%', style: Theme.of(context).textTheme.bodySmall),
+              Text('유사도 ${(item.similarityScore * 100).toStringAsFixed(1)}%',
+                  style: Theme.of(context).textTheme.bodySmall),
+              Text('채택률 ${rate.toStringAsFixed(1)}%',
+                  style: Theme.of(context).textTheme.bodySmall),
               if (item.lastUsedAt != null)
                 Text(
                   '최근 사용 ${item.lastUsedAt!.year}-${item.lastUsedAt!.month.toString().padLeft(2, '0')}-${item.lastUsedAt!.day.toString().padLeft(2, '0')}',
@@ -546,9 +589,18 @@ class _FeedbackPanel extends StatelessWidget {
             spacing: 8,
             runSpacing: 8,
             children: [
-              ChoiceChip(label: const Text('도움됨'), selected: type == 'useful', onSelected: (_) => onTypeChanged('useful')),
-              ChoiceChip(label: const Text('부분적'), selected: type == 'partial', onSelected: (_) => onTypeChanged('partial')),
-              ChoiceChip(label: const Text('부정확'), selected: type == 'wrong', onSelected: (_) => onTypeChanged('wrong')),
+              ChoiceChip(
+                  label: const Text('도움됨'),
+                  selected: type == 'useful',
+                  onSelected: (_) => onTypeChanged('useful')),
+              ChoiceChip(
+                  label: const Text('부분적'),
+                  selected: type == 'partial',
+                  onSelected: (_) => onTypeChanged('partial')),
+              ChoiceChip(
+                  label: const Text('부정확'),
+                  selected: type == 'wrong',
+                  onSelected: (_) => onTypeChanged('wrong')),
             ],
           ),
           const SizedBox(height: 10),
@@ -556,7 +608,8 @@ class _FeedbackPanel extends StatelessWidget {
             controller: controller,
             minLines: 2,
             maxLines: 4,
-            decoration: const InputDecoration(hintText: '근거가 부족하거나 보완이 필요한 부분을 적어 주세요.'),
+            decoration: const InputDecoration(
+                hintText: '근거가 부족하거나 보완이 필요한 부분을 적어 주세요.'),
           ),
           const SizedBox(height: 10),
           Align(
@@ -564,7 +617,10 @@ class _FeedbackPanel extends StatelessWidget {
             child: OutlinedButton.icon(
               onPressed: saving ? null : onSave,
               icon: saving
-                  ? const SizedBox(width: 15, height: 15, child: CircularProgressIndicator(strokeWidth: 2))
+                  ? const SizedBox(
+                      width: 15,
+                      height: 15,
+                      child: CircularProgressIndicator(strokeWidth: 2))
                   : const Icon(Icons.save_outlined, size: 17),
               label: const Text('피드백 저장'),
             ),
@@ -576,7 +632,12 @@ class _FeedbackPanel extends StatelessWidget {
 }
 
 class _Panel extends StatelessWidget {
-  const _Panel({required this.title, required this.icon, required this.child, this.subtitle, this.trailing});
+  const _Panel(
+      {required this.title,
+      required this.icon,
+      required this.child,
+      this.subtitle,
+      this.trailing});
   final String title;
   final String? subtitle;
   final IconData icon;
@@ -585,44 +646,13 @@ class _Panel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(color: cs.primaryContainer, borderRadius: BorderRadius.circular(11)),
-                  child: Icon(icon, size: 20, color: cs.onPrimaryContainer),
-                ),
-                const SizedBox(width: 11),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
-                      if (subtitle != null) ...[
-                        const SizedBox(height: 2),
-                        Text(subtitle!, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-                      ],
-                    ],
-                  ),
-                ),
-                if (trailing != null) trailing!,
-              ],
-            ),
-            const SizedBox(height: 15),
-            child,
-          ],
-        ),
-      ),
+    return WorkspacePanel(
+      title: title,
+      description: subtitle,
+      icon: icon,
+      trailing: trailing,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: child,
     );
   }
 }
@@ -647,8 +677,13 @@ class _ScoreBadge extends StatelessWidget {
             : cs.onSurfaceVariant;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(999)),
-      child: Text('$pct%', style: TextStyle(color: fg, fontSize: 12, fontWeight: FontWeight.w800)),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(AppRadii.small),
+      ),
+      child: Text('$pct%',
+          style:
+              TextStyle(color: fg, fontSize: 12, fontWeight: FontWeight.w800)),
     );
   }
 }
@@ -661,7 +696,8 @@ class _EmptyCases extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 24),
       child: Column(
         children: [
-          Icon(Icons.search_off_outlined, size: 34, color: Theme.of(context).colorScheme.outline),
+          Icon(Icons.search_off_outlined,
+              size: 34, color: Theme.of(context).colorScheme.outline),
           const SizedBox(height: 8),
           const Text('참고할 유사 사례가 없습니다.'),
         ],
@@ -678,7 +714,8 @@ class _ErrorBox extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: cs.errorContainer, borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(
+          color: cs.errorContainer, borderRadius: BorderRadius.circular(12)),
       child: Text(message, style: TextStyle(color: cs.onErrorContainer)),
     );
   }
@@ -692,8 +729,11 @@ class _NoteBox extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: cs.surfaceContainerLow, borderRadius: BorderRadius.circular(12)),
-      child: Text('추가 확인 · $text', style: Theme.of(context).textTheme.bodySmall),
+      decoration: BoxDecoration(
+          color: cs.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(12)),
+      child:
+          Text('추가 확인 · $text', style: Theme.of(context).textTheme.bodySmall),
     );
   }
 }

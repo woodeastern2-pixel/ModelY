@@ -1,0 +1,122 @@
+name: AI VOC Renewal Quality Gate
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ai-voc-renewal-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality-android:
+    name: Analyze, test, preview, Android
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Flutter 3.47.2
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.2'
+          channel: stable
+          cache: true
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Verify formatting
+        run: >-
+          dart format --output=none --set-exit-if-changed
+          lib/core/theme/app_theme.dart
+          lib/core/theme/app_tokens.dart
+          lib/presentation/widgets/workspace_ui.dart
+          lib/presentation/screens/chat/ai_chat_screen.dart
+          lib/presentation/screens/dashboard/dashboard_screen.dart
+          lib/presentation/screens/home/home_screen.dart
+          lib/presentation/screens/splash/splash_screen.dart
+          lib/presentation/screens/voc/ai_answer_screen_v2.dart
+          lib/presentation/screens/voc/voc_detail_screen_v2.dart
+          lib/presentation/screens/voc/voc_list_screen_v5.dart
+          lib/presentation/screens/voc/voc_register_screen.dart
+          test/responsive_ui_harness_test.dart
+          test/support/ui_harness.dart
+          test/ui_preview_golden_test.dart
+          test/workspace_responsive_harness_test.dart
+          test/workspace_ui_preview_golden_test.dart
+
+      - name: Static analysis
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Regression and responsive harness
+        run: flutter test --exclude-tags=golden
+
+      - name: Verify UI previews against approved baselines
+        run: flutter test test/ui_preview_golden_test.dart
+
+      - name: Verify workspace previews against approved baselines
+        run: flutter test test/workspace_ui_preview_golden_test.dart
+
+      - name: Upload phone, tablet and desktop previews
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-voc-ui-previews
+          path: test/goldens/*.png
+          if-no-files-found: error
+
+      - name: Build Android release APK
+        run: flutter build apk --release
+
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-voc-assistant-android-release
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+
+  windows-release:
+    name: Windows release
+    needs: quality-android
+    runs-on: windows-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter 3.47.2
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.2'
+          channel: stable
+          cache: true
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Build Windows release
+        run: flutter build windows --release
+
+      - name: Package Windows release
+        shell: pwsh
+        run: |
+          $releaseDir = "build/windows/x64/runner/Release"
+          $zipPath = "build/ai-voc-assistant-windows-x64.zip"
+          Compress-Archive -Path "$releaseDir/*" -DestinationPath $zipPath -CompressionLevel Optimal
+
+      - name: Upload Windows release
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-voc-assistant-windows-x64
+          path: build/ai-voc-assistant-windows-x64.zip
+          if-no-files-found: error
