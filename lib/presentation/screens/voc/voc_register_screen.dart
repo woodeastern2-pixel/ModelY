@@ -223,8 +223,8 @@ class _VocRegisterScreenState extends State<VocRegisterScreen> {
           const SizedBox(height: AppSpacing.sm),
           TextFormField(
             controller: _contentController,
-            minLines: desktop ? 11 : 7,
-            maxLines: desktop ? 16 : 12,
+            minLines: 8,
+            maxLines: 14,
             decoration: const InputDecoration(
               labelText: 'VOC 내용 *',
               hintText: '고객이 겪은 문제와 기대하는 결과를 구체적으로 적어 주세요.',
