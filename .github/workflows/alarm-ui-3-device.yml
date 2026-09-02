@@ -1,0 +1,107 @@
+name: Alarm UI - 3 Device Screenshot Check
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/modely-alarm-app
+
+jobs:
+  capture:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[ui-check]')
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: compact-api29
+            api: 29
+            profile: pixel_2
+          - name: standard-api33
+            api: 33
+            profile: pixel_4
+          - name: large-api35
+            api: 35
+            profile: pixel_6
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Build and capture
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api }}
+          target: google_apis
+          arch: x86_64
+          profile: ${{ matrix.profile }}
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: |
+            set -e
+            flutter build apk --debug
+            adb install -r build/app/outputs/flutter-apk/app-debug.apk
+            adb shell monkey -p com.example.ai_voc_assistant 1
+            sleep 4
+            mkdir -p captures/${{ matrix.name }}
+            adb exec-out screencap -p > captures/${{ matrix.name }}/01-home.png
+
+            SIZE=$(adb shell wm size | tail -1 | awk '{print $3}')
+            WIDTH=${SIZE%x*}
+            HEIGHT=${SIZE#*x}
+            SETTINGS_X=$((WIDTH * 3 / 4))
+            NAV_Y=$((HEIGHT - 180))
+
+            adb shell input tap "$SETTINGS_X" "$NAV_Y"
+            sleep 2
+            adb exec-out screencap -p > captures/${{ matrix.name }}/02-settings.png
+
+            cd captures
+            zip -r ../${{ matrix.name }}.zip ${{ matrix.name }}
+
+      - name: Upload device screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: alarm-ui-${{ matrix.name }}
+          path: |
+            captures/${{ matrix.name }}/
+            ${{ matrix.name }}.zip
+          if-no-files-found: error
+
+  bundle:
+    if: always()
+    needs: capture
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all device artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: alarm-ui-*
+          path: all-captures
+
+      - name: Bundle screenshots
+        run: |
+          cd all-captures
+          zip -r ../alarm-ui-3-device-screenshots.zip .
+
+      - name: Upload combined screenshot bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: alarm-ui-3-device-screenshots
+          path: alarm-ui-3-device-screenshots.zip
+          if-no-files-found: error
