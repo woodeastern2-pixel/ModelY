@@ -29,11 +29,11 @@ class VocStatusChip extends StatelessWidget {
   String _label(String s) {
     switch (s) {
       case 'OPEN':
-        return '미처리';
+        return '접수';
       case 'IN_PROGRESS':
-        return '처리중';
+        return '처리 중';
       case 'RESOLVED':
-        return '해결';
+        return '처리 완료';
       case 'REJECTED':
         return '반려';
       default:

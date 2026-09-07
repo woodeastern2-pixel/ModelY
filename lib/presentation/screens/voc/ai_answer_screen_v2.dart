@@ -108,7 +108,9 @@ class _AiAnswerScreenState extends State<AiAnswerScreen> {
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('AI 추천 답변을 채택하고 VOC 답변으로 저장했습니다.')),
+          const SnackBar(
+            content: Text('AI 답변을 승인해 VOC 답변으로 저장하고 지식 자료에 추가했습니다.'),
+          ),
         );
         Navigator.pop(context, true);
       }
@@ -130,7 +132,7 @@ class _AiAnswerScreenState extends State<AiAnswerScreen> {
           );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('AI 피드백을 저장했습니다.')),
+          const SnackBar(content: Text('답변 평가를 저장했습니다.')),
         );
       }
     } finally {
@@ -145,7 +147,7 @@ class _AiAnswerScreenState extends State<AiAnswerScreen> {
         final desktop = constraints.maxWidth >= 1050;
         return Scaffold(
           backgroundColor: context.visualColors.canvas,
-          appBar: AppBar(title: const Text('AI 답변 추천')),
+          appBar: AppBar(title: const Text('AI 답변 초안')),
           body: Consumer<AiViewModel>(
             builder: (context, vm, _) {
               return SingleChildScrollView(
@@ -169,7 +171,7 @@ class _AiAnswerScreenState extends State<AiAnswerScreen> {
                           icon: Icons.auto_awesome_rounded,
                           metrics: [
                             WorkspaceMetric(
-                              label: '근거 후보',
+                              label: '참고 자료',
                               value: '${vm.similarVocs.length}',
                             ),
                             WorkspaceMetric(
@@ -196,7 +198,7 @@ class _AiAnswerScreenState extends State<AiAnswerScreen> {
                                 foregroundColor: AppPalette.ink,
                               ),
                               icon: const Icon(Icons.refresh_rounded),
-                              label: const Text('근거 다시 분석'),
+                              label: const Text('참고 자료 다시 찾기'),
                             ),
                           ],
                         ),
@@ -222,7 +224,7 @@ class _AiAnswerScreenState extends State<AiAnswerScreen> {
                                   selectedCase: _selectedCase,
                                   onRegenerate: _runPipeline,
                                   onCopy: () =>
-                                      _copy(_answer, 'AI 추천 답변을 복사했습니다.'),
+                                      _copy(_answer, 'AI 답변 초안을 복사했습니다.'),
                                   onAdopt: _adopting ? null : _adopt,
                                   adopting: _adopting,
                                   feedbackType: _feedbackType,
@@ -248,7 +250,7 @@ class _AiAnswerScreenState extends State<AiAnswerScreen> {
                             answer: _answer,
                             selectedCase: _selectedCase,
                             onRegenerate: _runPipeline,
-                            onCopy: () => _copy(_answer, 'AI 추천 답변을 복사했습니다.'),
+                            onCopy: () => _copy(_answer, 'AI 답변 초안을 복사했습니다.'),
                             onAdopt: _adopting ? null : _adopt,
                             adopting: _adopting,
                             feedbackType: _feedbackType,
@@ -290,8 +292,8 @@ class _CaseNavigator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _Panel(
-      title: '유사 사례',
-      subtitle: '답변 생성에 참고한 VOC와 지식베이스 후보입니다.',
+      title: '참고한 유사 사례',
+      subtitle: '답변 초안 작성에 참고한 VOC와 지식 자료입니다.',
       icon: Icons.manage_search_outlined,
       child: vm.isSearching
           ? const Padding(
@@ -427,8 +429,8 @@ class _AnswerWorkspace extends StatelessWidget {
     return Column(
       children: [
         _Panel(
-          title: 'AI 추천 답변',
-          subtitle: '근거에 없는 내용은 최종 채택 전에 반드시 확인하세요.',
+          title: 'AI 답변 초안',
+          subtitle: '답변을 승인하기 전에 사실관계와 안내 절차를 확인해 주세요.',
           icon: Icons.auto_awesome_outlined,
           trailing: Wrap(
             spacing: 4,
@@ -441,7 +443,7 @@ class _AnswerWorkspace extends StatelessWidget {
                   icon: const Icon(Icons.copy_outlined)),
               IconButton(
                   onPressed: vm.isGenerating ? null : onRegenerate,
-                  tooltip: '재생성',
+                  tooltip: '다시 만들기',
                   icon: const Icon(Icons.refresh)),
             ],
           ),
@@ -453,7 +455,7 @@ class _AnswerWorkspace extends StatelessWidget {
                       children: [
                         CircularProgressIndicator(),
                         SizedBox(height: 12),
-                        Text('근거를 바탕으로 답변을 생성하고 있습니다.'),
+                        Text('참고 자료를 바탕으로 답변 초안을 만들고 있습니다.'),
                       ],
                     ),
                   ),
@@ -491,7 +493,7 @@ class _AnswerWorkspace extends StatelessWidget {
                                     child: CircularProgressIndicator(
                                         strokeWidth: 2))
                                 : const Icon(Icons.check_circle_outline),
-                            label: const Text('답변 채택'),
+                            label: const Text('답변 승인 및 저장'),
                           ),
                         ),
                       ],
@@ -527,7 +529,7 @@ class _SelectedEvidence extends StatelessWidget {
         kb.question.contains('매뉴얼 섹션');
     final code = VocDisplayUtils.codeFromProject(kb.project);
     return _Panel(
-      title: '선택한 답변 근거',
+      title: '이 답변의 참고 자료',
       subtitle: manual
           ? '시스템 매뉴얼'
           : '${code.isEmpty ? 'VOC 이력' : code} · 유사도 ${(item.similarityScore * 100).toStringAsFixed(1)}%',
@@ -579,8 +581,8 @@ class _FeedbackPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _Panel(
-      title: 'AI 피드백',
-      subtitle: '답변 품질 개선을 위해 결과를 평가해 주세요.',
+      title: '답변 평가',
+      subtitle: 'AI 답변 초안이 실제 업무에 도움이 되었는지 평가해 주세요.',
       icon: Icons.feedback_outlined,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -590,15 +592,15 @@ class _FeedbackPanel extends StatelessWidget {
             runSpacing: 8,
             children: [
               ChoiceChip(
-                  label: const Text('도움됨'),
+                  label: const Text('도움이 됨'),
                   selected: type == 'useful',
                   onSelected: (_) => onTypeChanged('useful')),
               ChoiceChip(
-                  label: const Text('부분적'),
+                  label: const Text('일부 도움'),
                   selected: type == 'partial',
                   onSelected: (_) => onTypeChanged('partial')),
               ChoiceChip(
-                  label: const Text('부정확'),
+                  label: const Text('부정확함'),
                   selected: type == 'wrong',
                   onSelected: (_) => onTypeChanged('wrong')),
             ],
@@ -609,7 +611,7 @@ class _FeedbackPanel extends StatelessWidget {
             minLines: 2,
             maxLines: 4,
             decoration: const InputDecoration(
-                hintText: '근거가 부족하거나 보완이 필요한 부분을 적어 주세요.'),
+                hintText: '좋았던 점이나 보완이 필요한 내용을 적어 주세요.'),
           ),
           const SizedBox(height: 10),
           Align(
@@ -622,7 +624,7 @@ class _FeedbackPanel extends StatelessWidget {
                       height: 15,
                       child: CircularProgressIndicator(strokeWidth: 2))
                   : const Icon(Icons.save_outlined, size: 17),
-              label: const Text('피드백 저장'),
+              label: const Text('평가 저장'),
             ),
           ),
         ],
@@ -733,7 +735,7 @@ class _NoteBox extends StatelessWidget {
           color: cs.surfaceContainerLow,
           borderRadius: BorderRadius.circular(12)),
       child:
-          Text('추가 확인 · $text', style: Theme.of(context).textTheme.bodySmall),
+          Text('추가 확인: $text', style: Theme.of(context).textTheme.bodySmall),
     );
   }
 }

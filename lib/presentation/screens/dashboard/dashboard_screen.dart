@@ -51,11 +51,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('운영 대시보드'),
+        title: const Text('VOC 현황'),
         actions: [
           IconButton(
             icon: const Icon(Icons.play_circle_fill_outlined),
-            tooltip: '데모 데이터 실행',
+            tooltip: '샘플 VOC로 둘러보기',
             onPressed: () => _showDemoModeDialog(context),
           ),
           IconButton(
@@ -105,17 +105,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             _CoreKpiCards(vm: vm),
                             const SizedBox(height: AppSpacing.xl),
                             const _SectionHeading(
-                              eyebrow: 'AI BRIEF',
-                              title: '오늘의 운영 인사이트',
-                              description: '실제 저장 데이터와 AI 운영 지표를 함께 봅니다.',
+                              eyebrow: '오늘의 요약',
+                              title: '오늘 확인할 VOC',
+                              description: '오늘 확인해야 할 VOC와 AI 활용 현황입니다.',
                             ),
                             const SizedBox(height: AppSpacing.sm),
                             _ExecutiveInsightsPanel(vm: vm),
                             const SizedBox(height: AppSpacing.xl),
                             const _SectionHeading(
-                              eyebrow: 'OPERATIONS',
-                              title: '상세 운영 지표',
-                              description: '처리 흐름과 자동화 성과를 항목별로 확인합니다.',
+                              eyebrow: '처리 현황',
+                              title: 'VOC 처리 흐름',
+                              description: '접수부터 완료까지의 처리 흐름을 확인하세요.',
                             ),
                             const SizedBox(height: AppSpacing.sm),
                             _OperationalMetricCards(vm: vm),
@@ -141,7 +141,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               const _SectionHeading(
                                 eyebrow: 'TREND',
                                 title: '월별 VOC 추이',
-                                description: '전체 접수와 해결 흐름을 월 단위로 비교합니다.',
+                                description: '월별 접수 건수와 처리 완료 건수를 비교합니다.',
                               ),
                               const SizedBox(height: AppSpacing.sm),
                               Card(
@@ -155,7 +155,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             const _SectionHeading(
                               eyebrow: 'TEAM',
                               title: '담당자별 처리 현황',
-                              description: '담당자별 처리량을 빠르게 비교합니다.',
+                              description: '담당자별 배정 건수와 처리 결과를 확인합니다.',
                             ),
                             const SizedBox(height: AppSpacing.sm),
                             Card(
@@ -164,7 +164,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 child: vm.assigneeStats.isNotEmpty
                                     ? _AssigneeChart(stats: vm.assigneeStats)
                                     : Text(
-                                        '담당자 처리 데이터가 아직 충분하지 않습니다. VOC를 처리하면 차트가 표시됩니다.',
+                                        '담당자가 배정된 VOC가 없습니다. VOC를 배정하면 처리 현황이 표시됩니다.',
                                         style: Theme.of(context)
                                             .textTheme
                                             .bodySmall,
@@ -196,7 +196,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return StatefulBuilder(
           builder: (ctx, setState) {
             return AlertDialog(
-              title: const Text('Demo Mode (3분 모의 시연)'),
+                title: const Text('3분 기능 둘러보기'),
               content: SizedBox(
                 width: 520,
                 child: Column(
@@ -211,7 +211,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: const Text(
-                        '시연 데이터가 현재 저장소에 추가됩니다. 기존 VOC와 설정은 삭제하거나 수정하지 않습니다.',
+                        '샘플 VOC가 현재 데이터에 추가됩니다. 기존 VOC와 설정은 변경되지 않습니다.',
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -221,7 +221,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               100,
                     ),
                     const SizedBox(height: 12),
-                    Text(service.getCurrentStatus()?.message ?? '시연 준비 중...'),
+                    Text(service.getCurrentStatus()?.message ?? '기능 둘러보기를 준비하고 있습니다.'),
                     const SizedBox(height: 12),
                     SizedBox(
                       height: 220,
@@ -254,7 +254,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           final count = await context
                               .read<VocViewModel>()
                               .importSampleVocs(samples);
-                          logs.add('✓ 샘플 데이터 $count개 생성됨');
+                          logs.add('샘플 VOC $count건을 추가했습니다.');
 
                           await service.startDemo((status) {
                             logs
@@ -268,7 +268,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           }
                         },
                   icon: const Icon(Icons.play_arrow),
-                  label: const Text('시연 시작'),
+                  label: const Text('둘러보기 시작'),
                 ),
               ],
             );
@@ -299,16 +299,16 @@ class _DashboardHero extends StatelessWidget {
     final Color signal;
 
     if (vm.totalVocs == 0) {
-      title = '첫 VOC부터 흐름을 만드세요.';
-      description = '고객의 목소리를 등록하면 AI가 분류하고, 답변과 다음 업무를 연결합니다.';
+      title = '첫 VOC를 등록해 보세요.';
+      description = 'VOC를 등록하면 AI가 유형과 우선순위를 분석하고 답변 작성을 도와드립니다.';
       signal = const Color(0xFF9FA1FF);
     } else if (needsAttention) {
-      title = '백로그를 먼저 정리할 때입니다.';
-      description = '미처리·처리중 VOC ${vm.backlogVocs}건을 우선순위에 맞춰 다시 배분해 보세요.';
+      title = '처리되지 않은 VOC를 먼저 확인해 주세요.';
+      description = '접수·처리 중인 VOC ${vm.backlogVocs}건을 우선순위에 따라 배정해 주세요.';
       signal = const Color(0xFFF2B45F);
     } else {
-      title = 'VOC 흐름이 안정적입니다.';
-      description = '현재 해결률을 유지하면서 AI 답변 채택률을 한 단계 더 높여보세요.';
+      title = 'VOC가 원활하게 처리되고 있습니다.';
+      description = '현재 처리 완료율을 유지하면서 AI 답변 승인률을 높여보세요.';
       signal = const Color(0xFF57D1C0);
     }
 
@@ -348,7 +348,7 @@ class _DashboardHero extends StatelessWidget {
                   ),
                   const SizedBox(width: AppSpacing.xs),
                   Text(
-                    'TODAY’S SIGNAL',
+                    '오늘의 현황',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
                           color: const Color(0xFFB9BED0),
                           letterSpacing: 1.2,
@@ -389,7 +389,7 @@ class _DashboardHero extends StatelessWidget {
                       foregroundColor: AppPalette.ink,
                     ),
                     icon: const Icon(Icons.add_rounded, size: 19),
-                    label: Text(compact ? '새 VOC' : '새 VOC 등록'),
+                    label: const Text('VOC 등록'),
                   ),
                   OutlinedButton.icon(
                     key: const Key('dashboard-open-vocs'),
@@ -401,7 +401,7 @@ class _DashboardHero extends StatelessWidget {
                       ),
                     ),
                     icon: const Icon(Icons.arrow_forward_rounded, size: 18),
-                    label: Text(compact ? 'VOC 보기' : '전체 VOC 보기'),
+                    label: const Text('전체 목록 보기'),
                   ),
                 ],
               ),
@@ -455,7 +455,7 @@ class _HeroPulse extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '현재 백로그',
+            '미완료 VOC',
             style: Theme.of(context)
                 .textTheme
                 .labelMedium
@@ -487,14 +487,14 @@ class _HeroPulse extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.lg),
           _HeroProgress(
-            label: '해결률',
+            label: '처리 완료율',
             value: vm.resolutionRate.clamp(0.0, 1.0).toDouble(),
             display: '${(vm.resolutionRate * 100).toStringAsFixed(0)}%',
             color: signal,
           ),
           const SizedBox(height: AppSpacing.md),
           _HeroProgress(
-            label: 'AI 활용률',
+            label: 'AI 답변 사용률',
             value: vm.aiUsageRate.clamp(0.0, 1.0).toDouble(),
             display: '${(vm.aiUsageRate * 100).toStringAsFixed(0)}%',
             color: const Color(0xFF9FA1FF),
@@ -615,7 +615,7 @@ class _DashboardErrorBanner extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              '일부 대시보드 정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.',
+              '일부 VOC 현황을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.',
               style: TextStyle(color: colors.onErrorContainer),
             ),
           ),
@@ -658,14 +658,14 @@ class _ExecutiveInsightsPanel extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'AI 운영 요약',
+                  'AI 분석 요약',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
               ],
             ),
             const SizedBox(height: 4),
             Text(
-              '실제 저장 데이터 기반 지표이며, AI 추정 항목은 참고용입니다.',
+              '저장된 VOC를 기준으로 계산했으며 AI 분석값은 참고용입니다.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 12),
@@ -675,56 +675,56 @@ class _ExecutiveInsightsPanel extends StatelessWidget {
               children: [
                 _metricChip(
                   context,
-                  'AI 정확도',
+                  'AI 분석 정확도',
                   '${(vm.aiOverallAccuracy * 100).toStringAsFixed(1)}%',
                   Icons.verified_outlined,
                   Colors.teal,
                 ),
                 _metricChip(
                   context,
-                  '답변 채택률',
+                  'AI 답변 승인률',
                   '${(vm.aiAnswerAdoptionRate * 100).toStringAsFixed(1)}%',
                   Icons.thumb_up_alt_outlined,
                   Colors.indigo,
                 ),
                 _metricChip(
                   context,
-                  '재오픈율 · AI 추정',
+                  '복수 답변 등록 비율',
                   '${(vm.reopenRate * 100).toStringAsFixed(1)}%',
                   Icons.replay_circle_filled_outlined,
                   Colors.deepOrange,
                   subtitle:
-                      '${vm.reopenedCount}건 / 해결 ${vm.resolvedForReopenRate}건',
+                      '${vm.reopenedCount}건 / 처리 완료 ${vm.resolvedForReopenRate}건',
                 ),
                 _metricChip(
                   context,
-                  '급상승 키워드 · 분석 지표',
+                  '최근 늘어난 키워드',
                   vm.risingKeyword,
                   Icons.local_fire_department_outlined,
                   Colors.redAccent,
                   subtitle: vm.risingKeywordDelta > 0
                       ? '최근 30일 +${vm.risingKeywordDelta}'
-                      : '최근 30일 상승 키워드 없음',
+                      : '최근 30일 동안 뚜렷하게 늘어난 키워드가 없습니다.',
                 ),
                 _metricChip(
                   context,
-                  '세그먼트 불만강도 · 분석 지표',
+                  '우선 확인 고객군',
                   vm.topSegmentName == '-' ? '-' : vm.topSegmentName,
                   Icons.groups_2_outlined,
                   Colors.pink,
                   subtitle: vm.topSegmentName == '-'
                       ? '데이터 부족'
-                      : '강도 ${vm.topSegmentScore.toStringAsFixed(1)}점 · ${vm.topSegmentVolume}건',
+                      : 'VOC ${vm.topSegmentVolume}건 · 우선 확인 점수 ${vm.topSegmentScore.toStringAsFixed(1)}점',
                 ),
                 _metricChip(
                   context,
-                  '월간 순절감액',
+                  '월 예상 순절감액',
                   roi == null ? '-' : won.format(roi.monthlyNetSavingsCost),
                   Icons.savings_outlined,
                   Colors.green,
                   subtitle: roi == null
                       ? null
-                      : '총절감 ${won.format(roi.monthlySavingsCost)} - 유지비 ${won.format(roiInput?.monthlyAiMaintenanceCost ?? 0)}',
+                      : '총 절감액 ${won.format(roi.monthlySavingsCost)} - 운영비 ${won.format(roiInput?.monthlyAiMaintenanceCost ?? 0)}',
                 ),
                 _metricChip(
                   context,
@@ -735,7 +735,7 @@ class _ExecutiveInsightsPanel extends StatelessWidget {
                 ),
                 _metricChip(
                   context,
-                  '회수기간',
+                  '투자비 회수 예상 기간',
                   roi == null || !roi.implementationPaybackMonths.isFinite
                       ? '-'
                       : '${roi.implementationPaybackMonths.toStringAsFixed(1)}개월',
@@ -744,11 +744,11 @@ class _ExecutiveInsightsPanel extends StatelessWidget {
                 ),
                 _metricChip(
                   context,
-                  '미해결 백로그율',
+                  '미완료 VOC 비율',
                   '${(vm.backlogRate * 100).toStringAsFixed(1)}%',
                   Icons.warning_amber_outlined,
                   Colors.orange,
-                  subtitle: '${vm.backlogVocs}건 (미처리+처리중)',
+                  subtitle: '${vm.backlogVocs}건 (접수+처리 중)',
                 ),
                 _metricChip(
                   context,
@@ -759,7 +759,7 @@ class _ExecutiveInsightsPanel extends StatelessWidget {
                 ),
                 _metricChip(
                   context,
-                  'AI 효과도',
+                  'AI 활용 효과',
                   roi == null
                       ? '-'
                       : '${roi.aiEffectiveness.toStringAsFixed(1)}점',
@@ -778,14 +778,14 @@ class _ExecutiveInsightsPanel extends StatelessWidget {
             if (aiRecommendations.isNotEmpty) ...[
               const SizedBox(height: 14),
               Text(
-                'AI 실시간 개선 권장사항',
+                'AI 권장 조치',
                 style: Theme.of(context).textTheme.titleSmall,
               ),
               if (aiUpdatedAt != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 2, bottom: 6),
                   child: Text(
-                    '최근 생성: ${DateFormat('yyyy-MM-dd HH:mm').format(aiUpdatedAt)}',
+                    '마지막 분석: ${DateFormat('yyyy-MM-dd HH:mm').format(aiUpdatedAt)}',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ),
@@ -894,20 +894,20 @@ class _ExecutiveInsightsPanel extends StatelessWidget {
           Text('산정 기준', style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: 6),
           Text(
-            '월간 총절감액 = 월 VOC건수 × 평균 처리시간 × 자동화율 × AI 정확도 × 시간당 인건비',
+            '월 예상 총절감액 = 월 VOC 건수 × 평균 처리 시간 × 자동화율 × AI 정확도 × 시간당 인건비',
             style: Theme.of(context).textTheme.bodySmall,
           ),
           Text(
-            '월간 순절감액 = 월간 총절감액 - 월간 AI 유지비',
+            '월 예상 순절감액 = 월 예상 총절감액 - 월간 AI 운영비',
             style: Theme.of(context).textTheme.bodySmall,
           ),
           Text(
-            'ROI(연간) = 연간 순절감액 ÷ (AI 도입비 + 연간 유지비) × 100',
+            '연간 ROI = 연간 순절감액 ÷ (AI 도입비 + 연간 운영비) × 100',
             style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: 8),
           Text(
-            '현재 입력값: 월 VOC ${input?.monthlyVocVolume ?? '-'}건, 평균처리 ${input?.avgHandleTimeHours.toStringAsFixed(2) ?? '-'}시간, 자동화율 ${((input?.automationRate ?? 0) * 100).toStringAsFixed(1)}%, AI정확도 ${((input?.aiAccuracyRate ?? 0) * 100).toStringAsFixed(1)}%',
+            '현재 입력값: 월 VOC ${input?.monthlyVocVolume ?? '-'}건, 평균 처리 ${input?.avgHandleTimeHours.toStringAsFixed(2) ?? '-'}시간, 자동화율 ${((input?.automationRate ?? 0) * 100).toStringAsFixed(1)}%, AI 정확도 ${((input?.aiAccuracyRate ?? 0) * 100).toStringAsFixed(1)}%',
             style: Theme.of(context).textTheme.bodySmall,
           ),
           Text(
@@ -916,7 +916,7 @@ class _ExecutiveInsightsPanel extends StatelessWidget {
           ),
           if (roi != null)
             Text(
-              '산출값: 월 순절감 ${won.format(roi.monthlyNetSavingsCost)}, 연 순절감 ${won.format(roi.yearlySavingsCost)}, ROI ${roi.roi.toStringAsFixed(1)}%',
+              '예상 결과: 월 순절감액 ${won.format(roi.monthlyNetSavingsCost)}, 연간 순절감액 ${won.format(roi.yearlySavingsCost)}, ROI ${roi.roi.toStringAsFixed(1)}%',
               style: Theme.of(context).textTheme.bodySmall,
             ),
         ],
@@ -940,21 +940,21 @@ class _CoreKpiCards extends StatelessWidget {
         '',
       ),
       _CardData(
-        '미처리',
+        '접수',
         vm.openVocs.toString(),
         Icons.bolt_rounded,
         AppPalette.amber,
         'OPEN',
       ),
       _CardData(
-        '해결률',
+        '처리 완료율',
         '${(vm.resolutionRate * 100).toStringAsFixed(1)}%',
         Icons.task_alt_rounded,
         AppPalette.teal,
         '',
       ),
       _CardData(
-        'AI 활용률',
+        'AI 답변 사용률',
         '${(vm.aiUsageRate * 100).toStringAsFixed(1)}%',
         Icons.auto_awesome_rounded,
         const Color(0xFF7A5AF8),
@@ -990,21 +990,21 @@ class _OperationalMetricCards extends StatelessWidget {
   Widget build(BuildContext context) {
     final cards = [
       _CardData(
-        '처리중',
+        '처리 중',
         vm.inProgressVocs.toString(),
         Icons.pending_actions,
         AppPalette.amber,
         'IN_PROGRESS',
       ),
       _CardData(
-        '해결',
+        '처리 완료',
         vm.resolvedVocs.toString(),
         Icons.check_circle_rounded,
         AppPalette.teal,
         'RESOLVED',
       ),
       _CardData(
-        '지식베이스',
+        '지식 자료',
         vm.kbCount.toString(),
         Icons.menu_book_rounded,
         AppPalette.indigo,
@@ -1018,7 +1018,7 @@ class _OperationalMetricCards extends StatelessWidget {
         '',
       ),
       _CardData(
-        '평균 처리시간',
+        '평균 처리 시간',
         '${(vm.avgProcessMinutes / 60).toStringAsFixed(1)}h',
         Icons.schedule_rounded,
         const Color(0xFF747B8E),
@@ -1070,7 +1070,7 @@ class _SummaryCard extends StatelessWidget {
   const _SummaryCard({required this.data, required this.vm});
 
   void _navigateToFilteredList(BuildContext context) {
-    if (data.label == '지식베이스') {
+    if (data.label == '지식 자료') {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const KnowledgeBaseScreen()),
@@ -1096,7 +1096,7 @@ class _SummaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isClickable = data.statusFilter.isNotEmpty ||
         data.label == '전체 VOC' ||
-        data.label == '지식베이스';
+        data.label == '지식 자료';
 
     return Card(
       key: Key('dashboard-metric-${data.label}'),
@@ -1198,7 +1198,7 @@ class _CategorySection extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    '카테고리별 VOC',
+                    'VOC 유형별 현황',
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
@@ -1207,15 +1207,15 @@ class _CategorySection extends StatelessWidget {
                   icon: Icon(
                     expanded ? Icons.visibility_off : Icons.visibility,
                   ),
-                  label: Text(expanded ? '숨기기' : '보기'),
+                  label: Text(expanded ? '접기' : '펼치기'),
                 ),
               ],
             ),
             const SizedBox(height: 4),
             Text(
               expanded
-                  ? '카테고리는 한 번에 ${VocCategoryCatalog.dashboardVisibleLimit}개씩 표시됩니다.'
-                  : '카테고리 영역은 접힌 상태로 시작합니다. 필요할 때만 펼쳐서 확인하세요.',
+                  ? '한 페이지에 VOC 유형을 최대 ${VocCategoryCatalog.dashboardVisibleLimit}개까지 표시합니다.'
+                  : '필요할 때 펼쳐서 VOC 유형별 현황을 확인하세요.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             if (data.isEmpty) ...[
@@ -1224,7 +1224,7 @@ class _CategorySection extends StatelessWidget {
                 child: Padding(
                   padding: const EdgeInsets.all(12),
                   child: Text(
-                    '카테고리 데이터가 아직 없습니다. VOC가 쌓이면 여기에서 분포와 토글을 확인할 수 있습니다.',
+                    '분류된 VOC가 없습니다. VOC가 등록되면 유형별 현황이 표시됩니다.',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ),
@@ -1345,7 +1345,7 @@ class _CategoryChart extends StatelessWidget {
               ),
               const SizedBox(width: 6),
               Text(
-                '${e.key} (${e.value}, ${pct.toStringAsFixed(0)}%)',
+                '${VocCategoryCatalog.displayName(e.key)} (${e.value}, ${pct.toStringAsFixed(0)}%)',
                 style: const TextStyle(fontSize: 12),
               ),
             ],

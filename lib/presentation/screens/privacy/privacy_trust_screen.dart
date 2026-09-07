@@ -11,7 +11,7 @@ class PrivacyTrustScreen extends StatelessWidget {
     final colorScheme = theme.colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('개인정보 · AI 데이터 보호')),
+      appBar: AppBar(title: const Text('개인정보 및 AI 데이터 처리 안내')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -58,9 +58,9 @@ class PrivacyTrustScreen extends StatelessWidget {
                               ),
                               const SizedBox(height: 6),
                               Text(
-                                '개인정보와 업무 데이터를 안전하게 처리하기 위한 기본 원칙입니다. '
-                                '외부 AI 서비스를 사용하는 경우 AI 처리에 필요한 정보만 전송하며, '
-                                '이메일·전화번호 등 탐지 가능한 개인정보는 전송 전에 자동으로 마스킹합니다.',
+                                '개인정보와 업무 데이터를 처리하는 기준을 안내합니다. '
+                                '외부 AI 서비스를 사용할 때는 분석에 필요한 정보만 전송하며, '
+                                '이메일 주소와 전화번호 등 확인 가능한 개인정보는 전송 전에 자동으로 가립니다.',
                                 style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
                               ),
                             ],
@@ -76,11 +76,11 @@ class PrivacyTrustScreen extends StatelessWidget {
                     children: const [
                       _PolicySection(
                         title: '1. 처리 목적',
-                        body: 'VOC 등록·조회·분류·답변 작성, 지식베이스 검색, 운영 통계, 동기화 및 사용자가 실행한 업무 자동화를 위해 필요한 데이터를 처리합니다.',
+                        body: 'VOC 등록·조회·분류·답변 작성, 지식 자료 검색, 운영 통계, 동기화 및 사용자가 실행한 업무 자동화에 필요한 데이터를 처리합니다.',
                       ),
                       _PolicySection(
                         title: '2. 처리될 수 있는 정보',
-                        body: 'VOC 제목·본문·고객/프로젝트 정보·담당자·처리 상태·답변, 지식베이스 문서, 사용자가 가져온 파일에서 추출된 업무 내용, AI·협업도구·동기화 설정 정보가 포함될 수 있습니다. VOC 원문에 개인정보가 포함될 수 있으므로 업무에 불필요한 개인정보 입력은 최소화해야 합니다.',
+                        body: 'VOC 제목·내용·고객 및 프로젝트 정보·담당자·처리 상태·답변, 지식 자료, 사용자가 가져온 파일에서 추출한 업무 내용, AI·업무 도구·동기화 설정 정보가 포함될 수 있습니다. VOC 원문에는 업무에 불필요한 개인정보를 입력하지 않는 것이 좋습니다.',
                       ),
                       _PolicySection(
                         title: '3. 저장 및 보유',
@@ -88,11 +88,11 @@ class PrivacyTrustScreen extends StatelessWidget {
                       ),
                       _PolicySection(
                         title: '4. 외부 서비스 전송',
-                        body: 'OpenAI, Gemini, Claude 등 외부 AI 제공자를 선택하면 AI 분석과 답변 생성에 필요한 텍스트가 해당 제공자 API로 전송될 수 있습니다. JIRA, Confluence, Outlook, Webhook 등 외부 연동을 활성화한 경우에도 해당 기능 수행에 필요한 데이터가 연결된 시스템으로 전달될 수 있습니다. Ollama는 사용자가 지정한 자체 엔드포인트를 사용합니다.',
+                        body: 'OpenAI, Gemini, Claude 등 외부 AI 서비스를 선택하면 분석과 답변 생성에 필요한 텍스트가 해당 서비스로 전송될 수 있습니다. Jira, Confluence, Outlook, 웹훅 등 외부 연동을 활성화한 경우에도 기능 실행에 필요한 데이터가 연결된 시스템으로 전달될 수 있습니다. Ollama는 사용자가 지정한 서버 주소를 사용합니다.',
                       ),
                       _PolicySection(
                         title: '5. 개인정보 보호조치',
-                        body: '외부 AI 요청을 만들 때 이메일, 전화번호, 주민등록번호, 카드번호 및 이름으로 명시된 값 등 탐지 가능한 개인정보를 자동 마스킹합니다. 마스킹은 외부 전송용 데이터에 적용되며 로컬 원본은 변경하지 않습니다. 자동 탐지는 보조수단이므로 모든 형태의 개인정보를 완전히 탐지한다고 보장할 수 없습니다.',
+                        body: '외부 AI로 데이터를 보낼 때 이메일 주소, 전화번호, 주민등록번호, 카드번호 및 이름으로 표시된 값 등 확인 가능한 개인정보를 자동으로 가립니다. 이 처리는 외부 전송용 데이터에만 적용되며 기기에 저장된 원본은 변경하지 않습니다. 자동 처리는 보조 수단이므로 모든 개인정보를 찾아낸다고 보장할 수는 없습니다.',
                       ),
                       _PolicySection(
                         title: '6. 정보주체 권리 및 문의',
@@ -107,11 +107,11 @@ class PrivacyTrustScreen extends StatelessWidget {
                     children: const [
                       _PolicySection(
                         title: 'AI가 사용하는 정보',
-                        body: '질문, VOC 제목과 내용, 유사한 과거 VOC, 지식베이스, 대화 맥락과 분석에 필요한 운영 정보가 AI 요청에 포함될 수 있습니다. 외부 AI 제공자로 전송되는 데이터에는 개인정보 마스킹을 먼저 적용합니다.',
+                        body: '질문, VOC 제목과 내용, 유사한 과거 VOC, 지식 자료, 대화 내용과 분석에 필요한 운영 정보가 AI 요청에 포함될 수 있습니다. 외부 AI 서비스로 보내는 데이터에는 개인정보 가림 처리를 먼저 적용합니다.',
                       ),
                       _PolicySection(
                         title: 'AI의 역할',
-                        body: 'AI는 분류, 긴급도·담당자 추천, 유사사례 검색, 답변 초안, 요약 및 운영 인사이트 작성을 지원합니다. 중요한 사실 확인과 최종 업무 판단은 사용자가 검토하는 것을 원칙으로 합니다.',
+                        body: 'AI는 VOC 유형 분류, 긴급도와 담당자 추천, 유사 사례 검색, 답변 초안 작성 및 운영 현황 요약을 돕습니다. 중요한 사실과 최종 업무 판단은 사용자가 직접 확인해야 합니다.',
                       ),
                       _PolicySection(
                         title: '자동 처리',

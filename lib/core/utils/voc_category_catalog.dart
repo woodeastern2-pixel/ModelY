@@ -6,6 +6,17 @@ class VocCategoryCatalog {
   static const int dashboardVisibleLimit = 7;
   static const String fallbackCategory = '기타';
 
+  static const Map<String, String> _displayNames = {
+    '기능문의': '기능 문의',
+    '사용법': '사용 방법',
+    '개선요청': '개선 요청',
+    '운영문의': '운영 문의',
+    '계약문의': '계약 문의',
+    'UI/UX': '화면·사용성',
+    '모바일': '모바일 앱',
+    '인프라': '시스템 환경',
+  };
+
   static const Map<String, List<String>> _keywordsByCategory = {
     '장애': [
       '장애',
@@ -97,6 +108,13 @@ class VocCategoryCatalog {
   };
 
   static List<String> get categories => AppConstants.defaultCategories;
+
+  /// 저장값은 유지하면서 화면에 자연스러운 카테고리명을 표시한다.
+  static String displayName(String? category) {
+    final value = category?.trim() ?? '';
+    if (value.isEmpty) return fallbackCategory;
+    return _displayNames[value] ?? value;
+  }
 
   static bool isAllowed(String? category) {
     if (category == null) return false;

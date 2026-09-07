@@ -21,7 +21,7 @@ class JiraScreen extends StatelessWidget {
       length: 5,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('업무 협업툴'),
+          title: const Text('업무 도구'),
           bottom: PreferredSize(
             preferredSize: const Size.fromHeight(48),
             child: Material(
@@ -33,7 +33,7 @@ class JiraScreen extends StatelessWidget {
                 indicatorColor: const Color(0xFFF59E0B),
                 indicatorWeight: 3,
                 tabs: const [
-                  Tab(text: 'JIRA'),
+                  Tab(text: 'Jira'),
                   Tab(text: 'Redmine'),
                   Tab(text: 'Confluence'),
                   Tab(text: 'Notion'),
@@ -69,10 +69,10 @@ class JiraScreen extends StatelessWidget {
                   title: 'Redmine 설정',
                   configured: settings.isRedmineConfigured,
                   description:
-                      '연동 정보 저장과 상태 표시만 지원합니다. 실제 이슈 동기화 API는 아직 지원하지 않습니다.',
+                      '연결 정보를 저장하고 상태를 확인할 수 있습니다. 이슈 동기화는 아직 지원하지 않습니다.',
                   rows: [
                     _ToolInfoRow('URL', settings.redmineUrl),
-                    _ToolInfoRow('Project', settings.redmineProject),
+                    _ToolInfoRow('프로젝트', settings.redmineProject),
                   ],
                 );
               },
@@ -83,10 +83,10 @@ class JiraScreen extends StatelessWidget {
                   title: 'Confluence 연동',
                   configured: settings.isConfluenceConfigured,
                   description:
-                      '승인된 VOC 답변을 FAQ 페이지로 게시할 때 사용하는 Space 인증 정보입니다.',
+                      '승인한 VOC 답변을 FAQ 페이지에 게시할 때 사용하는 연결 정보입니다.',
                   rows: [
                     _ToolInfoRow('URL', settings.confluenceUrl),
-                    _ToolInfoRow('Space', settings.confluenceSpace),
+                    _ToolInfoRow('스페이스', settings.confluenceSpace),
                   ],
                 );
               },
@@ -97,10 +97,10 @@ class JiraScreen extends StatelessWidget {
                   title: 'Notion 설정',
                   configured: settings.isNotionConfigured,
                   description:
-                      '연동 정보 저장과 상태 표시만 지원합니다. 실제 데이터베이스 동기화 API는 아직 지원하지 않습니다.',
+                      '연결 정보를 저장하고 상태를 확인할 수 있습니다. 데이터베이스 동기화는 아직 지원하지 않습니다.',
                   rows: [
-                    _ToolInfoRow('Workspace', settings.notionWorkspace),
-                    _ToolInfoRow('Database', settings.notionDatabaseId),
+                    _ToolInfoRow('워크스페이스', settings.notionWorkspace),
+                    _ToolInfoRow('데이터베이스', settings.notionDatabaseId),
                   ],
                 );
               },
@@ -111,9 +111,9 @@ class JiraScreen extends StatelessWidget {
                   title: 'GitHub Issues 설정',
                   configured: settings.isGithubConfigured,
                   description:
-                      '연동 정보 저장과 상태 표시만 지원합니다. 실제 Issues 동기화 API는 아직 지원하지 않습니다.',
+                      '연결 정보를 저장하고 상태를 확인할 수 있습니다. 이슈 동기화는 아직 지원하지 않습니다.',
                   rows: [
-                    _ToolInfoRow('Repository', settings.githubRepo),
+                    _ToolInfoRow('저장소', settings.githubRepo),
                   ],
                 );
               },
@@ -135,10 +135,10 @@ class _NotConfigured extends StatelessWidget {
           Icon(Icons.link_off, size: 64,
               color: Theme.of(context).colorScheme.outline),
           const SizedBox(height: 16),
-          const Text('JIRA가 설정되지 않았습니다',
+          const Text('Jira 연결 정보가 없습니다',
               style: TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          const Text('설정 화면의 업무 협업툴 설정에서 JIRA URL, 프로젝트 키, 토큰을 입력해 주세요',
+          const Text('설정의 업무 도구 메뉴에서 Jira 주소, 프로젝트 키, API 토큰을 입력해 주세요.',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.grey)),
         ],
@@ -160,17 +160,17 @@ class _ConnectionStatus extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('JIRA 설정', style: Theme.of(context).textTheme.titleSmall),
+            Text('Jira 연결 정보', style: Theme.of(context).textTheme.titleSmall),
             const Divider(height: 16),
             _InfoRow('서버 URL', settings.jiraUrl),
-            _InfoRow('프로젝트', settings.jiraProjectKey),
+            _InfoRow('프로젝트 키', settings.jiraProjectKey),
             _InfoRow('이메일', settings.jiraEmail),
             Row(
               children: [
                 const Icon(Icons.circle, size: 10,
                     color: Colors.green),
                 const SizedBox(width: 8),
-                Text(vm.isConnected ? '연결됨' : '연결 안 됨',
+                Text(vm.isConnected ? '연결됨' : '연결 확인 필요',
                     style: TextStyle(
                         color: vm.isConnected ? Colors.green : Colors.grey)),
               ],
@@ -228,7 +228,7 @@ class _ToolPlaceholder extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    configured ? '설정 정보 입력됨' : '설정 정보 미입력',
+                  configured ? '연결 정보 입력 완료' : '연결 정보 입력 필요',
                     style: TextStyle(
                       color: configured ? Colors.green : Colors.orange,
                       fontWeight: FontWeight.w600,
@@ -342,7 +342,7 @@ class _TestConnectionCard extends StatelessWidget {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.wifi_tethering),
-              label: Text(vm.isTesting ? '연결 중...' : 'JIRA 연결 테스트'),
+              label: Text(vm.isTesting ? '연결 확인 중...' : 'Jira 연결 확인'),
             ),
           ],
         ),

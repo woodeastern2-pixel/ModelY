@@ -135,15 +135,15 @@ class AppConstants {
   ];
 
   static const List<String> defaultBusinessTypeOptions = [
-    '메일',
-    '유저',
-    '미팅',
+    '이메일',
+    '사용자 직접 등록',
+    '회의',
     '메신저',
-    'Aipage',
+    'AI 페이지',
   ];
 
   static const List<String> defaultProjectNameOptions = [
-    'BW서비스운영',
+    'BW 서비스 운영',
   ];
 
   // Vector Search

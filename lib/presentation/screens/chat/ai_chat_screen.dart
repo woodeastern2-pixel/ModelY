@@ -22,28 +22,28 @@ class VocCopilotQuickAction {
 
 const vocCopilotQuickActions = <VocCopilotQuickAction>[
   VocCopilotQuickAction(
-    '오늘의 핵심 이슈',
-    '오늘의 VOC 핵심 이슈를 중요도와 근거가 되는 VOC 중심으로 요약해줘.',
+    '오늘 확인할 VOC',
+    '오늘 우선 확인해야 할 VOC를 중요도와 관련 VOC를 기준으로 요약해 줘.',
     Icons.today_outlined,
   ),
   VocCopilotQuickAction(
-    '미처리 VOC 분석',
-    '현재 미처리 VOC를 분석하고 우선 대응할 항목과 이유를 정리해줘.',
+    '처리 대기 VOC 우선순위',
+    '현재 처리 대기 중인 VOC를 분석하고 먼저 대응할 항목과 이유를 정리해 줘.',
     Icons.pending_actions_outlined,
   ),
   VocCopilotQuickAction(
-    '반복 불만 찾기',
-    '반복되는 고객 불만과 유사 VOC를 찾아 공통 원인과 대응 방향을 알려줘.',
+    '반복 문의 분석',
+    '반복되는 고객 문의와 유사한 VOC를 찾아 공통 원인과 대응 방향을 알려 줘.',
     Icons.repeat_outlined,
   ),
   VocCopilotQuickAction(
-    '긴급 VOC 우선순위',
-    '긴급 VOC의 처리 우선순위를 분석하고 우선순위별 근거를 설명해줘.',
+    '긴급 VOC 정리',
+    '긴급 VOC의 처리 순서를 정하고 각 항목을 먼저 확인해야 하는 이유를 설명해 줘.',
     Icons.priority_high,
   ),
   VocCopilotQuickAction(
-    '경영진 보고 요약',
-    '현재 VOC 현황을 경영진 보고용으로 핵심 이슈, 영향, 권고 조치 순서로 작성해줘.',
+    '경영진 보고서 요약',
+    '현재 VOC 현황을 경영진 보고서 형식으로 핵심 이슈, 영향, 권장 조치 순서로 작성해 줘.',
     Icons.summarize_outlined,
   ),
 ];
@@ -163,22 +163,22 @@ class _AiChatListScreenState extends State<_AiChatListScreen> {
                           child: WorkspaceHero(
                             key: const Key('copilot-home-hero'),
                             eyebrow: 'VOC COPILOT',
-                            title: '저장된 VOC에 바로 질문하세요.',
+                            title: '저장된 VOC에 대해 질문해 보세요.',
                             description:
-                                '고객 신호와 해결 지식을 근거로 우선순위, 반복 이슈, 보고용 요약을 만듭니다.',
+                                'VOC와 지식 자료를 바탕으로 우선순위, 반복 문의, 보고서 요약을 정리합니다.',
                             icon: Icons.auto_awesome_rounded,
                             metrics: [
                               WorkspaceMetric(
-                                label: '분석 대화',
+                                label: '저장된 대화',
                                 value: '${_sessions.length}',
                               ),
                               const WorkspaceMetric(
-                                label: 'Quick Action',
+                                label: '빠른 분석',
                                 value: '5',
                                 color: Color(0xFFBFC2FF),
                               ),
                               const WorkspaceMetric(
-                                label: '근거',
+                                label: '참조한 VOC',
                                 value: 'VOC',
                                 color: Color(0xFF55CDBE),
                               ),
@@ -192,7 +192,7 @@ class _AiChatListScreenState extends State<_AiChatListScreen> {
                                   foregroundColor: AppPalette.ink,
                                 ),
                                 icon: const Icon(Icons.add_comment_outlined),
-                                label: const Text('새 분석 시작'),
+                                label: const Text('새 대화 시작'),
                               ),
                             ],
                           ),
@@ -258,12 +258,12 @@ class _ChatSessionEmptyState extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
-              '아직 저장된 분석 대화가 없습니다.',
+              '아직 저장된 대화가 없습니다.',
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
-              '위 Quick Action을 선택하거나 새 분석을 시작해 보세요.',
+              '빠른 분석을 선택하거나 새 대화를 시작해 보세요.',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodySmall,
             ),
@@ -271,7 +271,7 @@ class _ChatSessionEmptyState extends StatelessWidget {
             FilledButton.icon(
               onPressed: onStart,
               icon: const Icon(Icons.add_comment_outlined),
-              label: const Text('새 분석 시작'),
+              label: const Text('새 대화 시작'),
             ),
           ],
         ),
@@ -289,8 +289,8 @@ class _CopilotLaunchpad extends StatelessWidget {
   Widget build(BuildContext context) {
     return WorkspacePanel(
       key: const Key('copilot-quick-actions'),
-      title: '바로 분석하기',
-      description: '자주 쓰는 운영 질문을 실제 VOC 근거와 함께 실행합니다.',
+      title: '빠른 분석',
+      description: '자주 확인하는 내용을 저장된 VOC를 기준으로 바로 분석합니다.',
       icon: Icons.bolt_outlined,
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -368,8 +368,8 @@ class _SessionWorkspace extends StatelessWidget {
   Widget build(BuildContext context) {
     return WorkspacePanel(
       key: const Key('copilot-session-list'),
-      title: '최근 분석',
-      description: '이전 대화와 연결된 VOC 근거를 다시 확인할 수 있습니다.',
+      title: '최근 대화',
+      description: '이전 대화와 답변에 참조된 VOC를 다시 확인할 수 있습니다.',
       icon: Icons.history,
       padding: EdgeInsets.zero,
       child: Column(
@@ -446,7 +446,7 @@ class _SessionRow extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    '${session.messageCount}개 메시지',
+                    '메시지 ${session.messageCount}개',
                     style: Theme.of(context).textTheme.labelSmall,
                   ),
                   const SizedBox(height: 3),
@@ -618,7 +618,7 @@ class _AiChatConversationScreenState extends State<_AiChatConversationScreen> {
                 const Padding(
                   padding: EdgeInsets.only(right: AppSpacing.sm),
                   child: Tooltip(
-                    message: 'VOC 근거 기반',
+                    message: '저장된 VOC 기준',
                     child: Icon(Icons.link_rounded),
                   ),
                 )
@@ -627,7 +627,7 @@ class _AiChatConversationScreenState extends State<_AiChatConversationScreen> {
                   padding: const EdgeInsets.only(right: AppSpacing.md),
                   child: Chip(
                     avatar: const Icon(Icons.link_rounded, size: 16),
-                    label: const Text('VOC 근거 기반'),
+                    label: const Text('저장된 VOC 기준'),
                     side: BorderSide(
                       color: Theme.of(context).colorScheme.outlineVariant,
                     ),
@@ -713,7 +713,7 @@ class _AiChatConversationScreenState extends State<_AiChatConversationScreen> {
                                               message.content,
                                             ),
                                       isUser
-                                          ? '메시지를 복사했습니다.'
+                                          ? '질문을 복사했습니다.'
                                           : 'AI 답변을 복사했습니다.',
                                     ),
                                   ),
@@ -836,7 +836,7 @@ class _ConversationMessage extends StatelessWidget {
           Row(
             children: [
               Text(
-                isUser ? '나' : 'VOC COPILOT',
+                isUser ? '내 질문' : 'VOC COPILOT',
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       color:
                           isUser ? colors.onPrimaryContainer : colors.primary,
@@ -846,7 +846,7 @@ class _ConversationMessage extends StatelessWidget {
               ),
               const Spacer(),
               IconButton(
-                tooltip: isUser ? '내 메시지 복사' : 'AI 답변 복사',
+                tooltip: isUser ? '질문 복사' : 'AI 답변 복사',
                 onPressed: onCopy,
                 icon: const Icon(Icons.content_copy_outlined, size: 16),
                 visualDensity: VisualDensity.compact,
@@ -936,15 +936,15 @@ class _CopilotConversationEmptyState extends StatelessWidget {
             children: [
               const WorkspaceHero(
                 key: Key('copilot-conversation-empty'),
-                eyebrow: 'EVIDENCE WORKSPACE',
-                title: '첫 분석 주제를 선택하세요.',
-                description: '저장된 VOC를 탐색해 핵심 이슈와 대응 우선순위를 근거와 함께 정리합니다.',
+                eyebrow: 'VOC 근거 분석',
+                title: '확인할 내용을 선택해 주세요.',
+                description: '저장된 VOC를 바탕으로 주요 이슈와 대응 우선순위를 정리합니다.',
                 icon: Icons.hub_outlined,
                 metrics: [
                   WorkspaceMetric(label: '분석 기준', value: 'VOC'),
                   WorkspaceMetric(
                     label: '응답 방식',
-                    value: '근거 우선',
+                    value: 'VOC 참조',
                     color: Color(0xFF55CDBE),
                   ),
                 ],

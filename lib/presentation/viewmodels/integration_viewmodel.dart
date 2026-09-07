@@ -226,10 +226,10 @@ class IntegrationViewModel extends ChangeNotifier {
       }
 
       _success =
-          'VOC 가져오기 완료: 추가 $imported건, 갱신 $updated건, 건너뜀 $skipped건, 필수값 누락 $invalid건';
+          'VOC를 가져왔습니다. 새 VOC $imported개 · 업데이트 $updated개 · 건너뜀 $skipped개 · 필수 정보 누락 $invalid개';
       return imported + updated;
     } catch (e) {
-      _error = '엑셀 Import 실패: $e';
+      _error = '엑셀 파일을 가져오지 못했습니다: $e';
       return 0;
     } finally {
       _end();
@@ -247,10 +247,10 @@ class IntegrationViewModel extends ChangeNotifier {
         vocs: vocs,
         responses: responses,
       );
-      _success = 'VOC/답변 Export 완료: $out';
+      _success = 'VOC와 답변을 내보냈습니다: $out';
       return out;
     } catch (e) {
-      _error = 'VOC Export 실패: $e';
+      _error = 'VOC를 내보내지 못했습니다: $e';
       return null;
     } finally {
       _end();
@@ -261,10 +261,10 @@ class IntegrationViewModel extends ChangeNotifier {
     _start();
     try {
       final out = await _excel.exportVocTemplate(filePath: filePath);
-      _success = 'VOC 템플릿 다운로드 완료: $out';
+      _success = 'VOC 입력 템플릿을 저장했습니다: $out';
       return out;
     } catch (e) {
-      _error = 'VOC 템플릿 다운로드 실패: $e';
+      _error = 'VOC 입력 템플릿을 저장하지 못했습니다: $e';
       return null;
     } finally {
       _end();
@@ -286,9 +286,9 @@ class IntegrationViewModel extends ChangeNotifier {
       await db.delete(AppConstants.tableEmails);
       await db.delete(AppConstants.tableEmailAttachments);
 
-      _success = 'VOC/Vector DB/AI 캐시를 모두 초기화했습니다.';
+      _success = 'VOC, AI 검색 데이터와 대화 기록을 모두 초기화했습니다.';
     } catch (e) {
-      _error = 'VOC 초기화 실패: $e';
+      _error = 'VOC 데이터를 초기화하지 못했습니다: $e';
     } finally {
       _end();
     }
@@ -307,10 +307,10 @@ class IntegrationViewModel extends ChangeNotifier {
         await _vocRepository.updateVoc(next);
         updated += 1;
       }
-      _success = 'Vector DB 재생성 완료: $updated건';
+      _success = 'AI 검색 데이터 $updated개를 다시 만들었습니다.';
       return updated;
     } catch (e) {
-      _error = 'Vector DB 재생성 실패: $e';
+      _error = 'AI 검색 데이터를 다시 만들지 못했습니다: $e';
       return 0;
     } finally {
       _end();
@@ -323,9 +323,9 @@ class IntegrationViewModel extends ChangeNotifier {
       final db = await DatabaseHelper.instance.database;
       await db.delete('ai_feedback');
       await db.delete('ai_chat_messages');
-      _success = 'AI 캐시를 초기화했습니다.';
+      _success = 'AI 대화와 답변 평가 기록을 초기화했습니다.';
     } catch (e) {
-      _error = 'AI 캐시 초기화 실패: $e';
+      _error = 'AI 대화 기록을 초기화하지 못했습니다: $e';
     } finally {
       _end();
     }
@@ -450,10 +450,10 @@ class IntegrationViewModel extends ChangeNotifier {
         imported += 1;
       }
 
-      _success = 'Outlook 메일 기반 VOC $imported건 생성 완료';
+      _success = 'Outlook 메일에서 VOC $imported개를 등록했습니다.';
       return imported;
     } catch (e) {
-      _error = 'Outlook 연동 실패: $e';
+      _error = 'Outlook 메일을 가져오지 못했습니다: $e';
       return 0;
     } finally {
       _end();
@@ -462,7 +462,7 @@ class IntegrationViewModel extends ChangeNotifier {
 
   Future<void> notifyUrgentVocToTeams(VocEntity voc) async {
     if (!_connectors.teamsNotifier.isConfigured) {
-      _error = 'Teams Webhook이 설정되지 않았습니다.';
+      _error = 'Teams 웹훅 URL이 설정되지 않았습니다.';
       notifyListeners();
       return;
     }
@@ -470,9 +470,9 @@ class IntegrationViewModel extends ChangeNotifier {
     _start();
     try {
       await _connectors.teamsNotifier.sendUrgentVoc(voc);
-      _success = 'Teams 긴급 알림 전송 완료';
+      _success = 'Teams로 긴급 VOC 알림을 보냈습니다.';
     } catch (e) {
-      _error = 'Teams 알림 실패: $e';
+      _error = 'Teams로 알림을 보내지 못했습니다: $e';
     } finally {
       _end();
     }
@@ -483,7 +483,7 @@ class IntegrationViewModel extends ChangeNotifier {
     required String answer,
   }) async {
     if (!_connectors.teamsNotifier.isConfigured) {
-      _error = 'Teams Webhook이 설정되지 않았습니다.';
+      _error = 'Teams 웹훅 URL이 설정되지 않았습니다.';
       notifyListeners();
       return;
     }
@@ -494,9 +494,9 @@ class IntegrationViewModel extends ChangeNotifier {
         voc: voc,
         answer: answer,
       );
-      _success = 'Teams AI 답변 공유 완료';
+      _success = 'AI 답변을 Teams로 공유했습니다.';
     } catch (e) {
-      _error = 'Teams 공유 실패: $e';
+      _error = 'Teams로 답변을 공유하지 못했습니다: $e';
     } finally {
       _end();
     }
@@ -506,7 +506,7 @@ class IntegrationViewModel extends ChangeNotifier {
     required VocEntity voc,
   }) async {
     if (!_connectors.slackNotifier.isConfigured) {
-      _error = 'Slack Webhook이 설정되지 않았습니다.';
+      _error = 'Slack 웹훅 URL이 설정되지 않았습니다.';
       notifyListeners();
       return;
     }
@@ -514,9 +514,9 @@ class IntegrationViewModel extends ChangeNotifier {
     _start();
     try {
       await _connectors.slackNotifier.shareVoc(voc);
-      _success = 'Slack VOC 공유 완료';
+      _success = 'VOC를 Slack으로 공유했습니다.';
     } catch (e) {
-      _error = 'Slack 공유 실패: $e';
+      _error = 'VOC를 Slack으로 공유하지 못했습니다: $e';
     } finally {
       _end();
     }
@@ -527,7 +527,7 @@ class IntegrationViewModel extends ChangeNotifier {
     required String answer,
   }) async {
     if (!_connectors.slackNotifier.isConfigured) {
-      _error = 'Slack Webhook이 설정되지 않았습니다.';
+      _error = 'Slack 웹훅 URL이 설정되지 않았습니다.';
       notifyListeners();
       return;
     }
@@ -538,9 +538,9 @@ class IntegrationViewModel extends ChangeNotifier {
         voc: voc,
         answer: answer,
       );
-      _success = 'Slack 공유 완료';
+      _success = 'AI 답변을 Slack으로 공유했습니다.';
     } catch (e) {
-      _error = 'Slack 공유 실패: $e';
+      _error = 'AI 답변을 Slack으로 공유하지 못했습니다: $e';
     } finally {
       _end();
     }
@@ -553,7 +553,7 @@ class IntegrationViewModel extends ChangeNotifier {
 
     final targets = _settingsViewModel.vocForwardWebhookTargets;
     if (targets.isEmpty) {
-      return '앱 동기화가 켜져 있지만 수신 URL이 없습니다.';
+      return '자동 동기화가 켜져 있지만 등록된 대상 URL이 없습니다.';
     }
 
     final payload = {
@@ -606,7 +606,7 @@ class IntegrationViewModel extends ChangeNotifier {
 
     if (failedTargets.isEmpty) {
       _lastSyncErrorDetails = null;
-      return '앱 동기화 전송 완료: $successCount개 앱';
+      return 'VOC를 연결된 앱 $successCount곳에 전달했습니다.';
     }
 
     _lastSyncErrorDetails = _buildSyncFailureDetails(
@@ -614,7 +614,7 @@ class IntegrationViewModel extends ChangeNotifier {
       targets: failedTargets,
     );
 
-    return '앱 동기화 일부 실패: 성공 $successCount개, 실패 ${failedTargets.length}개 (재시도 대기 ${_syncRetryQueue.length}건)';
+    return 'VOC 전달을 일부 완료하지 못했습니다. 성공 $successCount곳 · 실패 ${failedTargets.length}곳 · 다시 시도할 항목 ${_syncRetryQueue.length}개';
   }
 
   Future<String?> forwardVocChangeToPeerApps({
@@ -628,7 +628,7 @@ class IntegrationViewModel extends ChangeNotifier {
 
     final targets = _settingsViewModel.vocForwardWebhookTargets;
     if (targets.isEmpty) {
-      return '앱 동기화가 켜져 있지만 수신 URL이 없습니다.';
+      return '자동 동기화가 켜져 있지만 등록된 대상 URL이 없습니다.';
     }
 
     final payload = {
@@ -778,19 +778,19 @@ class IntegrationViewModel extends ChangeNotifier {
       if (failedTargets.isEmpty) {
         _lastSyncErrorDetails = null;
         _success =
-            '전체 동기화 전송 완료: 앱 $successCount개, VOC ${vocRows.length}건, 매뉴얼 ${manualRows.length}건';
+            '전체 데이터를 동기화했습니다. 앱 $successCount곳 · VOC ${vocRows.length}개 · 매뉴얼 ${manualRows.length}개';
       } else {
         _lastSyncErrorDetails = _buildSyncFailureDetails(
           title: '전체 VOC/매뉴얼 동기화 실패 상세',
           targets: failedTargets,
         );
         _error =
-            '전체 동기화 일부 실패: 성공 $successCount개, 실패 ${failedTargets.length}개 (재시도 대기 ${_syncRetryQueue.length}건)';
+            '전체 데이터 동기화를 일부 완료하지 못했습니다. 성공 $successCount곳 · 실패 ${failedTargets.length}곳 · 다시 시도할 항목 ${_syncRetryQueue.length}개';
       }
     } catch (e) {
       _lastSyncErrorDetails = '전체 동기화 예외\n- $e';
       _appendSyncLog('전체 동기화 예외: $e');
-      _error = '전체 동기화 전송 실패: $e';
+      _error = '전체 데이터를 동기화하지 못했습니다: $e';
     } finally {
       _endFullSyncProgress();
       _end();
@@ -802,7 +802,7 @@ class IntegrationViewModel extends ChangeNotifier {
     try {
       final targets = _settingsViewModel.vocForwardWebhookTargets;
       if (targets.isEmpty) {
-        _error = '가져올 대상 앱 URL이 없습니다.';
+        _error = 'VOC를 가져올 대상 URL이 없습니다.';
         return 0;
       }
 
@@ -908,17 +908,17 @@ class IntegrationViewModel extends ChangeNotifier {
           targets: failedTargets,
         );
         _error =
-            '상대 앱 VOC 가져오기 일부 실패: 성공 $successTargets개 앱, 실패 ${failedTargets.length}개 앱 (총 $remoteTotal건 확인, 중복 제외 $duplicateSkipped건, 반영 $imported건)';
+            '연결된 앱의 VOC를 일부 가져오지 못했습니다. 성공 $successTargets곳 · 실패 ${failedTargets.length}곳 · 전체 $remoteTotal개 · 중복 제외 $duplicateSkipped개 · 반영 $imported개';
       } else {
         _lastSyncErrorDetails = null;
         _success =
-            '상대 앱 VOC 가져오기 완료: 앱 $successTargets개, 총 $remoteTotal건 확인, 중복 제외 $duplicateSkipped건, 반영 $imported건';
+            '연결된 앱에서 VOC를 가져왔습니다. 앱 $successTargets곳 · 전체 $remoteTotal개 · 중복 제외 $duplicateSkipped개 · 반영 $imported개';
       }
 
       return imported;
     } catch (e) {
       _syncCurrentTarget = null;
-      _error = '상대 앱 VOC 가져오기 실패: $e';
+      _error = '연결된 앱에서 VOC를 가져오지 못했습니다: $e';
       return 0;
     } finally {
       _end();
@@ -1082,18 +1082,18 @@ class IntegrationViewModel extends ChangeNotifier {
       await _vocRepository.getAllVocs();
       if (failedTargets.isEmpty) {
         _bootstrapStatus =
-            '초기 동기화 완료: VOC $importedVocs건, 매뉴얼 $importedManuals건, 중복 제외 $duplicateSkips건';
+            '초기 동기화를 완료했습니다. VOC $importedVocs개 · 매뉴얼 $importedManuals개 · 중복 제외 $duplicateSkips개';
         _success = _bootstrapStatus;
       } else {
         _bootstrapStatus =
-            '초기 동기화 일부 실패: 성공 ${targets.length - failedTargets.length}개 앱, 실패 ${failedTargets.length}개 앱';
+            '초기 동기화를 일부 완료하지 못했습니다. 성공 ${targets.length - failedTargets.length}곳 · 실패 ${failedTargets.length}곳';
         _error = _bootstrapStatus;
       }
 
       notifyListeners();
       return importedVocs + importedManuals;
     } catch (e) {
-      _bootstrapStatus = '초기 동기화 실패: $e';
+      _bootstrapStatus = '초기 동기화를 완료하지 못했습니다: $e';
       _error = _bootstrapStatus;
       notifyListeners();
       return 0;
@@ -1105,7 +1105,7 @@ class IntegrationViewModel extends ChangeNotifier {
 
   Future<void> retryPendingSyncQueue() async {
     if (_syncRetryQueue.isEmpty) {
-      _success = '재시도할 동기화 대기 건이 없습니다.';
+      _success = '다시 시도할 동기화 항목이 없습니다.';
       notifyListeners();
       return;
     }
@@ -1138,11 +1138,11 @@ class IntegrationViewModel extends ChangeNotifier {
 
       if (_syncRetryQueue.isEmpty) {
         _lastSyncErrorDetails = null;
-        _success = '동기화 재시도 완료: $successCount건 성공';
+        _success = '동기화를 다시 시도해 $successCount개를 완료했습니다.';
       } else {
         _lastSyncErrorDetails = _buildRetryFailureDetails();
         _error =
-            '동기화 재시도 일부 실패: 성공 $successCount건, 잔여 ${_syncRetryQueue.length}건';
+            '동기화를 다시 시도했지만 일부 항목을 완료하지 못했습니다. 성공 $successCount개 · 남은 항목 ${_syncRetryQueue.length}개';
       }
     } finally {
       _end();
@@ -1400,10 +1400,10 @@ class IntegrationViewModel extends ChangeNotifier {
         voc: voc,
         approvedAnswer: approvedAnswer,
       );
-      _success = 'Confluence 문서화 완료';
+      _success = 'Confluence에 문서를 등록했습니다.';
       return pageUrl;
     } catch (e) {
-      _error = 'Confluence 등록 실패: $e';
+      _error = 'Confluence에 문서를 등록하지 못했습니다: $e';
       return null;
     } finally {
       _end();

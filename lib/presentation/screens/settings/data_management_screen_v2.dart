@@ -62,14 +62,14 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
       if (!mounted) return;
       await _refresh();
       _show(
-        '상대 앱 VOC 가져오기 완료 · 원격 VOC ${result.remoteTotal}건 · '
-        '신규 ${result.created}건 · 갱신 ${result.updated}건 · '
-        '반영 ${result.applied}건 · 앱 성공 ${result.successApps}곳'
-        '${result.failedApps > 0 ? ' · 앱 실패 ${result.failedApps}곳' : ''}',
+        '연결된 앱에서 VOC를 가져왔습니다. 전체 ${result.remoteTotal}개 · '
+        '새 VOC ${result.created}개 · 업데이트 ${result.updated}개 · '
+        '반영 ${result.applied}개 · 성공 ${result.successApps}곳'
+        '${result.failedApps > 0 ? ' · 실패 ${result.failedApps}곳' : ''}',
         error: result.failedApps > 0,
       );
     } catch (e) {
-      _show('상대 앱 VOC 가져오기 실패: $e', error: true);
+      _show('연결된 앱에서 VOC를 가져오지 못했습니다: $e', error: true);
     } finally {
       if (mounted) setState(() => _peerSyncRunning = false);
     }
@@ -83,14 +83,14 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
       if (!mounted) return;
       await _refresh();
       _show(
-        '초기 핸드셰이크 완료\n'
-        'VOC: 원격 ${result.vocRemoteTotal}건 · 신규 ${result.vocCreated}건 · 갱신 ${result.vocUpdated}건\n'
-        '지식베이스: 원격 ${result.manualRemoteTotal}건 · 신규 ${result.manualCreated}건 · 중복/제외 ${result.manualSkipped}건\n'
+        '초기 데이터 동기화를 완료했습니다.\n'
+        'VOC: 전체 ${result.vocRemoteTotal}개 · 새 VOC ${result.vocCreated}개 · 업데이트 ${result.vocUpdated}개\n'
+        '지식 자료: 전체 ${result.manualRemoteTotal}개 · 새 자료 ${result.manualCreated}개 · 제외 ${result.manualSkipped}개\n'
         '앱: 성공 ${result.successApps}곳${result.failedApps > 0 ? ' · 실패 ${result.failedApps}곳' : ''}',
         error: result.failedApps > 0,
       );
     } catch (e) {
-      _show('초기 핸드셰이크 실패: $e', error: true);
+      _show('초기 데이터 동기화에 실패했습니다: $e', error: true);
     } finally {
       if (mounted) setState(() => _peerSyncRunning = false);
     }
@@ -205,29 +205,29 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
                       children: [
                         _Group('시스템 간 동기화', Icons.sync_alt_outlined, [
                           _Cmd(
-                            '전체 VOC · 매뉴얼 공유',
+                            '전체 VOC와 매뉴얼 보내기',
                             Icons.cloud_upload_outlined,
                             busy ? null : () => _run((v) => v.forwardFullVocAndManualToPeerApps()),
                           ),
                           _Cmd(
-                            '상대 앱 VOC 가져오기',
+                            '연결된 앱의 VOC 가져오기',
                             Icons.cloud_download_outlined,
                             busy ? null : _pullPeerVocs,
                           ),
                           _Cmd(
-                            '초기 핸드셰이크',
+                            '초기 데이터 동기화',
                             Icons.handshake_outlined,
                             busy ? null : _bootstrapPeerData,
                           ),
                           _Cmd(
-                            '실패 동기화 재시도 (${vm.syncRetryQueueCount})',
+                            '실패한 동기화 다시 시도 (${vm.syncRetryQueueCount})',
                             Icons.refresh_outlined,
                             busy || vm.syncRetryQueueCount == 0
                                 ? null
                                 : () => _run((v) => v.retryPendingSyncQueue()),
                           ),
                         ]),
-                        _Group('가져오기 · 백업', Icons.folder_copy_outlined, [
+                        _Group('가져오기·내보내기', Icons.folder_copy_outlined, [
                           _Cmd(
                             'Outlook 메일에서 VOC 수집',
                             Icons.mark_email_read_outlined,
@@ -237,10 +237,10 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
                           _Cmd('VOC 내보내기', Icons.file_download_outlined, busy ? null : () => _export(false)),
                           _Cmd('VOC 입력 템플릿', Icons.description_outlined, busy ? null : () => _export(true)),
                         ]),
-                        _Group('AI · 검색 데이터', Icons.auto_awesome_motion_outlined, [
-                          _Cmd('Vector DB 재생성', Icons.hub_outlined, busy ? null : () => _run((v) async { await v.rebuildVectorDb(); })),
-                          _Cmd('AI 캐시 초기화', Icons.cleaning_services_outlined, busy ? null : () async {
-                            if (await _confirm('AI 캐시 초기화', 'AI 대화와 피드백 캐시를 초기화합니다. VOC 원문은 유지됩니다.')) {
+                        _Group('AI 검색 데이터', Icons.auto_awesome_motion_outlined, [
+                          _Cmd('AI 검색 데이터 다시 만들기', Icons.hub_outlined, busy ? null : () => _run((v) async { await v.rebuildVectorDb(); })),
+                          _Cmd('AI 대화 기록 초기화', Icons.cleaning_services_outlined, busy ? null : () async {
+                            if (await _confirm('AI 대화 기록 초기화', 'AI 대화와 답변 평가 기록을 초기화합니다. VOC 원문은 유지됩니다.')) {
                               await _run((v) => v.clearAiCache());
                             }
                           }),
@@ -249,7 +249,7 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
                           _Cmd('VOC 데이터 전체 초기화', Icons.delete_forever_outlined, busy ? null : () async {
                             if (await _confirm(
                               'VOC 데이터 전체 초기화',
-                              'VOC, 답변, 지식베이스, Vector DB와 AI 캐시가 삭제됩니다. 되돌릴 수 없습니다.',
+                              'VOC, 답변, 지식 자료, AI 검색 데이터와 대화 기록이 삭제됩니다. 이 작업은 되돌릴 수 없습니다.',
                               danger: true,
                             )) {
                               await _run((v) => v.clearAllVocData(), refresh: true);
@@ -311,19 +311,19 @@ class _Header extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '데이터 및 동기화 운영',
+                    '데이터 및 동기화 관리',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '가져오기, 백업, 동기화와 초기화 같은 실행 작업을 관리합니다.',
+                    'VOC 가져오기·내보내기, 시스템 간 동기화 및 데이터 초기화를 실행합니다.',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
                   ),
                 ],
               ),
             ),
             Text(
-              active ? '수신기 실행 중' : '수신기 확인 필요',
+              active ? '동기화 준비 완료' : '동기화 상태 확인 필요',
               style: TextStyle(color: tone, fontWeight: FontWeight.w700),
             ),
           ],

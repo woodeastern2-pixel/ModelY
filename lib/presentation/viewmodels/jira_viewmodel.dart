@@ -53,8 +53,8 @@ class JiraViewModel extends ChangeNotifier {
 
     try {
       _isConnected = await _jiraService!.testConnection();
-      _successMessage = _isConnected ? 'JIRA 연결 성공!' : null;
-      if (!_isConnected) _error = 'JIRA 연결 실패. URL, 이메일, 토큰을 확인해 주세요.';
+      _successMessage = _isConnected ? 'Jira 연결을 확인했습니다.' : null;
+      if (!_isConnected) _error = 'Jira에 연결하지 못했습니다. 주소, 이메일, API 토큰을 확인해 주세요.';
     } catch (e) {
       _isConnected = false;
       _error = e.toString();
@@ -71,7 +71,7 @@ class JiraViewModel extends ChangeNotifier {
     String priority = 'Medium',
   }) async {
     if (_jiraService == null) {
-      _error = 'JIRA가 설정되지 않았습니다';
+      _error = 'Jira 연결 정보가 없습니다.';
       notifyListeners();
       return null;
     }
@@ -99,7 +99,7 @@ class JiraViewModel extends ChangeNotifier {
 
       await _saveJiraLink(link);
       _vocLinks.add(link);
-      _successMessage = 'JIRA 이슈 $jiraKey 생성 완료';
+      _successMessage = 'Jira 이슈를 만들었습니다: $jiraKey';
       notifyListeners();
       return link;
     } catch (e) {

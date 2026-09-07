@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_tokens.dart';
+import '../../../core/utils/voc_category_catalog.dart';
 import '../../../domain/entities/response_entity.dart';
 import '../../../domain/entities/voc_entity.dart';
 import '../../viewmodels/ai_viewmodel.dart';
@@ -54,21 +55,21 @@ class _VocDetailScreenState extends State<VocDetailScreen> {
                 title: const Text('VOC 상세'),
                 actions: [
                   PopupMenuButton<String>(
-                    tooltip: 'VOC 작업',
+                    tooltip: '더보기',
                     onSelected: (action) => _handleAction(context, action, vm),
                     itemBuilder: (_) => [
                       const PopupMenuItem(value: 'edit', child: Text('수정')),
                       if (voc.status == AppConstants.vocStatusOpen)
                         const PopupMenuItem(
                           value: 'in_progress',
-                          child: Text('처리중으로 변경'),
+                          child: Text('처리 시작'),
                         ),
                       if (voc.status != AppConstants.vocStatusResolved)
                         const PopupMenuItem(
-                            value: 'resolve', child: Text('해결 완료')),
+                            value: 'resolve', child: Text('처리 완료')),
                       if (voc.status != AppConstants.vocStatusRejected)
                         const PopupMenuItem(
-                            value: 'reject', child: Text('반려 처리')),
+                            value: 'reject', child: Text('반려')),
                       const PopupMenuDivider(),
                       const PopupMenuItem(value: 'delete', child: Text('삭제')),
                     ],
@@ -90,7 +91,7 @@ class _VocDetailScreenState extends State<VocDetailScreen> {
                       children: [
                         WorkspaceHero(
                           key: const Key('voc-detail-hero'),
-                          eyebrow: 'CUSTOMER SIGNAL',
+                          eyebrow: 'VOC 상세',
                           title: voc.title,
                           description: _vocExcerpt(voc.content),
                           icon: Icons.campaign_outlined,
@@ -107,8 +108,8 @@ class _VocDetailScreenState extends State<VocDetailScreen> {
                                   : null,
                             ),
                             WorkspaceMetric(
-                              label: '카테고리',
-                              value: voc.category,
+                              label: 'VOC 유형',
+                              value: VocCategoryCatalog.displayName(voc.category),
                               color: const Color(0xFFBFC2FF),
                             ),
                           ],
@@ -136,7 +137,7 @@ class _VocDetailScreenState extends State<VocDetailScreen> {
                                 foregroundColor: AppPalette.ink,
                               ),
                               icon: const Icon(Icons.auto_awesome_rounded),
-                              label: const Text('AI 답변 만들기'),
+                              label: const Text('AI 답변 초안 만들기'),
                             ),
                           ],
                         ),
@@ -225,7 +226,7 @@ class _VocDetailScreenState extends State<VocDetailScreen> {
         context: context,
         builder: (ctx) => AlertDialog(
           title: const Text('VOC 삭제'),
-          content: const Text('이 VOC와 연결된 답변을 포함해 삭제합니다. 계속하시겠습니까?'),
+          content: const Text('이 VOC를 삭제하면 등록된 답변도 함께 삭제됩니다. 삭제하시겠습니까?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
@@ -302,10 +303,13 @@ class _VocDetailScreenState extends State<VocDetailScreen> {
                   if (categories.isNotEmpty)
                     DropdownButtonFormField<String>(
                       initialValue: category,
-                      decoration: const InputDecoration(labelText: '카테고리'),
+                      decoration: const InputDecoration(labelText: 'VOC 유형'),
                       items: categories
                           .map((item) =>
-                              DropdownMenuItem(value: item, child: Text(item)))
+                              DropdownMenuItem(
+                                value: item,
+                                child: Text(VocCategoryCatalog.displayName(item)),
+                              ))
                           .toList(),
                       onChanged: (value) {
                         if (value != null)
@@ -396,9 +400,9 @@ String _statusName(String status) {
     case AppConstants.vocStatusOpen:
       return '접수';
     case AppConstants.vocStatusInProgress:
-      return '처리중';
+      return '처리 중';
     case AppConstants.vocStatusResolved:
-      return '해결';
+      return '처리 완료';
     case AppConstants.vocStatusRejected:
       return '반려';
     default:
@@ -409,7 +413,7 @@ String _statusName(String status) {
 String _priorityName(String priority) {
   switch (priority) {
     case AppConstants.priorityHigh:
-      return '긴급';
+      return '높음';
     case AppConstants.priorityMedium:
       return '보통';
     case AppConstants.priorityLow:
@@ -426,7 +430,7 @@ class _VocSummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _Panel(
-      title: 'VOC 요약',
+      title: '기본 정보',
       icon: Icons.assignment_outlined,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -438,24 +442,28 @@ class _VocSummaryCard extends StatelessWidget {
               VocStatusChip(status: voc.status),
               PriorityChip(priority: voc.priority),
               Chip(
-                  label: Text(voc.category),
+                  label: Text(VocCategoryCatalog.displayName(voc.category)),
                   visualDensity: VisualDensity.compact),
             ],
           ),
           const SizedBox(height: 14),
-          _MetaRow(Icons.person_outline, '고객', voc.customer),
+          _MetaRow(Icons.person_outline, '고객명', voc.customer),
           if (voc.businessType != null)
-            _MetaRow(Icons.work_outline, '업무 구분', voc.businessType!),
+            _MetaRow(Icons.work_outline, '접수 경로', voc.businessType!),
           _MetaRow(Icons.folder_outlined, '프로젝트', voc.project),
           _MetaRow(Icons.schedule_outlined, '등록일', _formatDate(voc.createdAt)),
           if (voc.aiCategory != null)
-            _MetaRow(Icons.auto_awesome_outlined, 'AI 분류', voc.aiCategory!),
+            _MetaRow(
+              Icons.auto_awesome_outlined,
+              'AI 추천 유형',
+              VocCategoryCatalog.displayName(voc.aiCategory),
+            ),
           if (voc.urgency != null)
             _MetaRow(Icons.priority_high_outlined, '긴급도', voc.urgency!),
           if (voc.department != null)
             _MetaRow(Icons.apartment_outlined, '담당 부서', voc.department!),
           if (voc.assignee != null)
-            _MetaRow(Icons.badge_outlined, '담당자 추천', voc.assignee!),
+            _MetaRow(Icons.badge_outlined, '추천 담당자', voc.assignee!),
           if (voc.duplicateScore != null)
             _MetaRow(
               Icons.copy_all_outlined,
@@ -465,8 +473,8 @@ class _VocSummaryCard extends StatelessWidget {
           if (voc.jiraScore != null)
             _MetaRow(
               Icons.bug_report_outlined,
-              'JIRA 판단',
-              voc.jiraRequired ? '필요' : '불필요',
+              'Jira 등록',
+              voc.jiraRequired ? '필요' : '필요 없음',
             ),
         ],
       ),
@@ -560,10 +568,16 @@ class _IntelligencePanelState extends State<_IntelligencePanel> {
             : (voc.isBusinessRelated ? '관련' : '비관련'),
         voc.businessScore,
       ),
-      _MetricData('분류', voc.aiCategory ?? '분석 전', voc.categoryScore),
+      _MetricData(
+        '추천 유형',
+        voc.aiCategory == null
+            ? '분석 전'
+            : VocCategoryCatalog.displayName(voc.aiCategory),
+        voc.categoryScore,
+      ),
       _MetricData('긴급도', voc.urgency ?? '분석 전', voc.urgencyScore),
       _MetricData('담당 부서', voc.department ?? '분석 전', voc.departmentScore),
-      _MetricData('담당자 추천', voc.assignee ?? '분석 전', voc.assigneeScore),
+      _MetricData('추천 담당자', voc.assignee ?? '분석 전', voc.assigneeScore),
       _MetricData(
         '중복 가능성',
         voc.duplicateScore == null
@@ -572,8 +586,10 @@ class _IntelligencePanelState extends State<_IntelligencePanel> {
         voc.duplicateScore,
       ),
       _MetricData(
-        'JIRA 판단',
-        voc.jiraScore == null ? '분석 전' : (voc.jiraRequired ? '필요' : '불필요'),
+        'Jira 등록',
+        voc.jiraScore == null
+            ? '분석 전'
+            : (voc.jiraRequired ? '필요' : '필요 없음'),
         voc.jiraScore,
       ),
     ];
@@ -581,7 +597,7 @@ class _IntelligencePanelState extends State<_IntelligencePanel> {
     return _Panel(
       title: 'AI 분석 결과',
       icon: Icons.analytics_outlined,
-      subtitle: '분석 결과와 AI의 판단 신뢰도를 구분해 표시합니다.',
+      subtitle: 'AI가 분석한 유형, 긴급도, 담당자와 각 항목의 신뢰도를 확인하세요.',
       trailing: OutlinedButton.icon(
         onPressed: _running ? null : _run,
         icon: _running
@@ -590,7 +606,7 @@ class _IntelligencePanelState extends State<_IntelligencePanel> {
                 height: 15,
                 child: CircularProgressIndicator(strokeWidth: 2))
             : const Icon(Icons.refresh_outlined, size: 18),
-        label: Text(_running ? '분석 중' : 'AI 분석 실행'),
+        label: Text(_running ? '분석 중' : 'AI로 다시 분석'),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -637,7 +653,7 @@ class _MetricTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final confidence = data.confidence == null
-        ? '신뢰도 분석 전'
+        ? '아직 분석하지 않음'
         : '신뢰도 ${(data.confidence! * 100).toStringAsFixed(0)}%';
     return Container(
       padding: const EdgeInsets.all(13),
@@ -697,7 +713,7 @@ class _ReasonBox extends StatelessWidget {
           const SizedBox(width: 9),
           Expanded(
               child:
-                  Text('판단 근거 · $text', style: const TextStyle(height: 1.45))),
+                  Text('판단 근거: $text', style: const TextStyle(height: 1.45))),
         ],
       ),
     );
@@ -711,8 +727,8 @@ class _AiAnswerEntry extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _Panel(
-      title: 'AI 답변 추천',
-      subtitle: '유사 VOC와 지식베이스 근거를 확인한 뒤 답변을 생성합니다.',
+      title: 'AI 답변 초안',
+      subtitle: '유사 VOC와 지식 자료를 참고해 답변 초안을 만듭니다.',
       icon: Icons.auto_awesome_outlined,
       trailing: FilledButton.icon(
         onPressed: () {
@@ -732,7 +748,7 @@ class _AiAnswerEntry extends StatelessWidget {
           );
         },
         icon: const Icon(Icons.auto_awesome, size: 18),
-        label: const Text('AI 추천 열기'),
+        label: const Text('답변 초안 만들기'),
       ),
       child: const SizedBox.shrink(),
     );
@@ -757,7 +773,7 @@ class _RejectBanner extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'AI 분석 결과 업무 관련 VOC로 분류되지 않았습니다.',
+              'AI 분석 결과, 업무와 관련 없는 내용으로 판단됐습니다.',
               style: TextStyle(color: cs.onErrorContainer),
             ),
           ),
@@ -845,7 +861,7 @@ class _ResponsesWorkspaceState extends State<_ResponsesWorkspace> {
     );
 
     final composer = _Panel(
-      title: '새 답변 작성',
+      title: '직접 답변 작성',
       icon: Icons.edit_note_outlined,
       child: Column(
         children: [
@@ -880,7 +896,7 @@ class _ResponsesWorkspaceState extends State<_ResponsesWorkspace> {
                 _controller.clear();
               },
               icon: const Icon(Icons.send_outlined, size: 18),
-              label: const Text('Draft 저장'),
+              label: const Text('임시 저장'),
             ),
           ),
         ],
@@ -888,8 +904,8 @@ class _ResponsesWorkspaceState extends State<_ResponsesWorkspace> {
     );
 
     return _Panel(
-      title: '답변 워크스페이스',
-      subtitle: '기존 답변을 검토하거나 새 답변을 작성합니다.',
+      title: '등록된 답변',
+      subtitle: '등록된 답변을 검토하거나 새 답변을 작성하세요.',
       icon: Icons.forum_outlined,
       child: widget.desktop
           ? Row(
@@ -983,7 +999,7 @@ class _ResponseCard extends StatelessWidget {
                   const Chip(
                       label: Text('AI'), visualDensity: VisualDensity.compact),
                 Chip(
-                  label: Text(approved ? '승인됨' : 'Draft'),
+                  label: Text(approved ? '승인 완료' : '임시 저장'),
                   visualDensity: VisualDensity.compact,
                 ),
                 if (response.confidenceScore != null)
@@ -1001,7 +1017,7 @@ class _ResponseCard extends StatelessWidget {
                   TextButton.icon(
                     onPressed: onApprove,
                     icon: const Icon(Icons.check_outlined, size: 16),
-                    label: const Text('승인'),
+                    label: const Text('답변 승인'),
                   ),
               ],
             ),
@@ -1041,8 +1057,8 @@ class _CollaborationActions extends StatelessWidget {
     final isUrgent =
         urgent == 'high' || urgent == 'critical' || urgent.contains('긴급');
     return _Panel(
-      title: '협업 연동',
-      subtitle: '필요한 경우에만 외부 채널로 공유합니다.',
+      title: '외부 도구로 공유',
+      subtitle: '필요한 경우에만 연결된 외부 도구로 공유하세요.',
       icon: Icons.share_outlined,
       child: Wrap(
         spacing: 8,
@@ -1055,7 +1071,7 @@ class _CollaborationActions extends StatelessWidget {
                     .read<IntegrationViewModel>()
                     .notifyUrgentVocToTeams(voc),
             icon: const Icon(Icons.notifications_active_outlined),
-            label: const Text('Teams 긴급 알림'),
+            label: const Text('Teams로 긴급 알림 보내기'),
           ),
           OutlinedButton.icon(
             onPressed: answer.isEmpty || vm.isLoading
@@ -1066,7 +1082,7 @@ class _CollaborationActions extends StatelessWidget {
                           answer: answer,
                         ),
             icon: const Icon(Icons.share_outlined),
-            label: const Text('Teams 답변 공유'),
+            label: const Text('Teams로 답변 공유하기'),
           ),
           OutlinedButton.icon(
             onPressed: vm.isLoading
@@ -1075,7 +1091,7 @@ class _CollaborationActions extends StatelessWidget {
                     .read<IntegrationViewModel>()
                     .shareVocToSlack(voc: voc),
             icon: const Icon(Icons.forum_outlined),
-            label: const Text('Slack VOC 공유'),
+            label: const Text('Slack으로 VOC 공유하기'),
           ),
           OutlinedButton.icon(
             onPressed: answer.isEmpty || vm.isLoading
@@ -1086,7 +1102,7 @@ class _CollaborationActions extends StatelessWidget {
                           answer: answer,
                         ),
             icon: const Icon(Icons.chat_bubble_outline),
-            label: const Text('Slack 답변 공유'),
+            label: const Text('Slack으로 답변 공유하기'),
           ),
           if (vm.error != null)
             SizedBox(
@@ -1120,10 +1136,10 @@ class _JiraSection extends StatelessWidget {
       builder: (context, vm, _) {
         if (!vm.isConfigured) return const SizedBox.shrink();
         return _Panel(
-          title: 'JIRA 연동',
+          title: 'Jira 연동',
           subtitle: vm.vocLinks.isEmpty
-              ? '연결된 JIRA 이슈가 없습니다.'
-              : '${vm.vocLinks.length}개 이슈 연결됨',
+              ? '연결된 Jira 이슈가 없습니다.'
+              : 'Jira 이슈 ${vm.vocLinks.length}개가 연결되어 있습니다.',
           icon: Icons.task_alt_outlined,
           trailing: OutlinedButton.icon(
             onPressed: vm.isLoading ? null : () => _create(context, vm),
@@ -1161,8 +1177,8 @@ class _JiraSection extends StatelessWidget {
       SnackBar(
         content: Text(
           result != null
-              ? 'JIRA 이슈 ${result.jiraKey} 생성 완료'
-              : (vm.error ?? 'JIRA 이슈 생성에 실패했습니다.'),
+              ? 'Jira 이슈를 만들었습니다: ${result.jiraKey}'
+              : (vm.error ?? 'Jira 이슈를 만들지 못했습니다.'),
         ),
       ),
     );

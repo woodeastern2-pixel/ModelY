@@ -41,13 +41,13 @@ class _HomeScreenState extends State<HomeScreen> {
     _NavItem(
       icon: Icons.space_dashboard_outlined,
       selectedIcon: Icons.space_dashboard_rounded,
-      label: '대시보드',
+      label: 'VOC 현황',
       mobileLabel: '홈',
     ),
     _NavItem(
       icon: Icons.inbox_outlined,
       selectedIcon: Icons.inbox_rounded,
-      label: 'VOC 관리',
+      label: 'VOC 목록',
       mobileLabel: 'VOC',
     ),
     _NavItem(
@@ -59,14 +59,14 @@ class _HomeScreenState extends State<HomeScreen> {
     _NavItem(
       icon: Icons.menu_book_outlined,
       selectedIcon: Icons.menu_book_rounded,
-      label: '지식베이스',
+      label: '지식 자료',
       mobileLabel: '지식',
     ),
     _NavItem(
       icon: Icons.account_tree_outlined,
       selectedIcon: Icons.account_tree_rounded,
-      label: '업무 협업툴',
-      mobileLabel: '협업',
+      label: '업무 도구',
+      mobileLabel: '도구',
     ),
     _NavItem(
       icon: Icons.tune_outlined,
@@ -356,7 +356,7 @@ class _DesktopNavigation extends StatelessWidget {
                 IconButton(
                   key: const Key('desktop-privacy'),
                   onPressed: onPrivacyTap,
-                  tooltip: '개인정보 · AI 데이터 보호',
+                  tooltip: '개인정보 및 AI 데이터 처리 안내',
                   color: visual.navigationMuted,
                   icon: const Icon(Icons.shield_outlined),
                 ),
@@ -573,7 +573,7 @@ class _MobileMoreSheet extends StatelessWidget {
               selectedTileColor: Theme.of(context).colorScheme.primaryContainer,
               leading: Icon(items[4].icon),
               title: Text(items[4].label),
-              subtitle: const Text('JIRA · Redmine · Notion 연동'),
+              subtitle: const Text('Jira·Redmine·Notion 연동'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.pop(context, 4),
             ),
@@ -584,7 +584,7 @@ class _MobileMoreSheet extends StatelessWidget {
               selectedTileColor: Theme.of(context).colorScheme.primaryContainer,
               leading: Icon(items[5].icon),
               title: Text(items[5].label),
-              subtitle: const Text('AI · 동기화 · 화면 설정'),
+              subtitle: const Text('AI·동기화·화면 설정'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.pop(context, 5),
             ),
@@ -592,7 +592,7 @@ class _MobileMoreSheet extends StatelessWidget {
             ListTile(
               key: const Key('more-privacy'),
               leading: const Icon(Icons.shield_outlined),
-              title: const Text('개인정보 · AI 데이터 보호'),
+              title: const Text('개인정보 및 AI 데이터 처리 안내'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.pop(context, 99),
             ),

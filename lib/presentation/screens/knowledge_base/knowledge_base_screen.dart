@@ -12,11 +12,11 @@ class KnowledgeBaseScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('지식베이스'),
+        title: const Text('지식 자료'),
         actions: [
           IconButton(
             icon: const Icon(Icons.upload_file_outlined),
-            tooltip: '시스템 매뉴얼 업로드',
+            tooltip: '매뉴얼 추가',
             onPressed: () => _pickAndImportDocuments(context),
           ),
           IconButton(
@@ -41,12 +41,12 @@ class KnowledgeBaseScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      '매뉴얼 분석 중: 섹션 ${vm.manualImportProcessedSections}/${vm.manualImportTotalSections == 0 ? '?' : vm.manualImportTotalSections}, 생성 ${vm.manualImportGeneratedEntries}건',
+                      '매뉴얼을 분석하고 있습니다. ${vm.manualImportProcessedSections}/${vm.manualImportTotalSections == 0 ? '?' : vm.manualImportTotalSections}개 구간 처리 · 질문 ${vm.manualImportGeneratedEntries}개 생성',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                     if ((vm.manualImportCurrentFile ?? '').isNotEmpty)
                       Text(
-                        '처리 파일: ${vm.manualImportCurrentFile}',
+                        '현재 파일: ${vm.manualImportCurrentFile}',
                         style: Theme.of(context)
                             .textTheme
                             .labelSmall
@@ -116,20 +116,20 @@ class KnowledgeBaseScreen extends StatelessWidget {
     if (result == null) {
       await _showCopyableErrorDialog(
         context,
-        vm.error ?? '매뉴얼 업로드에 실패했습니다.',
+        vm.error ?? '매뉴얼을 추가하지 못했습니다. 파일을 확인한 뒤 다시 시도해 주세요.',
       );
       return;
     }
 
     final warningText = result.warnings.isEmpty
         ? ''
-        : '\n경고 ${result.warnings.length}건: ${result.warnings.first}';
+        : '\n확인 필요 ${result.warnings.length}개: ${result.warnings.first}';
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         duration: const Duration(seconds: 4),
         content: Text(
-          '업로드 ${result.selectedFiles}건 중 ${result.processedFiles}건 처리, 신규 ${result.importedEntries}건, 갱신 ${result.updatedEntries}건$warningText',
+          '선택한 파일 ${result.selectedFiles}개 중 ${result.processedFiles}개를 처리했습니다. 새 자료 ${result.importedEntries}개, 업데이트 ${result.updatedEntries}개$warningText',
         ),
       ),
     );
@@ -142,7 +142,7 @@ class KnowledgeBaseScreen extends StatelessWidget {
     await showDialog<void>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('매뉴얼 업로드 오류'),
+        title: const Text('매뉴얼 추가 오류'),
         content: SizedBox(
           width: 560,
           child: SingleChildScrollView(
@@ -195,7 +195,7 @@ class _ImportErrorPanel extends StatelessWidget {
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  '최근 업로드 오류',
+                  '최근 매뉴얼 추가 오류',
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
                 const Spacer(),
@@ -248,7 +248,7 @@ class _SearchBarState extends State<_SearchBar> {
       child: TextField(
         controller: _controller,
         decoration: InputDecoration(
-          hintText: '지식베이스 검색...',
+          hintText: '질문, 답변 또는 매뉴얼 검색',
           prefixIcon: const Icon(Icons.search),
           suffixIcon: _controller.text.isNotEmpty
               ? IconButton(
@@ -287,7 +287,10 @@ class _CategoryFilter extends StatelessWidget {
           ...vm.categories.map((c) => Padding(
                 padding: const EdgeInsets.only(left: 6),
                 child: FilterChip(
-                  label: Text(c, style: const TextStyle(fontSize: 12)),
+                  label: Text(
+                    c == '시스템매뉴얼' ? '시스템 매뉴얼' : c,
+                    style: const TextStyle(fontSize: 12),
+                  ),
                   selected: vm.filterCategory == c,
                   onSelected: (_) => vm.setFilter(c),
                   visualDensity: VisualDensity.compact,
@@ -340,12 +343,12 @@ class _ManualUploadManagerState extends State<_ManualUploadManager> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        '업로드된 시스템 매뉴얼',
+                        '등록된 매뉴얼',
                         style: Theme.of(context).textTheme.titleSmall,
                       ),
                     ),
                     Text(
-                      '$fileCount개 문서 · $totalSections개 질문',
+                      '문서 $fileCount개 · 질문 $totalSections개',
                       style: Theme.of(context).textTheme.labelSmall,
                     ),
                     const SizedBox(width: 4),
@@ -359,7 +362,7 @@ class _ManualUploadManagerState extends State<_ManualUploadManager> {
             ),
             const SizedBox(height: 6),
             const Text(
-              '문서 탭을 선택하면 해당 매뉴얼에서 파생된 질문만 표시됩니다.',
+              '문서를 선택하면 해당 매뉴얼에서 생성된 질문만 볼 수 있습니다.',
               style: TextStyle(fontSize: 12, color: Colors.grey),
             ),
             const SizedBox(height: 8),
@@ -398,10 +401,10 @@ class _ManualUploadManagerState extends State<_ManualUploadManager> {
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.description_outlined, size: 18),
                   title: Text(entry.key, maxLines: 1, overflow: TextOverflow.ellipsis),
-                  subtitle: Text('파생 질문 ${entry.value}건', style: const TextStyle(fontSize: 12)),
+                  subtitle: Text('생성된 질문 ${entry.value}개', style: const TextStyle(fontSize: 12)),
                   trailing: IconButton(
                     icon: const Icon(Icons.delete_outline, color: Colors.red),
-                    tooltip: '파일 기반 매뉴얼 삭제',
+                    tooltip: '이 매뉴얼 삭제',
                     onPressed: () => _confirmDeleteGroup(context, widget.vm, entry.key, entry.value),
                   ),
                 ),
@@ -422,8 +425,8 @@ class _ManualUploadManagerState extends State<_ManualUploadManager> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('매뉴얼 그룹 삭제'),
-          content: Text('$fileName 파일로 등록된 섹션 $count건을 삭제하시겠습니까?'),
+        title: const Text('매뉴얼 삭제'),
+          content: Text('$fileName에서 생성된 지식 자료 $count개를 삭제하시겠습니까?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -441,7 +444,7 @@ class _ManualUploadManagerState extends State<_ManualUploadManager> {
     final deleted = await vm.deleteManualEntriesByFile(fileName);
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$fileName 매뉴얼 섹션 $deleted건을 삭제했습니다.')),
+      SnackBar(content: Text('$fileName에서 생성된 지식 자료 $deleted개를 삭제했습니다.')),
     );
   }
 }
@@ -490,7 +493,10 @@ class _KbCard extends StatelessWidget {
                 )
               else
                 Chip(
-                  label: Text(entry.category, style: const TextStyle(fontSize: 10)),
+                  label: Text(
+                    isManual ? '시스템 매뉴얼' : entry.category,
+                    style: const TextStyle(fontSize: 10),
+                  ),
                   visualDensity: VisualDensity.compact,
                   padding: EdgeInsets.zero,
                 ),
@@ -519,7 +525,7 @@ class _KbCard extends StatelessWidget {
                   children: [
                     if (entry.embedding != null)
                       const Chip(
-                        label: Text('임베딩 완료',
+                        label: Text('AI 검색 준비 완료',
                             style: TextStyle(fontSize: 10)),
                         visualDensity: VisualDensity.compact,
                         padding: EdgeInsets.zero,
@@ -545,7 +551,7 @@ class _KbCard extends StatelessWidget {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('삭제 확인'),
-        content: const Text('지식베이스 항목을 삭제하시겠습니까?'),
+        content: const Text('이 지식 자료를 삭제하시겠습니까?'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -574,9 +580,9 @@ class _EmptyState extends StatelessWidget {
           Icon(Icons.book_outlined, size: 64,
               color: Theme.of(context).colorScheme.outline),
           const SizedBox(height: 16),
-          const Text('지식베이스가 비어 있습니다'),
+          const Text('등록된 지식 자료가 없습니다'),
           const SizedBox(height: 8),
-          const Text('VOC 답변을 승인하면 자동으로 등록됩니다',
+          const Text('VOC 답변을 승인하거나 매뉴얼을 추가하면 지식 자료가 생성됩니다.',
               style: TextStyle(fontSize: 12, color: Colors.grey)),
         ],
       ),

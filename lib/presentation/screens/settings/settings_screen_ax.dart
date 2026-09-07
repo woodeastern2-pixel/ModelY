@@ -18,10 +18,10 @@ class _SettingsScreenAxState extends State<SettingsScreenAx> {
   bool _aiUnlocked = false;
 
   static const _sections = [
-    _SectionData('AI 설정', 'AI 연결과 모델', Icons.auto_awesome_outlined),
-    _SectionData('업무 도구', 'JIRA와 협업 시스템', Icons.workspaces_outline),
-    _SectionData('연동', '메일·동기화·알림', Icons.sync_alt_outlined),
-    _SectionData('일반', '사용자·화면·업무 기준', Icons.tune_outlined),
+    _SectionData('AI 설정', 'AI 연결 및 모델 관리', Icons.auto_awesome_outlined),
+    _SectionData('업무 도구', 'Jira 및 협업 도구 연결', Icons.workspaces_outline),
+    _SectionData('연동', '이메일·동기화·알림 설정', Icons.sync_alt_outlined),
+    _SectionData('일반', '사용자·화면·업무 기준 설정', Icons.tune_outlined),
   ];
 
   Future<bool> _requestAdminAccess() async {
@@ -38,7 +38,7 @@ class _SettingsScreenAxState extends State<SettingsScreenAx> {
             autofocus: true,
             obscureText: obscure,
             decoration: InputDecoration(
-              labelText: '관리자 패스워드',
+              labelText: '관리자 비밀번호',
               suffixIcon: IconButton(
                 onPressed: () => setDialogState(() => obscure = !obscure),
                 icon: Icon(obscure ? Icons.visibility_off : Icons.visibility),
@@ -63,7 +63,7 @@ class _SettingsScreenAxState extends State<SettingsScreenAx> {
     final granted = value == AppConstants.defaultAdminPassword;
     if (!granted && value != null && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('관리자 패스워드가 올바르지 않습니다.')),
+        const SnackBar(content: Text('관리자 비밀번호가 올바르지 않습니다.')),
       );
     }
     return granted;
@@ -494,7 +494,7 @@ class _InfoNote extends StatelessWidget {
 }
 
 class _StatusBadge extends StatelessWidget {
-  const _StatusBadge(this.on, {this.onText = '연결됨', this.offText = '미설정'});
+  const _StatusBadge(this.on, {this.onText = '연결됨', this.offText = '설정 필요'});
   final bool on;
   final String onText;
   final String offText;
@@ -599,7 +599,7 @@ class _AiSettingsViewState extends State<_AiSettingsView> {
         AppConstants.aiProviderOpenAi => 'OpenAI',
         AppConstants.aiProviderGemini => 'Google Gemini',
         AppConstants.aiProviderClaude => 'Anthropic Claude',
-        _ => '사내 · 로컬 AI',
+        _ => '사내·로컬 AI',
       };
 
   Widget _secret(TextEditingController controller, String label) => TextField(
@@ -620,7 +620,7 @@ class _AiSettingsViewState extends State<_AiSettingsView> {
       case AppConstants.aiProviderOpenAi:
         return Column(
           children: [
-            _secret(_openAiKey, 'API Key'),
+            _secret(_openAiKey, 'API 키'),
             if (_advanced) ...[
               const SizedBox(height: 12),
               TextField(
@@ -633,7 +633,7 @@ class _AiSettingsViewState extends State<_AiSettingsView> {
       case AppConstants.aiProviderGemini:
         return Column(
           children: [
-            _secret(_geminiKey, 'API Key'),
+            _secret(_geminiKey, 'API 키'),
             if (_advanced) ...[
               const SizedBox(height: 12),
               TextField(
@@ -646,7 +646,7 @@ class _AiSettingsViewState extends State<_AiSettingsView> {
       case AppConstants.aiProviderClaude:
         return Column(
           children: [
-            _secret(_claudeKey, 'API Key'),
+            _secret(_claudeKey, 'API 키'),
             if (_advanced) ...[
               const SizedBox(height: 12),
               TextField(
@@ -667,7 +667,7 @@ class _AiSettingsViewState extends State<_AiSettingsView> {
             TextField(
               controller: _ollamaUrl,
               decoration: const InputDecoration(
-                labelText: 'AI 서버 주소',
+                labelText: '사내·로컬 AI 서버 주소',
                 prefixIcon: Icon(Icons.dns_outlined),
               ),
             ),
@@ -700,7 +700,7 @@ class _AiSettingsViewState extends State<_AiSettingsView> {
       await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('AI 연결 확인 완료'),
+          title: const Text('AI 연결을 확인했습니다'),
           content: SelectableText(reply),
           actions: [
             FilledButton(
@@ -729,7 +729,7 @@ class _AiSettingsViewState extends State<_AiSettingsView> {
     return _SettingsPage(
       children: [
         Text(
-          'VOC 분석과 답변 생성에 사용할 AI 연결 방식을 설정합니다.',
+          'VOC 분석과 답변 초안 생성에 사용할 AI 서비스와 모델을 설정합니다.',
           style: Theme.of(context).textTheme.bodyMedium,
         ),
         const SizedBox(height: 18),
@@ -742,8 +742,8 @@ class _AiSettingsViewState extends State<_AiSettingsView> {
               icon: Icons.hub_outlined,
               children: [
                 _ProviderRow(
-                  title: '사내 · 로컬 AI',
-                  subtitle: 'Ollama 또는 내부 AI 서버',
+                  title: '사내·로컬 AI',
+                  subtitle: 'Ollama 또는 조직 내부 AI 서버',
                   icon: Icons.lan_outlined,
                   selected: _provider == AppConstants.aiProviderOllama,
                   onTap: () =>
@@ -777,7 +777,7 @@ class _AiSettingsViewState extends State<_AiSettingsView> {
             );
             final details = _Panel(
               title: '$_title 연결 정보',
-              subtitle: '일반 사용에 필요한 정보만 우선 표시합니다.',
+              subtitle: '연결에 필요한 기본 정보를 입력해 주세요.',
               icon: Icons.settings_input_component_outlined,
               children: [
                 _fields(),
@@ -830,12 +830,12 @@ class _AiSettingsViewState extends State<_AiSettingsView> {
             OutlinedButton.icon(
               onPressed: _testing ? null : _test,
               icon: const Icon(Icons.wifi_tethering_outlined),
-              label: Text(_testing ? '확인 중...' : '연결 테스트'),
+              label: Text(_testing ? '연결 확인 중...' : '연결 확인'),
             ),
             FilledButton.icon(
               onPressed: _save,
               icon: const Icon(Icons.save_outlined),
-              label: const Text('AI 연결 정보 저장'),
+              label: const Text('저장'),
             ),
           ],
         ),
@@ -1055,34 +1055,34 @@ class _WorkToolsView extends StatelessWidget {
     final vm = context.watch<SettingsViewModel>();
     final tools = [
       _ToolData(
-        'JIRA',
+        'Jira',
         '이슈 등록 및 상태 연계',
         Icons.task_alt_outlined,
         vm.isJiraConfigured,
         [
-          _ToolField(AppConstants.settingJiraUrl, 'JIRA 주소', vm.jiraUrl),
+          _ToolField(AppConstants.settingJiraUrl, 'Jira 주소', vm.jiraUrl),
           _ToolField(
-              AppConstants.settingJiraProjectKey, '프로젝트 Key', vm.jiraProjectKey),
+              AppConstants.settingJiraProjectKey, '프로젝트 키', vm.jiraProjectKey),
           _ToolField(AppConstants.settingJiraEmail, '계정 이메일', vm.jiraEmail),
-          _ToolField(AppConstants.settingJiraToken, 'API Token', vm.jiraToken,
+          _ToolField(AppConstants.settingJiraToken, 'API 토큰', vm.jiraToken,
               secret: true),
         ],
       ),
       _ToolData(
         'Confluence',
-        '문서 및 지식베이스 연계',
+        '문서 및 지식 자료 연동',
         Icons.menu_book_outlined,
         vm.isConfluenceConfigured,
         [
           _ToolField(
               AppConstants.settingConfluenceUrl, 'Confluence 주소', vm.confluenceUrl),
           _ToolField(
-              AppConstants.settingConfluenceSpace, 'Space Key', vm.confluenceSpace),
+              AppConstants.settingConfluenceSpace, '스페이스 키', vm.confluenceSpace),
           _ToolField(
               AppConstants.settingConfluenceEmail, '계정 이메일', vm.confluenceEmail),
           _ToolField(
             AppConstants.settingConfluenceToken,
-            'API Token',
+            'API 토큰',
             vm.confluenceToken,
             secret: true,
           ),
@@ -1090,52 +1090,52 @@ class _WorkToolsView extends StatelessWidget {
       ),
       _ToolData(
         'Redmine',
-        '설정 정보 관리 · API 동기화 미지원',
+        '연결 정보 저장 가능 · 동기화 미지원',
         Icons.assignment_outlined,
         vm.isRedmineConfigured,
         [
           _ToolField(AppConstants.settingRedmineUrl, 'Redmine 주소', vm.redmineUrl),
           _ToolField(AppConstants.settingRedmineProject, '프로젝트', vm.redmineProject),
           _ToolField(
-              AppConstants.settingRedmineApiKey, 'API Key', vm.redmineApiKey,
+              AppConstants.settingRedmineApiKey, 'API 키', vm.redmineApiKey,
               secret: true),
         ],
       ),
       _ToolData(
         'Notion',
-        '설정 정보 관리 · API 동기화 미지원',
+        '연결 정보 저장 가능 · 동기화 미지원',
         Icons.description_outlined,
         vm.isNotionConfigured,
         [
           _ToolField(
-              AppConstants.settingNotionWorkspace, 'Workspace', vm.notionWorkspace),
+              AppConstants.settingNotionWorkspace, '워크스페이스', vm.notionWorkspace),
           _ToolField(
-              AppConstants.settingNotionDatabaseId, 'Database ID', vm.notionDatabaseId),
-          _ToolField(AppConstants.settingNotionApiKey, 'API Key', vm.notionApiKey,
+              AppConstants.settingNotionDatabaseId, '데이터베이스 ID', vm.notionDatabaseId),
+          _ToolField(AppConstants.settingNotionApiKey, 'API 키', vm.notionApiKey,
               secret: true),
         ],
       ),
       _ToolData(
         'GitHub Issues',
-        '설정 정보 관리 · API 동기화 미지원',
+        '연결 정보 저장 가능 · 동기화 미지원',
         Icons.code_outlined,
         vm.isGithubConfigured,
         [
-          _ToolField(AppConstants.settingGithubRepo, 'Repository', vm.githubRepo),
-          _ToolField(AppConstants.settingGithubToken, 'Token', vm.githubToken,
+          _ToolField(AppConstants.settingGithubRepo, '저장소', vm.githubRepo),
+          _ToolField(AppConstants.settingGithubToken, '액세스 토큰', vm.githubToken,
               secret: true),
         ],
       ),
       _ToolData(
         'Asana',
-        '설정 정보 관리 · API 동기화 미지원',
+        '연결 정보 저장 가능 · 동기화 미지원',
         Icons.view_kanban_outlined,
         vm.isAsanaConfigured,
         [
           _ToolField(
-              AppConstants.settingAsanaWorkspace, 'Workspace', vm.asanaWorkspace),
-          _ToolField(AppConstants.settingAsanaProject, 'Project', vm.asanaProject),
-          _ToolField(AppConstants.settingAsanaToken, 'Token', vm.asanaToken,
+              AppConstants.settingAsanaWorkspace, '워크스페이스', vm.asanaWorkspace),
+          _ToolField(AppConstants.settingAsanaProject, '프로젝트', vm.asanaProject),
+          _ToolField(AppConstants.settingAsanaToken, '액세스 토큰', vm.asanaToken,
               secret: true),
         ],
       ),
@@ -1192,13 +1192,13 @@ class _IntegrationView extends StatelessWidget {
                 Icons.mail_outline,
                 vm.isOutlookConfigured,
                 [
-                  _ToolField(AppConstants.settingOutlookAccessToken, 'Access Token',
+                  _ToolField(AppConstants.settingOutlookAccessToken, '액세스 토큰',
                       vm.outlookAccessToken,
                       secret: true),
                   _ToolField(
-                      AppConstants.settingOutlookMailbox, 'Mailbox', vm.outlookMailbox),
+                      AppConstants.settingOutlookMailbox, '메일함', vm.outlookMailbox),
                   _ToolField(
-                      AppConstants.settingOutlookFolder, 'Folder', vm.outlookFolder),
+                      AppConstants.settingOutlookFolder, '폴더', vm.outlookFolder),
                 ],
               ),
             ),
@@ -1219,10 +1219,10 @@ class _IntegrationView extends StatelessWidget {
             else
               _NavigationRow(
                 icon: Icons.link_outlined,
-                title: '수신 URL 목록',
+                title: '동기화 대상 URL',
                 subtitle: vm.vocForwardWebhookTargets.isEmpty
-                    ? '등록된 수신 URL이 없습니다.'
-                    : '${vm.vocForwardWebhookTargets.length}개 URL 등록됨',
+                    ? '등록된 동기화 대상 URL이 없습니다.'
+                    : '동기화 대상 ${vm.vocForwardWebhookTargets.length}개 등록',
                 badge: vm.vocForwardWebhookTargets.isEmpty
                     ? null
                     : '${vm.vocForwardWebhookTargets.length}개',
@@ -1236,7 +1236,7 @@ class _IntegrationView extends StatelessWidget {
             SwitchListTile.adaptive(
               contentPadding: EdgeInsets.zero,
               title: const Text('VOC 자동 전달'),
-              subtitle: const Text('VOC 등록 시 활성화된 수신 URL로 자동 공유합니다.'),
+              subtitle: const Text('새 VOC를 등록하면 활성화된 대상에 자동으로 전달합니다.'),
               value: vm.vocAutoForwardEnabled,
               onChanged: (value) => context.read<SettingsViewModel>().saveSetting(
                     AppConstants.settingVocAutoForwardEnabled,
@@ -1258,7 +1258,7 @@ class _IntegrationView extends StatelessWidget {
                 vm.isTeamsConfigured,
                 [
                   _ToolField(
-                      AppConstants.settingTeamsWebhook, 'Teams Webhook URL', vm.teamsWebhook),
+                      AppConstants.settingTeamsWebhook, 'Teams 웹훅 URL', vm.teamsWebhook),
                   _ToolField(AppConstants.settingUrgencyWebhookThreshold, '알림 기준',
                       vm.urgencyWebhookThreshold),
                 ],
@@ -1273,7 +1273,7 @@ class _IntegrationView extends StatelessWidget {
                 vm.isSlackConfigured,
                 [
                   _ToolField(
-                      AppConstants.settingSlackWebhook, 'Slack Webhook URL', vm.slackWebhook),
+                      AppConstants.settingSlackWebhook, 'Slack 웹훅 URL', vm.slackWebhook),
                   _ToolField(AppConstants.settingUrgencyWebhookThreshold, '알림 기준',
                       vm.urgencyWebhookThreshold),
                 ],
@@ -1284,7 +1284,7 @@ class _IntegrationView extends StatelessWidget {
         const SizedBox(height: 14),
         _Panel(
           title: '데이터 관리',
-          subtitle: '백업, 가져오기, 전체 동기화와 초기화 작업을 관리합니다.',
+          subtitle: 'VOC 가져오기·내보내기, 시스템 간 동기화 및 데이터 초기화를 관리합니다.',
           icon: Icons.storage_outlined,
           children: [
             Align(
@@ -1432,7 +1432,7 @@ class _VocSyncEditorState extends State<_VocSyncEditor> {
     final value = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(initial.isEmpty ? '수신 URL 추가' : '수신 URL 수정'),
+        title: Text(initial.isEmpty ? '동기화 대상 추가' : '동기화 대상 수정'),
         content: SizedBox(
           width: 560,
           child: TextField(
@@ -1440,7 +1440,7 @@ class _VocSyncEditorState extends State<_VocSyncEditor> {
             autofocus: true,
             keyboardType: TextInputType.url,
             decoration: const InputDecoration(
-              labelText: '수신 URL',
+              labelText: '동기화 대상 URL',
               hintText: 'https://example.com/webhook/voc',
               prefixIcon: Icon(Icons.link_outlined),
             ),
@@ -1467,7 +1467,7 @@ class _VocSyncEditorState extends State<_VocSyncEditor> {
         (uri.scheme != 'http' && uri.scheme != 'https')) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('http 또는 https 형식의 URL을 입력해주세요.')),
+          const SnackBar(content: Text('http 또는 https로 시작하는 URL을 입력해 주세요.')),
         );
       }
       return null;
@@ -1533,11 +1533,11 @@ class _VocSyncEditorState extends State<_VocSyncEditor> {
                 Icon(Icons.link_off_outlined,
                     color: cs.onSurfaceVariant, size: 30),
                 const SizedBox(height: 8),
-                const Text('등록된 수신 URL이 없습니다.',
+                const Text('등록된 동기화 대상이 없습니다.',
                     style: TextStyle(fontWeight: FontWeight.w700)),
                 const SizedBox(height: 4),
                 Text(
-                  'URL을 추가하면 여러 시스템으로 VOC를 동기화할 수 있습니다.',
+                  '대상 URL을 추가하면 해당 시스템으로 VOC를 동기화할 수 있습니다.',
                   textAlign: TextAlign.center,
                   style: Theme.of(context)
                       .textTheme
@@ -1603,7 +1603,7 @@ class _VocSyncEditorState extends State<_VocSyncEditor> {
       children: [
         if (!widget.embedded) ...[
           Text(
-            '여러 시스템의 수신 URL을 각각 추가하고 관리할 수 있습니다.',
+            'VOC를 보낼 시스템의 URL을 추가하고 관리할 수 있습니다.',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 18),
@@ -1629,7 +1629,7 @@ class _VocSyncEditorState extends State<_VocSyncEditor> {
           children: [
             Expanded(
               child: Text(
-                '수신 URL 목록',
+                '동기화 대상 URL',
                 style: Theme.of(context)
                     .textTheme
                     .titleSmall
@@ -1639,7 +1639,7 @@ class _VocSyncEditorState extends State<_VocSyncEditor> {
             FilledButton.tonalIcon(
               onPressed: _add,
               icon: const Icon(Icons.add, size: 18),
-              label: const Text('URL 추가'),
+              label: const Text('대상 추가'),
             ),
           ],
         ),
@@ -1828,7 +1828,7 @@ class _GeneralViewState extends State<_GeneralView> {
                     TextField(
                       controller: _business,
                       decoration: const InputDecoration(
-                        labelText: '업무 구분 목록',
+                        labelText: '접수 경로 목록',
                         hintText: '쉼표로 구분',
                       ),
                     ),
@@ -1844,7 +1844,7 @@ class _GeneralViewState extends State<_GeneralView> {
                 ),
                 const SizedBox(height: 14),
                 _Panel(
-                  title: 'AI 업무 자동화',
+                  title: 'AI 답변 자동 생성',
                   subtitle: 'VOC 등록 직후 AI 답변 초안을 자동 생성합니다.',
                   icon: Icons.smart_toy_outlined,
                   trailing: Switch(

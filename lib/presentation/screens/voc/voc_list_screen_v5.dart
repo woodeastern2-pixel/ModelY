@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_tokens.dart';
+import '../../../core/utils/voc_category_catalog.dart';
 import '../../../data/services/bulk_ai_resolve_service.dart';
 import '../../../domain/entities/voc_entity.dart';
 import '../../viewmodels/dashboard_viewmodel.dart';
@@ -73,18 +74,17 @@ class _VocListScreenState extends State<VocListScreen> {
     final count = context.read<VocViewModel>().pendingVocCount;
     if (count == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('미처리 VOC가 없습니다.')),
+        const SnackBar(content: Text('처리 대기 중인 VOC가 없습니다.')),
       );
       return;
     }
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('미처리 VOC AI 일괄 처리'),
+        title: const Text('AI 답변 자동 승인 및 일괄 완료'),
         content: Text(
-          '미처리 VOC $count건을 처리합니다.\n\n'
-          '속도 향상을 위해 로컬 AI는 최대 2건, 외부 AI는 최대 3건을 동시에 처리합니다. '
-          '각 답변이 저장된 뒤에만 해당 VOC를 해결 상태로 변경합니다.',
+          '처리 대기 중인 VOC $count건을 일괄 완료합니다.\n\n'
+          'AI가 답변을 생성하거나 기존 답변을 사용합니다. 답변은 자동 승인되며 VOC는 처리 완료 상태로 변경됩니다.',
         ),
         actions: [
           TextButton(
@@ -93,7 +93,7 @@ class _VocListScreenState extends State<VocListScreen> {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('실행'),
+            child: const Text('자동 승인 및 처리'),
           ),
         ],
       ),
@@ -104,7 +104,7 @@ class _VocListScreenState extends State<VocListScreen> {
       _bulkRunning = true;
       _stopRequested = false;
       _progress = null;
-      _bulkMessage = 'AI 일괄 처리 준비 중';
+      _bulkMessage = '일괄 처리를 준비하고 있습니다.';
       _lastError = null;
     });
 
@@ -118,8 +118,8 @@ class _VocListScreenState extends State<VocListScreen> {
           if (progress.lastError != null) {
             _lastError = progress.lastError;
           }
-          _bulkMessage = '${progress.completed} / ${progress.total} 처리 완료 · '
-              '성공 ${progress.success} · 실패 ${progress.failed}';
+          _bulkMessage = '${progress.total}건 중 ${progress.completed}건 처리 · '
+              '완료 ${progress.success}건 · 실패 ${progress.failed}건';
         });
       },
     );
@@ -140,9 +140,9 @@ class _VocListScreenState extends State<VocListScreen> {
     setState(() {
       _bulkRunning = false;
       _bulkMessage = result.stopped
-          ? 'AI 일괄 처리 중지 · 성공 ${result.success} · 실패 ${result.failed}'
-          : 'AI 일괄 처리 완료 · 성공 ${result.success} · 실패 ${result.failed} · '
-              '기존 답변 재사용 ${result.reused}';
+          ? '일괄 처리를 중지했습니다. 완료 ${result.success}건 · 실패 ${result.failed}건'
+          : '일괄 처리를 완료했습니다. 완료 ${result.success}건 · 실패 ${result.failed}건 · '
+              '기존 답변 사용 ${result.reused}건';
       _lastError = result.lastError;
     });
   }
@@ -151,7 +151,7 @@ class _VocListScreenState extends State<VocListScreen> {
     if (!_bulkRunning) return;
     setState(() {
       _stopRequested = true;
-      _bulkMessage = '중지 요청됨 · 진행 중인 요청만 마무리합니다.';
+      _bulkMessage = '중지를 요청했습니다. 현재 처리 중인 항목까지만 완료합니다.';
     });
   }
 
@@ -164,10 +164,12 @@ class _VocListScreenState extends State<VocListScreen> {
         return Scaffold(
           backgroundColor: context.visualColors.canvas,
           appBar: AppBar(
-            title: const Text('VOC 작업함'),
+            title: const Text('VOC 목록'),
             actions: [
               IconButton(
-                tooltip: _bulkRunning ? 'AI 일괄 처리 중지' : '미처리 VOC AI 일괄 처리',
+                tooltip: _bulkRunning
+                    ? '일괄 처리 중지'
+                    : 'AI 답변 자동 승인 및 일괄 완료',
                 onPressed: _bulkRunning ? _stop : _bulk,
                 icon: Icon(
                   _bulkRunning
@@ -452,21 +454,21 @@ class _QueueHero extends StatelessWidget {
 
     return WorkspaceHero(
       key: const Key('voc-queue-hero'),
-      eyebrow: 'VOC QUEUE',
-      title: pending == 0 ? '처리 대기열이 비었습니다.' : '지금 처리할 VOC $pending건',
+      eyebrow: 'VOC 목록',
+      title: pending == 0 ? '처리할 VOC가 없습니다.' : '처리가 필요한 VOC $pending건',
       description: urgent > 0
-          ? '고위험 $urgent건을 먼저 확인하고, AI 초안과 담당 정보를 연결하세요.'
-          : '검색과 상태 필터로 고객 신호를 좁히고 다음 업무를 바로 실행하세요.',
+          ? '우선순위가 높은 VOC $urgent건을 먼저 확인해 주세요.'
+          : '검색과 필터를 사용해 필요한 VOC를 찾고 바로 처리하세요.',
       icon: Icons.inbox_rounded,
       metrics: [
         WorkspaceMetric(label: '전체', value: '${vocs.length}'),
         WorkspaceMetric(
-          label: '미처리',
+          label: '미완료',
           value: '$pending',
           color: pending > 0 ? const Color(0xFFF2B45F) : null,
         ),
         WorkspaceMetric(
-          label: '해결률',
+          label: '처리 완료율',
           value: '${resolvedRate.toStringAsFixed(0)}%',
           color: const Color(0xFF55CDBE),
         ),
@@ -482,7 +484,7 @@ class _QueueHero extends StatelessWidget {
                   foregroundColor: AppPalette.ink,
                 ),
                 icon: const Icon(Icons.add),
-                label: const Text('새 VOC 등록'),
+                label: const Text('VOC 등록'),
               ),
               OutlinedButton.icon(
                 onPressed: onBulk,
@@ -497,7 +499,9 @@ class _QueueHero extends StatelessWidget {
                       ? Icons.stop_circle_outlined
                       : Icons.auto_awesome_outlined,
                 ),
-                label: Text(bulkRunning ? 'AI 처리 중지' : 'AI 일괄 처리'),
+                label: Text(
+                  bulkRunning ? '일괄 처리 중지' : 'AI 자동 승인 및 완료',
+                ),
               ),
             ],
     );
@@ -587,7 +591,7 @@ class _Filters extends StatelessWidget {
                 const SizedBox(width: AppSpacing.xs),
                 IconButton.filledTonal(
                   onPressed: onToggleMobile,
-                  tooltip: '상세 필터',
+                  tooltip: '필터',
                   icon: Icon(
                     mobileExpanded ? Icons.expand_less : Icons.tune,
                   ),
@@ -604,13 +608,13 @@ class _Filters extends StatelessWidget {
                   runSpacing: 7,
                   children: [
                     _Status('전체', '', vm),
-                    _Status('미처리', AppConstants.vocStatusOpen, vm),
+                    _Status('접수', AppConstants.vocStatusOpen, vm),
                     _Status(
-                      '처리중',
+                      '처리 중',
                       AppConstants.vocStatusInProgress,
                       vm,
                     ),
-                    _Status('해결', AppConstants.vocStatusResolved, vm),
+                    _Status('처리 완료', AppConstants.vocStatusResolved, vm),
                     _Status('반려', AppConstants.vocStatusRejected, vm),
                   ],
                 ),
@@ -643,7 +647,7 @@ class _Filters extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  '검색 결과 $total건 · $current / $pages',
+                  '총 $total건 · $current/$pages페이지',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
@@ -654,7 +658,7 @@ class _Filters extends StatelessWidget {
                 child: DropdownButtonFormField<int>(
                   initialValue: pageSize,
                   isExpanded: true,
-                  decoration: const InputDecoration(labelText: '표시'),
+                  decoration: const InputDecoration(labelText: '페이지당'),
                   items: const [
                     DropdownMenuItem(value: 25, child: Text('25건')),
                     DropdownMenuItem(value: 50, child: Text('50건')),
@@ -694,7 +698,7 @@ class _Search extends StatelessWidget {
     return TextField(
       decoration: const InputDecoration(
         prefixIcon: Icon(Icons.search),
-        hintText: '제목, 내용, 고객, 프로젝트 검색',
+        hintText: '제목, 내용, 고객명 또는 프로젝트명 검색',
       ),
       onChanged: vm.setSearch,
     );
@@ -716,7 +720,7 @@ class _Sort extends StatelessWidget {
         DropdownMenuItem(value: 'latest', child: Text('등록일')),
         DropdownMenuItem(value: 'updated', child: Text('수정일')),
         DropdownMenuItem(value: 'title', child: Text('제목')),
-        DropdownMenuItem(value: 'customer', child: Text('고객')),
+        DropdownMenuItem(value: 'customer', child: Text('고객명')),
         DropdownMenuItem(value: 'priority', child: Text('우선순위')),
         DropdownMenuItem(value: 'status', child: Text('상태')),
       ],
@@ -742,13 +746,13 @@ class _Category extends StatelessWidget {
   Widget build(BuildContext context) {
     return DropdownButtonFormField<String>(
       initialValue: value,
-      decoration: const InputDecoration(labelText: '카테고리'),
+      decoration: const InputDecoration(labelText: 'VOC 유형'),
       items: [
-        const DropdownMenuItem(value: '', child: Text('전체 카테고리')),
+        const DropdownMenuItem(value: '', child: Text('전체 유형')),
         ...categories.map(
           (category) => DropdownMenuItem(
             value: category,
-            child: Text(category),
+            child: Text(VocCategoryCatalog.displayName(category)),
           ),
         ),
       ],
@@ -794,12 +798,12 @@ class _QueueTable extends StatelessWidget {
             ),
             color: context.visualColors.mutedSurface,
             child: const _QueueColumns(
-              title: 'VOC / 고객 신호',
-              customer: '고객',
-              category: '카테고리',
+              title: 'VOC',
+              customer: '고객명',
+              category: '유형',
               priority: '우선순위',
               status: '상태',
-              date: '업데이트',
+              date: '최근 수정',
               header: true,
             ),
           ),
@@ -872,7 +876,7 @@ class _QueueRow extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
             categoryWidget: Text(
-              voc.category,
+              VocCategoryCatalog.displayName(voc.category),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -1001,7 +1005,7 @@ class _QueueCard extends StatelessWidget {
                         children: [
                           Expanded(
                             child: Text(
-                              '${voc.customer} · ${voc.category}',
+                              '${voc.customer} · ${VocCategoryCatalog.displayName(voc.category)}',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: Theme.of(context)
@@ -1039,7 +1043,7 @@ class _QueueCard extends StatelessWidget {
                           VocStatusChip(status: voc.status),
                           if (voc.aiCategory?.isNotEmpty == true)
                             Text(
-                              'AI · ${voc.aiCategory}',
+                              'AI · ${VocCategoryCatalog.displayName(voc.aiCategory)}',
                               style: Theme.of(context)
                                   .textTheme
                                   .labelSmall
@@ -1086,7 +1090,7 @@ class _Empty extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
-              '필터를 바꾸거나 새 고객 신호를 등록해 보세요.',
+              '검색어나 필터를 변경하거나 새 VOC를 등록해 보세요.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: AppSpacing.md),

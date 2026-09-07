@@ -108,11 +108,14 @@ class _VocRegisterScreenState extends State<VocRegisterScreen> {
         businessType: _selectedBusinessType.trim(),
         priority: autoPriority,
       );
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       setState(() => _isSaving = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('등록 오류: $e'), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text('VOC를 등록하지 못했습니다. 입력 내용을 확인한 뒤 다시 시도해 주세요.'),
+          backgroundColor: Colors.red,
+        ),
       );
       return;
     }
@@ -120,7 +123,7 @@ class _VocRegisterScreenState extends State<VocRegisterScreen> {
     if (!mounted) return;
     unawaited(dashboardVm.loadDashboard());
     messenger.showSnackBar(const SnackBar(
-      content: Text('VOC가 등록되었습니다. AI 분석은 백그라운드에서 진행합니다.'),
+      content: Text('VOC를 등록했습니다. AI 분석은 백그라운드에서 계속됩니다.'),
     ));
 
     unawaited(
@@ -209,14 +212,14 @@ class _VocRegisterScreenState extends State<VocRegisterScreen> {
 
     final vocContent = _SectionCard(
       key: const Key('voc-register-content'),
-      title: 'VOC 내용',
-      subtitle: '제목과 내용을 입력하면 등록 직후 AI가 분류·긴급도·담당 정보를 분석합니다.',
+      title: '문의 내용',
+      subtitle: '제목과 내용을 입력하면 AI가 VOC 유형, 긴급도와 담당자를 분석합니다.',
       icon: Icons.edit_note_rounded,
       child: Column(
         children: [
           _buildTextField(
             controller: _titleController,
-            label: 'VOC 제목 *',
+            label: '제목 *',
             icon: Icons.title,
             minLength: 4,
           ),
@@ -226,8 +229,8 @@ class _VocRegisterScreenState extends State<VocRegisterScreen> {
             minLines: 8,
             maxLines: 14,
             decoration: const InputDecoration(
-              labelText: 'VOC 내용 *',
-              hintText: '고객이 겪은 문제와 기대하는 결과를 구체적으로 적어 주세요.',
+              labelText: '내용 *',
+              hintText: '고객이 겪고 있는 문제와 원하는 결과를 구체적으로 입력해 주세요.',
               alignLabelWithHint: true,
             ),
             validator: (v) => v == null || v.trim().isEmpty
@@ -242,8 +245,8 @@ class _VocRegisterScreenState extends State<VocRegisterScreen> {
 
     final contextInformation = _SectionCard(
       key: const Key('voc-register-context'),
-      title: '문맥 정보',
-      subtitle: '고객과 프로젝트 정보를 연결하면 후속 대응이 더 빨라집니다.',
+      title: '추가 정보',
+      subtitle: '고객 및 프로젝트 정보를 입력하면 담당자가 더 빠르게 확인할 수 있습니다.',
       icon: Icons.account_tree_outlined,
       child: _ResponsiveGrid(
         minItemWidth: 300,
@@ -255,7 +258,7 @@ class _VocRegisterScreenState extends State<VocRegisterScreen> {
             required: false,
           ),
           _selectField(
-            label: '업무 구분 (선택)',
+            label: '접수 경로 (선택)',
             icon: Icons.work_outline,
             value: businessTypeValue,
             items: businessTypes,
@@ -307,10 +310,10 @@ class _VocRegisterScreenState extends State<VocRegisterScreen> {
                     children: [
                       const WorkspaceHero(
                         key: Key('voc-register-hero'),
-                        eyebrow: 'NEW CUSTOMER SIGNAL',
-                        title: '고객의 목소리를, 실행 가능한 신호로.',
+                        eyebrow: 'VOC 등록',
+                        title: '새 VOC 등록',
                         description:
-                            '필수 내용에 집중하세요. 등록 후 AI가 긴급도와 분류, 담당 후보를 백그라운드에서 분석합니다.',
+                            '제목과 내용을 입력하면 AI가 VOC 유형, 긴급도와 담당자를 자동으로 분석합니다.',
                         icon: Icons.add_comment_outlined,
                         metrics: [
                           WorkspaceMetric(label: '필수 항목', value: '2'),
@@ -320,8 +323,8 @@ class _VocRegisterScreenState extends State<VocRegisterScreen> {
                             color: Color(0xFFBFC2FF),
                           ),
                           WorkspaceMetric(
-                            label: '처리 방식',
-                            value: '비동기',
+                            label: 'AI 분석',
+                            value: '등록 후 자동 실행',
                             color: Color(0xFF55CDBE),
                           ),
                         ],
@@ -370,7 +373,7 @@ class _VocRegisterScreenState extends State<VocRegisterScreen> {
       isExpanded: true,
       decoration: InputDecoration(labelText: label, prefixIcon: Icon(icon)),
       items: [
-        const DropdownMenuItem(value: '', child: Text('선택 안함')),
+        const DropdownMenuItem(value: '', child: Text('선택하지 않음')),
         ...items
             .map((item) => DropdownMenuItem(value: item, child: Text(item))),
       ],
@@ -503,14 +506,14 @@ class _SubmitBar extends StatelessWidget {
               child: CircularProgressIndicator(strokeWidth: 2),
             )
           : const Icon(Icons.save_outlined),
-      label: Text(saving ? '저장 중...' : 'VOC 등록'),
+      label: Text(saving ? '등록 중...' : 'VOC 등록'),
     );
     if (!desktop) return SizedBox(height: 52, child: button);
     return Row(
       children: [
         Expanded(
           child: Text(
-            '등록 후 상세 화면으로 이동하며 AI 분석은 별도로 진행됩니다.',
+            '등록이 완료되면 상세 화면으로 이동합니다. AI 분석은 자동으로 진행됩니다.',
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ),

@@ -55,7 +55,7 @@ class OutlookGraphConnector implements OutlookCollectorConnector {
     final folder =
         settings.settings[AppConstants.settingOutlookFolder] ?? 'Inbox';
     if (token.trim().isEmpty) {
-      throw Exception('Outlook Access Token이 설정되지 않았습니다.');
+      throw Exception('Outlook 액세스 토큰이 설정되지 않았습니다.');
     }
     return service.collectMails(accessToken: token, folder: folder, top: top);
   }
@@ -87,7 +87,7 @@ class TeamsWebhookConnector implements AlertNotifierConnector {
   String get _webhook {
     final value = settings.settings[AppConstants.settingTeamsWebhook] ?? '';
     if (value.trim().isEmpty) {
-      throw Exception('Teams Webhook이 설정되지 않았습니다.');
+      throw Exception('Teams 웹훅 URL이 설정되지 않았습니다.');
     }
     return value;
   }
@@ -99,10 +99,10 @@ class TeamsWebhookConnector implements AlertNotifierConnector {
       title: '[긴급 VOC] ${voc.title}',
       message: voc.content,
       extra: {
-        '고객': voc.customer,
+        '고객명': voc.customer,
         '프로젝트': voc.project,
         '긴급도': voc.urgency ?? '-',
-        '담당부서': voc.department ?? '-',
+        '담당 부서': voc.department ?? '-',
         '담당자': voc.assignee ?? '-',
       },
     );
@@ -115,7 +115,7 @@ class TeamsWebhookConnector implements AlertNotifierConnector {
       title: '[VOC 공유] ${voc.title}',
       message: voc.content,
       extra: {
-        '고객': voc.customer,
+        '고객명': voc.customer,
         '카테고리': voc.category,
         '긴급도': voc.urgency ?? '-',
       },
@@ -129,12 +129,12 @@ class TeamsWebhookConnector implements AlertNotifierConnector {
   }) {
     return service.sendTeamsAlert(
       webhookUrl: _webhook,
-      title: '[AI 답변 공유] ${voc.title}',
+      title: '[VOC 답변 공유] ${voc.title}',
       message: answer,
       extra: {
-        '고객': voc.customer,
+        '고객명': voc.customer,
         '카테고리': voc.category,
-        '담당자 추천': voc.assignee ?? '-',
+        '추천 담당자': voc.assignee ?? '-',
       },
     );
   }
@@ -161,7 +161,7 @@ class SlackWebhookConnector implements AlertNotifierConnector {
   String get _webhook {
     final value = settings.settings[AppConstants.settingSlackWebhook] ?? '';
     if (value.trim().isEmpty) {
-      throw Exception('Slack Webhook이 설정되지 않았습니다.');
+      throw Exception('Slack 웹훅 URL이 설정되지 않았습니다.');
     }
     return value;
   }
@@ -172,10 +172,10 @@ class SlackWebhookConnector implements AlertNotifierConnector {
       webhookUrl: _webhook,
       text: '[긴급 VOC] ${voc.title}\n${voc.content}',
       fields: {
-        '고객': voc.customer,
+        '고객명': voc.customer,
         '프로젝트': voc.project,
         '긴급도': voc.urgency ?? '-',
-        '담당부서': voc.department ?? '-',
+        '담당 부서': voc.department ?? '-',
         '담당자': voc.assignee ?? '-',
       },
     );
@@ -187,7 +187,7 @@ class SlackWebhookConnector implements AlertNotifierConnector {
       webhookUrl: _webhook,
       text: '[VOC 공유] ${voc.title}\n${voc.content}',
       fields: {
-        '고객': voc.customer,
+        '고객명': voc.customer,
         '프로젝트': voc.project,
         '카테고리': voc.category,
         '긴급도': voc.urgency ?? '-',
@@ -202,12 +202,12 @@ class SlackWebhookConnector implements AlertNotifierConnector {
   }) {
     return service.sendSlackMessage(
       webhookUrl: _webhook,
-      text: '[VOC 공유] ${voc.title}\n\nAI 추천 답변:\n$answer',
+      text: '[VOC 답변 공유] ${voc.title}\n\nAI 답변 초안:\n$answer',
       fields: {
-        '고객': voc.customer,
+        '고객명': voc.customer,
         '카테고리': voc.category,
         '긴급도': voc.urgency ?? '-',
-        '담당자 추천': voc.assignee ?? '-',
+        '추천 담당자': voc.assignee ?? '-',
       },
     );
   }
@@ -247,7 +247,7 @@ class ConfluenceFaqConnector implements KnowledgeBasePublisherConnector {
     final token = settings.settings[AppConstants.settingConfluenceToken] ?? '';
 
     if (url.isEmpty || space.isEmpty || email.isEmpty || token.isEmpty) {
-      throw Exception('Confluence 설정이 미완성입니다.');
+      throw Exception('Confluence 연결 정보가 모두 입력되지 않았습니다.');
     }
 
     final service = ConfluenceService(

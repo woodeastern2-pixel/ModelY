@@ -75,8 +75,8 @@ class DefaultDemoModeService implements DemoModeService {
       logs: logs,
       onProgress: onProgress,
       task: () async {
-        logs.add('① 데이터 준비: 추가된 시연 VOC를 목록에서 확인합니다.');
-        logs.add('안내: 기존 운영 VOC와 설정은 삭제하거나 수정하지 않습니다.');
+        logs.add('① 샘플 VOC 확인: 추가된 VOC를 목록에서 확인합니다.');
+        logs.add('기존 VOC와 설정은 변경되지 않습니다.');
       },
     );
 
@@ -90,8 +90,8 @@ class DefaultDemoModeService implements DemoModeService {
       logs: logs,
       onProgress: onProgress,
       task: () async {
-        logs.add('② AI 분석: 카테고리·긴급도·유사 VOC 영역을 확인합니다.');
-        logs.add('안내: 실제 AI 결과는 현재 AI 설정과 데이터에 따라 달라집니다.');
+        logs.add('② AI 분석 확인: VOC 유형, 긴급도와 유사 VOC 영역을 살펴봅니다.');
+        logs.add('실제 AI 결과는 현재 AI 설정과 저장된 데이터에 따라 달라집니다.');
       },
     );
 
@@ -105,8 +105,8 @@ class DefaultDemoModeService implements DemoModeService {
       logs: logs,
       onProgress: onProgress,
       task: () async {
-        logs.add('③ 답변과 처리: VOC 상세에서 유사 사례와 AI 답변을 확인합니다.');
-        logs.add('④ 해결 반영: 승인과 상태 변경은 사용자가 실제 기능에서 실행합니다.');
+        logs.add('③ 답변 확인: VOC 상세에서 유사 사례와 AI 답변 초안을 살펴봅니다.');
+        logs.add('④ 처리 완료: 답변 승인과 상태 변경은 VOC 상세 화면에서 직접 실행합니다.');
       },
     );
 
@@ -121,8 +121,8 @@ class DefaultDemoModeService implements DemoModeService {
       onProgress: onProgress,
       task: () async {
         logs.add(
-            '협업툴 안내: JIRA·Confluence·Teams·Slack은 설정된 경우 실제 기능에서 실행할 수 있습니다.');
-        logs.add('이 시연 안내 자체는 외부 시스템에 요청을 보내지 않습니다.');
+            '업무 도구 안내: Jira·Confluence·Teams·Slack은 연결된 경우에만 사용할 수 있습니다.');
+        logs.add('기능 둘러보기 중에는 외부 시스템으로 데이터를 보내지 않습니다.');
       },
     );
 
@@ -136,8 +136,8 @@ class DefaultDemoModeService implements DemoModeService {
       logs: logs,
       onProgress: onProgress,
       task: () async {
-        logs.add('⑤ 결과 확인: 대시보드가 현재 저장된 VOC를 기준으로 계산됩니다.');
-        logs.add('안내: 하드코딩된 성과 수치나 가짜 KPI를 표시하지 않습니다.');
+        logs.add('⑤ 결과 확인: VOC 현황은 현재 저장된 데이터를 기준으로 계산됩니다.');
+        logs.add('임의로 만든 성과 수치는 표시하지 않습니다.');
       },
     );
 
@@ -147,7 +147,7 @@ class DefaultDemoModeService implements DemoModeService {
     _currentStatus = DemoStatus(
       phase: DemoPhase.completed,
       progressPercent: 100,
-      message: '시연 안내가 완료되었습니다. 실제 결과는 각 업무 화면에서 확인하세요.',
+      message: '기능 둘러보기를 마쳤습니다. 실제 결과는 각 업무 화면에서 확인하세요.',
       logs: logs,
       elapsed: DateTime.now().difference(startTime),
       totalDuration: _demoDuration,
@@ -193,19 +193,19 @@ class DefaultDemoModeService implements DemoModeService {
   String _getPhaseMessage(DemoPhase phase) {
     switch (phase) {
       case DemoPhase.generating:
-        return '📝 샘플 데이터 생성 중...';
+        return '샘플 VOC를 추가하고 있습니다.';
       case DemoPhase.analyzing:
-        return '🤖 AI 분석 진행 중...';
+        return 'AI 분석 화면을 안내하고 있습니다.';
       case DemoPhase.workflow:
-        return '⚙️ 워크플로우 자동 실행...';
+        return 'VOC 처리 과정을 안내하고 있습니다.';
       case DemoPhase.notifications:
-        return '협업툴 사용 경로 안내 중...';
+        return '업무 도구 사용 방법을 안내하고 있습니다.';
       case DemoPhase.dashboard:
-        return '📊 대시보드 업데이트...';
+        return 'VOC 현황 화면을 안내하고 있습니다.';
       case DemoPhase.completed:
-        return '시연 안내 완료';
+        return '기능 둘러보기 완료';
       default:
-        return '준비 중...';
+        return '기능 둘러보기를 준비하고 있습니다.';
     }
   }
 
