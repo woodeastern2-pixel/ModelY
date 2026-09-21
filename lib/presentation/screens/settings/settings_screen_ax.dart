@@ -24,6 +24,7 @@ class _SettingsScreenAxState extends State<SettingsScreenAx> {
     if (AppConstants.showCollaborationTools)
       _SectionData('연동', '이메일·동기화·알림 설정', Icons.sync_alt_outlined),
     _SectionData('일반', '사용자·화면·업무 기준 설정', Icons.tune_outlined),
+    _SectionData('데이터 관리', '가져오기·내보내기 및 초기화', Icons.storage_outlined),
   ];
 
   Future<bool> _requestAdminAccess() async {
@@ -97,6 +98,7 @@ class _SettingsScreenAxState extends State<SettingsScreenAx> {
       if (AppConstants.showCollaborationTools) _WorkToolsView(),
       if (AppConstants.showCollaborationTools) _IntegrationView(),
       _GeneralView(),
+      DataManagementScreen(embedded: true),
     ],
   );
 
@@ -1325,26 +1327,6 @@ class _IntegrationView extends StatelessWidget {
                     vm.urgencyWebhookThreshold,
                   ),
                 ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 14),
-        _Panel(
-          title: '데이터 관리',
-          subtitle: 'VOC 가져오기·내보내기, 시스템 간 동기화 및 데이터 초기화를 관리합니다.',
-          icon: Icons.storage_outlined,
-          children: [
-            Align(
-              alignment: Alignment.centerRight,
-              child: FilledButton.tonalIcon(
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const DataManagementScreen(),
-                  ),
-                ),
-                icon: const Icon(Icons.arrow_forward),
-                label: const Text('데이터 관리 열기'),
               ),
             ),
           ],
