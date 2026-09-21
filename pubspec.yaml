@@ -1,7 +1,7 @@
 name: ai_voc_assistant
 description: AI VOC Assistant - AI 기반 고객 VOC 분석 및 답변 추천 시스템
 publish_to: 'none'
-version: 1.1.1+3
+version: 1.1.2+4
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

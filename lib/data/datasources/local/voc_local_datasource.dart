@@ -9,9 +9,32 @@ class VocLocalDatasource {
   final DatabaseHelper _dbHelper;
   static final RegExp _tokenPattern = RegExp(r'[A-Za-z0-9가-힣]{2,}');
   static const Set<String> _keywordStopwords = {
-    'the', 'and', 'for', 'with', 'this', 'that', 'from', 'are', 'was', 'were',
-    '있습니다', '문의', '요청', '확인', '처리', '관련', '대한', '합니다', '입니다', '해주세요',
-    '기능', '오류', '이슈', '사용', '고객', '서비스',
+    'the',
+    'and',
+    'for',
+    'with',
+    'this',
+    'that',
+    'from',
+    'are',
+    'was',
+    'were',
+    '있습니다',
+    '문의',
+    '요청',
+    '확인',
+    '처리',
+    '관련',
+    '대한',
+    '합니다',
+    '입니다',
+    '해주세요',
+    '기능',
+    '오류',
+    '이슈',
+    '사용',
+    '고객',
+    '서비스',
   };
 
   VocLocalDatasource(this._dbHelper);
@@ -58,7 +81,8 @@ class VocLocalDatasource {
     final db = await _dbHelper.database;
     final maps = await db.query(
       AppConstants.tableVocs,
-      where: 'title LIKE ? OR content LIKE ? OR customer LIKE ? OR project LIKE ?',
+      where:
+          'title LIKE ? OR content LIKE ? OR customer LIKE ? OR project LIKE ?',
       whereArgs: ['%$query%', '%$query%', '%$query%', '%$query%'],
       orderBy: 'created_at DESC',
     );
@@ -125,7 +149,9 @@ class VocLocalDatasource {
     final result = await db.rawQuery(
       'SELECT status, COUNT(*) as count FROM ${AppConstants.tableVocs} GROUP BY status',
     );
-    return {for (final row in result) row['status'] as String: row['count'] as int};
+    return {
+      for (final row in result) row['status'] as String: row['count'] as int
+    };
   }
 
   Future<Map<String, int>> getVocCountByCategory() async {
@@ -157,16 +183,6 @@ class VocLocalDatasource {
   Future<Map<String, dynamic>> getAdvancedMetrics() async {
     final db = await _dbHelper.database;
 
-    final totalVocQ = await db.rawQuery(
-      'SELECT COUNT(*) as c FROM ${AppConstants.tableVocs}',
-    );
-    final total = (totalVocQ.first['c'] as int?) ?? 0;
-
-    final dupQ = await db.rawQuery(
-      'SELECT COUNT(*) as c FROM ${AppConstants.tableVocs} WHERE duplicate_score >= 0.85',
-    );
-    final duplicateCount = (dupQ.first['c'] as int?) ?? 0;
-
     final aiRespQ = await db.rawQuery(
       'SELECT COUNT(*) as c FROM ${AppConstants.tableResponses} WHERE ai_generated = 1',
     );
@@ -183,34 +199,12 @@ class VocLocalDatasource {
       FROM ${AppConstants.tableVocs}
       WHERE status = 'RESOLVED'
     ''');
-    final avgMinutes = (avgProcessQ.first['avg_minutes'] as num?)?.toDouble() ?? 0.0;
-
-    final monthlyDup = await db.rawQuery('''
-      SELECT strftime('%Y-%m', created_at) as month,
-             COUNT(*) as total,
-             SUM(CASE WHEN duplicate_score >= 0.85 THEN 1 ELSE 0 END) as dup
-      FROM ${AppConstants.tableVocs}
-      WHERE created_at >= date('now', '-6 months')
-      GROUP BY month
-      ORDER BY month ASC
-    ''');
-
-    double duplicateReductionRate = 0.0;
-    if (monthlyDup.length >= 2) {
-      final first = monthlyDup.first;
-      final last = monthlyDup.last;
-      final firstRate = ((first['dup'] as int?) ?? 0) /
-          ((((first['total'] as int?) ?? 0) == 0) ? 1 : (first['total'] as int));
-      final lastRate = ((last['dup'] as int?) ?? 0) /
-          ((((last['total'] as int?) ?? 0) == 0) ? 1 : (last['total'] as int));
-      duplicateReductionRate = (firstRate - lastRate).clamp(-1.0, 1.0);
-    }
+    final avgMinutes =
+        (avgProcessQ.first['avg_minutes'] as num?)?.toDouble() ?? 0.0;
 
     return {
-      'duplicateCount': duplicateCount,
-      'duplicateRate': total == 0 ? 0.0 : duplicateCount / total,
-      'duplicateReductionRate': duplicateReductionRate,
       'aiUsageRate': totalResponses == 0 ? 0.0 : aiResponses / totalResponses,
+      'aiResponses': aiResponses,
       'avgProcessMinutes': avgMinutes,
       'totalResponses': totalResponses,
     };
@@ -234,32 +228,8 @@ class VocLocalDatasource {
     final db = await _dbHelper.database;
     final vocRows = await db.query(
       AppConstants.tableVocs,
-      columns: ['id', 'title', 'content', 'customer', 'priority', 'status', 'created_at'],
+      columns: ['title', 'content', 'priority', 'status', 'created_at'],
     );
-    final responseRows = await db.rawQuery('''
-      SELECT voc_id, COUNT(*) as cnt
-      FROM ${AppConstants.tableResponses}
-      GROUP BY voc_id
-    ''');
-
-    final responseCountByVocId = <String, int>{
-      for (final row in responseRows)
-        (row['voc_id'] as String): (row['cnt'] as int? ?? 0),
-    };
-
-    var resolvedCount = 0;
-    var reopenedCount = 0;
-    for (final row in vocRows) {
-      final status = row['status'] as String? ?? '';
-      if (status == AppConstants.vocStatusResolved) {
-        resolvedCount += 1;
-        final vocId = row['id'] as String;
-        if ((responseCountByVocId[vocId] ?? 0) >= 2) {
-          reopenedCount += 1;
-        }
-      }
-    }
-    final reopenRate = resolvedCount == 0 ? 0.0 : reopenedCount / resolvedCount;
 
     final now = DateTime.now();
     final recentStart = now.subtract(const Duration(days: 30));
@@ -267,7 +237,8 @@ class VocLocalDatasource {
 
     final recentCounts = <String, int>{};
     final previousCounts = <String, int>{};
-    final segmentStats = <String, _SegmentAccumulator>{};
+    var recent30DayVocs = 0;
+    var highPriorityBacklogVocs = 0;
 
     for (final row in vocRows) {
       final title = (row['title'] as String? ?? '').toLowerCase();
@@ -281,6 +252,7 @@ class VocLocalDatasource {
 
       if (createdAt != null) {
         if (createdAt.isAfter(recentStart)) {
+          recent30DayVocs += 1;
           for (final token in tokens) {
             recentCounts[token] = (recentCounts[token] ?? 0) + 1;
           }
@@ -291,16 +263,11 @@ class VocLocalDatasource {
         }
       }
 
-      final segment = _normalizeCustomerSegment(row['customer'] as String?);
       final priority = row['priority'] as String? ?? '';
       final status = row['status'] as String? ?? '';
-      final acc = segmentStats.putIfAbsent(segment, () => _SegmentAccumulator());
-      acc.total += 1;
-      if (priority == AppConstants.priorityHigh) {
-        acc.highPriority += 1;
-      }
-      if (status != AppConstants.vocStatusResolved) {
-        acc.unresolved += 1;
+      if (priority == AppConstants.priorityHigh &&
+          status != AppConstants.vocStatusResolved) {
+        highPriorityBacklogVocs += 1;
       }
     }
 
@@ -315,30 +282,11 @@ class VocLocalDatasource {
       }
     });
 
-    String topSegmentName = '-';
-    var topSegmentScore = 0.0;
-    var topSegmentVolume = 0;
-    segmentStats.forEach((name, acc) {
-      if (acc.total == 0) return;
-      final highRate = acc.highPriority / acc.total;
-      final unresolvedRate = acc.unresolved / acc.total;
-      final score = (acc.total * 6) + (highRate * 45) + (unresolvedRate * 35);
-      if (score > topSegmentScore) {
-        topSegmentScore = score;
-        topSegmentName = name;
-        topSegmentVolume = acc.total;
-      }
-    });
-
     return {
-      'reopenRate': reopenRate.clamp(0.0, 1.0),
-      'reopenedCount': reopenedCount,
-      'resolvedCount': resolvedCount,
+      'recent30DayVocs': recent30DayVocs,
+      'highPriorityBacklogVocs': highPriorityBacklogVocs,
       'risingKeyword': risingKeyword,
       'risingKeywordDelta': risingDelta,
-      'topSegmentName': topSegmentName,
-      'topSegmentScore': topSegmentScore.clamp(0.0, 100.0),
-      'topSegmentVolume': topSegmentVolume,
     };
   }
 
@@ -352,14 +300,6 @@ class VocLocalDatasource {
       tokens.add(token);
     }
     return tokens;
-  }
-
-  String _normalizeCustomerSegment(String? raw) {
-    final value = (raw ?? '').trim();
-    if (value.isEmpty) return '미분류';
-    final split = value.split(RegExp(r'[\s\-_/()\[\]]+'));
-    final first = split.isEmpty ? value : split.first;
-    return first.isEmpty ? '미분류' : first;
   }
 
   // Responses
@@ -393,7 +333,8 @@ class VocLocalDatasource {
 
   Future<void> deleteResponse(String id) async {
     final db = await _dbHelper.database;
-    await db.delete(AppConstants.tableResponses, where: 'id = ?', whereArgs: [id]);
+    await db
+        .delete(AppConstants.tableResponses, where: 'id = ?', whereArgs: [id]);
   }
 
   // Mappers
@@ -505,9 +446,9 @@ class VocLocalDatasource {
       approvedAt: map['approved_at'] != null
           ? DateTime.parse(map['approved_at'] as String)
           : null,
-        adoptionCount: map['adoption_count'] as int? ?? 0,
-        usageCount: map['usage_count'] as int? ?? 0,
-        lastUsedAt: map['last_used_at'] != null
+      adoptionCount: map['adoption_count'] as int? ?? 0,
+      usageCount: map['usage_count'] as int? ?? 0,
+      lastUsedAt: map['last_used_at'] != null
           ? DateTime.parse(map['last_used_at'] as String)
           : null,
       createdAt: DateTime.parse(map['created_at'] as String),
@@ -533,10 +474,4 @@ class VocLocalDatasource {
       'updated_at': r.updatedAt.toIso8601String(),
     };
   }
-}
-
-class _SegmentAccumulator {
-  int total = 0;
-  int highPriority = 0;
-  int unresolved = 0;
 }

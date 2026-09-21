@@ -78,7 +78,6 @@ class VocAssistantApp extends StatelessWidget {
           create: (ctx) => DashboardViewModel(
             vocRepo,
             kbRepo,
-            ctx.read<SettingsViewModel>(),
           ),
         ),
         ChangeNotifierProvider(

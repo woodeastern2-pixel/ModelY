@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/utils/voc_category_catalog.dart';
 import '../../../data/services/demo_mode_service.dart';
 import '../../../data/services/sample_voc_generator.dart';
-import '../../../domain/services/executive_dashboard_service.dart';
 import '../../viewmodels/dashboard_viewmodel.dart';
 import '../../viewmodels/voc_viewmodel.dart';
 import '../voc/voc_register_screen.dart';
@@ -81,9 +79,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   child: LayoutBuilder(
                     builder: (context, constraints) {
                       final compact = constraints.maxWidth < 600;
-                      final pagePadding = compact
-                          ? AppSpacing.sm
-                          : AppSpacing.lg;
+                      final pagePadding =
+                          compact ? AppSpacing.sm : AppSpacing.lg;
                       return Padding(
                         padding: EdgeInsets.all(pagePadding),
                         child: Column(
@@ -106,12 +103,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             _CoreKpiCards(vm: vm),
                             const SizedBox(height: AppSpacing.xl),
                             const _SectionHeading(
-                              eyebrow: '오늘의 요약',
-                              title: '오늘 확인할 VOC',
-                              description: '오늘 확인해야 할 VOC와 AI 활용 현황입니다.',
+                              eyebrow: '운영 요약',
+                              title: '지금 확인할 VOC',
+                              description: '실제 등록·처리 기록을 기준으로 확인합니다.',
                             ),
                             const SizedBox(height: AppSpacing.sm),
-                            _ExecutiveInsightsPanel(vm: vm),
+                            _OperationalSummaryPanel(vm: vm),
                             const SizedBox(height: AppSpacing.xl),
                             const _SectionHeading(
                               eyebrow: '처리 현황',
@@ -219,7 +216,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     LinearProgressIndicator(
                       value:
                           (service.getCurrentStatus()?.progressPercent ?? 0) /
-                          100,
+                              100,
                     ),
                     const SizedBox(height: 12),
                     Text(
@@ -354,28 +351,29 @@ class _DashboardHero extends StatelessWidget {
                   Text(
                     '오늘의 현황',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: const Color(0xFFB9BED0),
-                      letterSpacing: 1.2,
-                      fontWeight: FontWeight.w700,
-                    ),
+                          color: const Color(0xFFB9BED0),
+                          letterSpacing: 1.2,
+                          fontWeight: FontWeight.w700,
+                        ),
                   ),
                 ],
               ),
               const SizedBox(height: AppSpacing.md),
               Text(
                 title,
-                style:
-                    (compact
-                            ? Theme.of(context).textTheme.headlineMedium
-                            : Theme.of(context).textTheme.displaySmall)
-                        ?.copyWith(color: Colors.white),
+                style: (compact
+                        ? Theme.of(context).textTheme.headlineMedium
+                        : Theme.of(context).textTheme.displaySmall)
+                    ?.copyWith(color: Colors.white),
               ),
               const SizedBox(height: AppSpacing.xs),
               ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 620),
                 child: Text(
                   description,
-                  style: Theme.of(context).textTheme.bodyMedium
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
                       ?.copyWith(color: const Color(0xFFC7CBD8), height: 1.55),
                 ),
               ),
@@ -459,7 +457,9 @@ class _HeroPulse extends StatelessWidget {
         children: [
           Text(
             '미완료 VOC',
-            style: Theme.of(context).textTheme.labelMedium
+            style: Theme.of(context)
+                .textTheme
+                .labelMedium
                 ?.copyWith(color: const Color(0xFFB9BED0)),
           ),
           const SizedBox(height: AppSpacing.xxs),
@@ -468,7 +468,9 @@ class _HeroPulse extends StatelessWidget {
             children: [
               Text(
                 vm.backlogVocs.toString(),
-                style: Theme.of(context).textTheme.displayMedium
+                style: Theme.of(context)
+                    .textTheme
+                    .displayMedium
                     ?.copyWith(color: Colors.white, height: 1),
               ),
               const SizedBox(width: AppSpacing.xs),
@@ -476,7 +478,9 @@ class _HeroPulse extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: 4),
                 child: Text(
                   '건',
-                  style: Theme.of(context).textTheme.bodyMedium
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
                       ?.copyWith(color: const Color(0xFFB9BED0)),
                 ),
               ),
@@ -491,7 +495,7 @@ class _HeroPulse extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.md),
           _HeroProgress(
-            label: 'AI 답변 사용률',
+            label: 'AI 작성 답변 비율',
             value: vm.aiUsageRate.clamp(0.0, 1.0).toDouble(),
             display: '${(vm.aiUsageRate * 100).toStringAsFixed(0)}%',
             color: const Color(0xFF9FA1FF),
@@ -524,13 +528,17 @@ class _HeroProgress extends StatelessWidget {
             Expanded(
               child: Text(
                 label,
-                style: Theme.of(context).textTheme.labelSmall
+                style: Theme.of(context)
+                    .textTheme
+                    .labelSmall
                     ?.copyWith(color: const Color(0xFFB9BED0)),
               ),
             ),
             Text(
               display,
-              style: Theme.of(context).textTheme.labelMedium
+              style: Theme.of(context)
+                  .textTheme
+                  .labelMedium
                   ?.copyWith(color: Colors.white),
             ),
           ],
@@ -569,16 +577,18 @@ class _SectionHeading extends StatelessWidget {
         Text(
           eyebrow,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: Theme.of(context).colorScheme.primary,
-            letterSpacing: 1.15,
-          ),
+                color: Theme.of(context).colorScheme.primary,
+                letterSpacing: 1.15,
+              ),
         ),
         const SizedBox(height: AppSpacing.xxs),
         Text(title, style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 2),
         Text(
           description,
-          style: Theme.of(context).textTheme.bodySmall
+          style: Theme.of(context)
+              .textTheme
+              .bodySmall
               ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
         ),
       ],
@@ -617,179 +627,78 @@ class _DashboardErrorBanner extends StatelessWidget {
   }
 }
 
-class _ExecutiveInsightsPanel extends StatelessWidget {
+class _OperationalSummaryPanel extends StatelessWidget {
   final DashboardViewModel vm;
-  const _ExecutiveInsightsPanel({required this.vm});
+  const _OperationalSummaryPanel({required this.vm});
 
   @override
   Widget build(BuildContext context) {
-    final roi = vm.roiResult;
-    final roiInput = vm.roiInputSnapshot;
-    final won = NumberFormat.currency(
-      locale: 'ko_KR',
-      symbol: '₩',
-      decimalDigits: 0,
-    );
-    final trendPct = vm.monthlyVocTrendPercent * 100;
-    final aiUpdatedAt = vm.executiveAiUpdatedAt;
-    final aiRecommendations = vm.executiveAiRecommendations;
-
     return Card(
+      key: const Key('dashboard-operational-summary'),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 Icon(
-                  Icons.auto_awesome_rounded,
+                  Icons.fact_check_outlined,
                   size: 20,
                   color: Theme.of(context).colorScheme.primary,
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppSpacing.xs),
                 Text(
-                  'AI 분석 요약',
+                  '운영 현황 요약',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
               ],
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: AppSpacing.xxs),
             Text(
-              '저장된 VOC를 기준으로 계산했으며 AI 분석값은 참고용입니다.',
+              '저장된 VOC와 답변 기록에서 직접 집계한 값만 표시합니다.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.sm),
             Wrap(
-              spacing: 10,
-              runSpacing: 10,
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.sm,
               children: [
                 _metricChip(
                   context,
-                  'AI 분석 정확도',
-                  '${(vm.aiOverallAccuracy * 100).toStringAsFixed(1)}%',
-                  Icons.verified_outlined,
-                  Colors.teal,
+                  '우선 처리 VOC',
+                  '${vm.highPriorityBacklogVocs}건',
+                  Icons.priority_high_rounded,
+                  Colors.redAccent,
+                  subtitle: '미완료 VOC 중 우선순위 높음',
                 ),
                 _metricChip(
                   context,
-                  'AI 답변 승인률',
-                  '${(vm.aiAnswerAdoptionRate * 100).toStringAsFixed(1)}%',
-                  Icons.thumb_up_alt_outlined,
+                  '최근 30일 접수',
+                  '${vm.recent30DayVocs}건',
+                  Icons.calendar_month_outlined,
+                  Colors.blue,
+                ),
+                _metricChip(
+                  context,
+                  'AI 작성 답변',
+                  '${vm.aiGeneratedResponses}건',
+                  Icons.auto_awesome_outlined,
                   Colors.indigo,
-                ),
-                _metricChip(
-                  context,
-                  '복수 답변 등록 비율',
-                  '${(vm.reopenRate * 100).toStringAsFixed(1)}%',
-                  Icons.replay_circle_filled_outlined,
-                  Colors.deepOrange,
-                  subtitle:
-                      '${vm.reopenedCount}건 / 처리 완료 ${vm.resolvedForReopenRate}건',
+                  subtitle: '전체 답변 ${vm.totalResponses}건',
                 ),
                 _metricChip(
                   context,
                   '최근 늘어난 키워드',
                   vm.risingKeyword,
-                  Icons.local_fire_department_outlined,
-                  Colors.redAccent,
+                  Icons.trending_up_rounded,
+                  Colors.teal,
                   subtitle: vm.risingKeywordDelta > 0
-                      ? '최근 30일 +${vm.risingKeywordDelta}'
-                      : '최근 30일 동안 뚜렷하게 늘어난 키워드가 없습니다.',
-                ),
-                _metricChip(
-                  context,
-                  '우선 확인 고객군',
-                  vm.topSegmentName == '-' ? '-' : vm.topSegmentName,
-                  Icons.groups_2_outlined,
-                  Colors.pink,
-                  subtitle: vm.topSegmentName == '-'
-                      ? '데이터 부족'
-                      : 'VOC ${vm.topSegmentVolume}건 · 우선 확인 점수 ${vm.topSegmentScore.toStringAsFixed(1)}점',
-                ),
-                _metricChip(
-                  context,
-                  '월 예상 순절감액',
-                  roi == null ? '-' : won.format(roi.monthlyNetSavingsCost),
-                  Icons.savings_outlined,
-                  Colors.green,
-                  subtitle: roi == null
-                      ? null
-                      : '총 절감액 ${won.format(roi.monthlySavingsCost)} - 운영비 ${won.format(roiInput?.monthlyAiMaintenanceCost ?? 0)}',
-                ),
-                _metricChip(
-                  context,
-                  'ROI',
-                  roi == null ? '-' : '${roi.roi.toStringAsFixed(1)}%',
-                  Icons.trending_up,
-                  Colors.deepPurple,
-                ),
-                _metricChip(
-                  context,
-                  '투자비 회수 예상 기간',
-                  roi == null || !roi.implementationPaybackMonths.isFinite
-                      ? '-'
-                      : '${roi.implementationPaybackMonths.toStringAsFixed(1)}개월',
-                  Icons.schedule,
-                  Colors.brown,
-                ),
-                _metricChip(
-                  context,
-                  '미완료 VOC 비율',
-                  '${(vm.backlogRate * 100).toStringAsFixed(1)}%',
-                  Icons.warning_amber_outlined,
-                  Colors.orange,
-                  subtitle: '${vm.backlogVocs}건 (접수+처리 중)',
-                ),
-                _metricChip(
-                  context,
-                  '전월 VOC 증감',
-                  '${trendPct >= 0 ? '+' : ''}${trendPct.toStringAsFixed(1)}%',
-                  trendPct >= 0 ? Icons.trending_up : Icons.trending_down,
-                  trendPct >= 0 ? Colors.red : Colors.blue,
-                ),
-                _metricChip(
-                  context,
-                  'AI 활용 효과',
-                  roi == null
-                      ? '-'
-                      : '${roi.aiEffectiveness.toStringAsFixed(1)}점',
-                  Icons.auto_graph,
-                  Colors.cyan,
+                      ? '직전 30일보다 +${vm.risingKeywordDelta}건'
+                      : '최근 30일 동안 뚜렷한 증가 없음',
                 ),
               ],
             ),
-            const SizedBox(height: 14),
-            _formulaPanel(context, roiInput, roi, won),
-            const SizedBox(height: 14),
-            Text(
-              'ROI는 투자 대비 수익률(Return On Investment)입니다. 값이 높을수록 투자 효율이 높습니다.',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            if (aiRecommendations.isNotEmpty) ...[
-              const SizedBox(height: 14),
-              Text('AI 권장 조치', style: Theme.of(context).textTheme.titleSmall),
-              if (aiUpdatedAt != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 2, bottom: 6),
-                  child: Text(
-                    '마지막 분석: ${DateFormat('yyyy-MM-dd HH:mm').format(aiUpdatedAt)}',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ),
-              const SizedBox(height: 6),
-              ...aiRecommendations
-                  .take(4)
-                  .map(
-                    (r) => Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: Text(
-                        '- $r',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ),
-                  ),
-            ],
           ],
         ),
       ),
@@ -819,15 +728,15 @@ class _ExecutiveInsightsPanel extends StatelessWidget {
           Row(
             children: [
               Icon(icon, size: 16, color: color),
-              const SizedBox(width: 6),
+              const SizedBox(width: AppSpacing.xs),
               Expanded(
                 child: Text(
                   label,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                 ),
               ),
             ],
@@ -837,8 +746,10 @@ class _ExecutiveInsightsPanel extends StatelessWidget {
             value,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.titleMedium
-                ?.copyWith(color: color, fontWeight: FontWeight.w800),
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w800,
+                ),
           ),
           if (subtitle != null && subtitle.trim().isNotEmpty)
             Padding(
@@ -848,64 +759,9 @@ class _ExecutiveInsightsPanel extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
               ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _formulaPanel(
-    BuildContext context,
-    RoiCalculatorInput? input,
-    RoiResult? roi,
-    NumberFormat won,
-  ) {
-    final hourlyCost = ((input?.hourlyLaborCost ?? 35.0) * 1400).round();
-    final maintenanceCost = ((input?.monthlyAiMaintenanceCost ?? 2500) * 1400)
-        .round();
-    final implementationCost = ((input?.aiImplementationCost ?? 50000) * 1400)
-        .round();
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10),
-        color: Theme.of(context).colorScheme.surfaceContainerLow,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('산정 기준', style: Theme.of(context).textTheme.titleSmall),
-          const SizedBox(height: 6),
-          Text(
-            '월 예상 총절감액 = 월 VOC 건수 × 평균 처리 시간 × 자동화율 × AI 정확도 × 시간당 인건비',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          Text(
-            '월 예상 순절감액 = 월 예상 총절감액 - 월간 AI 운영비',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          Text(
-            '연간 ROI = 연간 순절감액 ÷ (AI 도입비 + 연간 운영비) × 100',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '현재 입력값: 월 VOC ${input?.monthlyVocVolume ?? '-'}건, 평균 처리 ${input?.avgHandleTimeHours.toStringAsFixed(2) ?? '-'}시간, 자동화율 ${((input?.automationRate ?? 0) * 100).toStringAsFixed(1)}%, AI 정확도 ${((input?.aiAccuracyRate ?? 0) * 100).toStringAsFixed(1)}%',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          Text(
-            '비용 가정: 시간당 인건비 약 ${won.format(hourlyCost)}, 월 유지비 약 ${won.format(maintenanceCost)}, 도입비 약 ${won.format(implementationCost)}',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          if (roi != null)
-            Text(
-              '예상 결과: 월 순절감액 ${won.format(roi.monthlyNetSavingsCost)}, 연간 순절감액 ${won.format(roi.yearlySavingsCost)}, ROI ${roi.roi.toStringAsFixed(1)}%',
-              style: Theme.of(context).textTheme.bodySmall,
             ),
         ],
       ),
@@ -942,7 +798,7 @@ class _CoreKpiCards extends StatelessWidget {
         '',
       ),
       _CardData(
-        'AI 답변 사용률',
+        'AI 작성 답변 비율',
         '${(vm.aiUsageRate * 100).toStringAsFixed(1)}%',
         Icons.auto_awesome_rounded,
         const Color(0xFF7A5AF8),
@@ -999,14 +855,7 @@ class _OperationalMetricCards extends StatelessWidget {
         '',
       ),
       _CardData(
-        '중복 감소율',
-        '${(vm.duplicateReductionRate * 100).toStringAsFixed(1)}%',
-        Icons.copy_all_rounded,
-        const Color(0xFF0D8FA3),
-        '',
-      ),
-      _CardData(
-        '평균 처리 시간',
+        '평균 완료 소요 시간',
         '${(vm.avgProcessMinutes / 60).toStringAsFixed(1)}h',
         Icons.schedule_rounded,
         const Color(0xFF747B8E),
@@ -1016,10 +865,10 @@ class _OperationalMetricCards extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final crossCount = constraints.maxWidth >= 1100
-            ? 5
+            ? 4
             : constraints.maxWidth >= 700
-            ? 3
-            : 2;
+                ? 3
+                : 2;
         return GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -1082,8 +931,7 @@ class _SummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isClickable =
-        data.statusFilter.isNotEmpty ||
+    final isClickable = data.statusFilter.isNotEmpty ||
         data.label == '전체 VOC' ||
         data.label == '지식 자료';
 
@@ -1116,8 +964,9 @@ class _SummaryCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
                     ),
                   ),
                   if (isClickable)
@@ -1133,9 +982,9 @@ class _SummaryCard extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.7,
-                ),
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.7,
+                    ),
               ),
             ],
           ),
@@ -1170,8 +1019,8 @@ class _CategorySection extends StatelessWidget {
     final end = totalPages == 0
         ? 0
         : (start + pageSize > entries.length
-              ? entries.length
-              : start + pageSize);
+            ? entries.length
+            : start + pageSize);
     final visibleEntries = totalPages == 0
         ? <MapEntry<String, int>>[]
         : entries.sublist(start, end);
