@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/constants/app_constants.dart';
 import '../../../data/services/peer_sync_service.dart';
 import '../../viewmodels/dashboard_viewmodel.dart';
 import '../../viewmodels/integration_viewmodel.dart';
@@ -15,7 +16,9 @@ import '../../viewmodels/settings_viewmodel.dart';
 import '../../viewmodels/voc_viewmodel.dart';
 
 class DataManagementScreen extends StatefulWidget {
-  const DataManagementScreen({super.key});
+  const DataManagementScreen({super.key, this.embedded = false});
+
+  final bool embedded;
 
   @override
   State<DataManagementScreen> createState() => _DataManagementScreenState();
@@ -58,7 +61,8 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
     if (_peerSyncRunning) return;
     setState(() => _peerSyncRunning = true);
     try {
-      final result = await PeerSyncService(context.read<SettingsViewModel>()).pullAllVocs();
+      final result = await PeerSyncService(context.read<SettingsViewModel>())
+          .pullAllVocs();
       if (!mounted) return;
       await _refresh();
       _show(
@@ -79,7 +83,8 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
     if (_peerSyncRunning) return;
     setState(() => _peerSyncRunning = true);
     try {
-      final result = await PeerSyncService(context.read<SettingsViewModel>()).bootstrap();
+      final result = await PeerSyncService(context.read<SettingsViewModel>())
+          .bootstrap();
       if (!mounted) return;
       await _refresh();
       _show(
@@ -117,9 +122,18 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
         title: const Text('중복 VOC 처리'),
         content: const Text('같은 제목과 내용의 VOC가 이미 있을 때 처리 방식을 선택하세요.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, 'append'), child: const Text('추가')),
-          TextButton(onPressed: () => Navigator.pop(ctx, 'overwrite'), child: const Text('덮어쓰기')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, 'skip'), child: const Text('건너뛰기')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'append'),
+            child: const Text('추가'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'overwrite'),
+            child: const Text('덮어쓰기'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, 'skip'),
+            child: const Text('건너뛰기'),
+          ),
         ],
       ),
     );
@@ -145,7 +159,9 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
 
   Future<void> _export(bool template) async {
     final date = DateFormat('yyyyMMdd').format(DateTime.now());
-    final name = template ? 'VOC_Import_Template_$date.xlsx' : 'VOC_Backup_$date.xlsx';
+    final name = template
+        ? 'VOC_Import_Template_$date.xlsx'
+        : 'VOC_Backup_$date.xlsx';
     final path = await _xlsxPath(name);
     if (path == null || !mounted) return;
     await _run((vm) async {
@@ -157,16 +173,25 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
     });
   }
 
-  Future<bool> _confirm(String title, String body, {bool danger = false}) async {
+  Future<bool> _confirm(
+    String title,
+    String body, {
+    bool danger = false,
+  }) async {
     return await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
             title: Text(title),
             content: Text(body),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('취소')),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('취소'),
+              ),
               FilledButton(
-                style: danger ? FilledButton.styleFrom(backgroundColor: Colors.red) : null,
+                style: danger
+                    ? FilledButton.styleFrom(backgroundColor: Colors.red)
+                    : null,
                 onPressed: () => Navigator.pop(ctx, true),
                 child: Text(danger ? '초기화' : '실행'),
               ),
@@ -180,34 +205,41 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
   Widget build(BuildContext context) {
     final vm = context.watch<IntegrationViewModel>();
     final busy = vm.isLoading || _peerSyncRunning;
-    return Scaffold(
-      appBar: AppBar(title: const Text('데이터 관리')),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final wide = constraints.maxWidth >= 920;
-          final pad = constraints.maxWidth >= 900 ? 28.0 : 16.0;
-          return SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(pad, 20, pad, 40),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1180),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _Header(active: vm.inAppReceiverRunning),
-                    if (busy) ...[
-                      const SizedBox(height: 14),
-                      const LinearProgressIndicator(),
-                    ],
-                    const SizedBox(height: 16),
-                    _Grid(
-                      wide: wide,
-                      children: [
+    final content = LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= 920;
+        final pad = constraints.maxWidth >= 900 ? 28.0 : 16.0;
+        return SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(pad, 20, pad, 40),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1180),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _Header(
+                    active: vm.inAppReceiverRunning,
+                    showSync: AppConstants.showCollaborationTools,
+                  ),
+                  if (busy) ...[
+                    const SizedBox(height: 14),
+                    const LinearProgressIndicator(),
+                  ],
+                  const SizedBox(height: 16),
+                  _Grid(
+                    wide: wide,
+                    children: [
+                      if (AppConstants.showCollaborationTools)
                         _Group('시스템 간 동기화', Icons.sync_alt_outlined, [
                           _Cmd(
                             '전체 VOC와 매뉴얼 보내기',
                             Icons.cloud_upload_outlined,
-                            busy ? null : () => _run((v) => v.forwardFullVocAndManualToPeerApps()),
+                            busy
+                                ? null
+                                : () => _run(
+                                    (v) =>
+                                        v.forwardFullVocAndManualToPeerApps(),
+                                  ),
                           ),
                           _Cmd(
                             '연결된 앱의 VOC 가져오기',
@@ -227,74 +259,135 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
                                 : () => _run((v) => v.retryPendingSyncQueue()),
                           ),
                         ]),
-                        _Group('가져오기·내보내기', Icons.folder_copy_outlined, [
+                      _Group('가져오기·내보내기', Icons.folder_copy_outlined, [
+                        if (AppConstants.showCollaborationTools)
                           _Cmd(
                             'Outlook 메일에서 VOC 수집',
                             Icons.mark_email_read_outlined,
-                            busy ? null : () => _run((v) async { await v.collectOutlookAndCreateVoc(top: 20); }, refresh: true),
+                            busy
+                                ? null
+                                : () => _run((v) async {
+                                    await v.collectOutlookAndCreateVoc(top: 20);
+                                  }, refresh: true),
                           ),
-                          _Cmd('VOC 가져오기', Icons.file_upload_outlined, busy ? null : _importVoc),
-                          _Cmd('VOC 내보내기', Icons.file_download_outlined, busy ? null : () => _export(false)),
-                          _Cmd('VOC 입력 템플릿', Icons.description_outlined, busy ? null : () => _export(true)),
-                        ]),
-                        _Group('AI 검색 데이터', Icons.auto_awesome_motion_outlined, [
-                          _Cmd('AI 검색 데이터 다시 만들기', Icons.hub_outlined, busy ? null : () => _run((v) async { await v.rebuildVectorDb(); })),
-                          _Cmd('AI 대화 기록 초기화', Icons.cleaning_services_outlined, busy ? null : () async {
-                            if (await _confirm('AI 대화 기록 초기화', 'AI 대화와 답변 평가 기록을 초기화합니다. VOC 원문은 유지됩니다.')) {
-                              await _run((v) => v.clearAiCache());
-                            }
-                          }),
-                        ]),
-                        _Group('초기화', Icons.warning_amber_rounded, [
-                          _Cmd('VOC 데이터 전체 초기화', Icons.delete_forever_outlined, busy ? null : () async {
-                            if (await _confirm(
-                              'VOC 데이터 전체 초기화',
-                              'VOC, 답변, 지식 자료, AI 검색 데이터와 대화 기록이 삭제됩니다. 이 작업은 되돌릴 수 없습니다.',
-                              danger: true,
-                            )) {
-                              await _run((v) => v.clearAllVocData(), refresh: true);
-                            }
-                          }, danger: true),
-                        ], danger: true),
-                      ],
-                    ),
-                    if (vm.syncRuntimeLogs.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      Card(
-                        child: ExpansionTile(
-                          title: const Text('동기화 실행 로그'),
-                          subtitle: Text('${vm.syncRuntimeLogs.length}개 기록'),
-                          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                          children: [
-                            SizedBox(
-                              width: double.infinity,
-                              height: 180,
-                              child: SingleChildScrollView(
-                                child: SelectableText(vm.syncRuntimeLogs.join('\n')),
+                        _Cmd(
+                          'VOC 가져오기',
+                          Icons.file_upload_outlined,
+                          busy ? null : _importVoc,
+                        ),
+                        _Cmd(
+                          'VOC 내보내기',
+                          Icons.file_download_outlined,
+                          busy ? null : () => _export(false),
+                        ),
+                        _Cmd(
+                          'VOC 입력 템플릿',
+                          Icons.description_outlined,
+                          busy ? null : () => _export(true),
+                        ),
+                      ]),
+                      _Group('AI 검색 데이터', Icons.auto_awesome_motion_outlined, [
+                        _Cmd(
+                          'AI 검색 데이터 다시 만들기',
+                          Icons.hub_outlined,
+                          busy
+                              ? null
+                              : () => _run((v) async {
+                                  await v.rebuildVectorDb();
+                                }),
+                        ),
+                        _Cmd(
+                          'AI 대화 기록 초기화',
+                          Icons.cleaning_services_outlined,
+                          busy
+                              ? null
+                              : () async {
+                                  if (await _confirm(
+                                    'AI 대화 기록 초기화',
+                                    'AI 대화와 답변 평가 기록을 초기화합니다. '
+                                        'VOC 원문은 유지됩니다.',
+                                  )) {
+                                    await _run((v) => v.clearAiCache());
+                                  }
+                                },
+                        ),
+                      ]),
+                      _Group('초기화', Icons.warning_amber_rounded, [
+                        _Cmd(
+                          'VOC 데이터 전체 초기화',
+                          Icons.delete_forever_outlined,
+                          busy
+                              ? null
+                              : () async {
+                                  if (await _confirm(
+                                    'VOC 데이터 전체 초기화',
+                                    'VOC, 답변, 지식 자료, AI 검색 데이터와 대화 기록이 '
+                                        '삭제됩니다. 이 작업은 되돌릴 수 없습니다.',
+                                    danger: true,
+                                  )) {
+                                    await _run(
+                                      (v) => v.clearAllVocData(),
+                                      refresh: true,
+                                    );
+                                  }
+                                },
+                          danger: true,
+                        ),
+                      ], danger: true),
+                    ],
+                  ),
+                  if (AppConstants.showCollaborationTools &&
+                      vm.syncRuntimeLogs.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Card(
+                      child: ExpansionTile(
+                        title: const Text('동기화 실행 로그'),
+                        subtitle: Text('${vm.syncRuntimeLogs.length}개 기록'),
+                        childrenPadding: const EdgeInsets.fromLTRB(
+                          16,
+                          0,
+                          16,
+                          16,
+                        ),
+                        children: [
+                          SizedBox(
+                            width: double.infinity,
+                            height: 180,
+                            child: SingleChildScrollView(
+                              child: SelectableText(
+                                vm.syncRuntimeLogs.join('\n'),
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ],
-                ),
+                ],
               ),
             ),
-          );
-        },
-      ),
+          ),
+        );
+      },
+    );
+    if (widget.embedded) return content;
+    return Scaffold(
+      appBar: AppBar(title: const Text('데이터 관리')),
+      body: content,
     );
   }
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.active});
+  const _Header({required this.active, required this.showSync});
   final bool active;
+  final bool showSync;
 
   @override
   Widget build(BuildContext context) {
-    final tone = active ? Colors.green : Colors.orange;
+    final tone = showSync
+        ? (active ? Colors.green : Colors.orange)
+        : Theme.of(context).colorScheme.primary;
     final cs = Theme.of(context).colorScheme;
     return Card(
       child: Padding(
@@ -311,21 +404,26 @@ class _Header extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '데이터 및 동기화 관리',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                    showSync ? '데이터 및 동기화 관리' : '데이터 관리',
+                    style: Theme.of(context).textTheme.titleLarge
+                        ?.copyWith(fontWeight: FontWeight.w800),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'VOC 가져오기·내보내기, 시스템 간 동기화 및 데이터 초기화를 실행합니다.',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                    showSync
+                        ? 'VOC 가져오기·내보내기, 시스템 간 동기화 및 데이터 초기화를 실행합니다.'
+                        : 'VOC 가져오기·내보내기, AI 검색 데이터 및 초기화를 관리합니다.',
+                    style: Theme.of(context).textTheme.bodyMedium
+                        ?.copyWith(color: cs.onSurfaceVariant),
                   ),
                 ],
               ),
             ),
-            Text(
-              active ? '동기화 준비 완료' : '동기화 상태 확인 필요',
-              style: TextStyle(color: tone, fontWeight: FontWeight.w700),
-            ),
+            if (showSync)
+              Text(
+                active ? '동기화 준비 완료' : '동기화 상태 확인 필요',
+                style: TextStyle(color: tone, fontWeight: FontWeight.w700),
+              ),
           ],
         ),
       ),
@@ -340,15 +438,15 @@ class _Grid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
-        builder: (context, c) {
-          final w = wide ? (c.maxWidth - 14) / 2 : c.maxWidth;
-          return Wrap(
-            spacing: 14,
-            runSpacing: 14,
-            children: children.map((e) => SizedBox(width: w, child: e)).toList(),
-          );
-        },
+    builder: (context, c) {
+      final w = wide ? (c.maxWidth - 14) / 2 : c.maxWidth;
+      return Wrap(
+        spacing: 14,
+        runSpacing: 14,
+        children: children.map((e) => SizedBox(width: w, child: e)).toList(),
       );
+    },
+  );
 }
 
 class _Group extends StatelessWidget {
@@ -360,42 +458,50 @@ class _Group extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Card(
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    child: Padding(
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  Icon(icon, color: danger ? Colors.red : Theme.of(context).colorScheme.primary),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-                    ),
-                  ),
-                ],
+              Icon(
+                icon,
+                color: danger
+                    ? Colors.red
+                    : Theme.of(context).colorScheme.primary,
               ),
-              const SizedBox(height: 14),
-              ...commands.map(
-                (c) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      style: c.danger ? OutlinedButton.styleFrom(foregroundColor: Colors.red) : null,
-                      onPressed: c.action,
-                      icon: Icon(c.icon),
-                      label: Text(c.label),
-                    ),
-                  ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w800),
                 ),
               ),
             ],
           ),
-        ),
-      );
+          const SizedBox(height: 14),
+          ...commands.map(
+            (c) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  style: c.danger
+                      ? OutlinedButton.styleFrom(foregroundColor: Colors.red)
+                      : null,
+                  onPressed: c.action,
+                  icon: Icon(c.icon),
+                  label: Text(c.label),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _Cmd {
