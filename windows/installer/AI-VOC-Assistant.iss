@@ -1,7 +1,13 @@
 #define MyAppName "AI VOC Assistant"
-#define MyAppVersion "1.1.0"
+#ifndef MyAppVersion
+  #define MyAppVersion "1.1.1"
+#endif
+#ifndef MyAppBuild
+  #define MyAppBuild "3"
+#endif
 #define MyAppPublisher "Easternwood"
 #define MyAppExeName "ai_voc_assistant.exe"
+#define MyArtifactName "AI-VOC-Assistant-v" + MyAppVersion + "-build" + MyAppBuild + "-Setup"
 
 [Setup]
 AppId={{C4268CC0-4815-49EE-B2DA-9A7364B2706E}
@@ -12,10 +18,13 @@ DefaultDirName={autopf}\AI VOC Assistant
 DefaultGroupName=AI VOC Assistant
 DisableProgramGroupPage=yes
 OutputDir=..\..\release_artifacts\windows
-OutputBaseFilename=AI-VOC-Assistant-Setup
+OutputBaseFilename={#MyArtifactName}
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
+CloseApplications=yes
+CloseApplicationsFilter={#MyAppExeName}
+RestartApplications=no
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayIcon={app}\{#MyAppExeName}

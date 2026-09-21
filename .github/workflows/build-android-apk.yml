@@ -30,10 +30,15 @@ jobs:
       - name: Build release APK
         run: |
           flutter build apk --release
-          cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/AI-VOC-Assistant.apk
+          VERSION_SPEC=$(awk '/^version:/{print $2}' pubspec.yaml)
+          APP_VERSION=${VERSION_SPEC%%+*}
+          BUILD_NUMBER=${VERSION_SPEC##*+}
+          OUTPUT_NAME="AI-VOC-Assistant-v${APP_VERSION}-build${BUILD_NUMBER}"
+          cp build/app/outputs/flutter-apk/app-release.apk "build/app/outputs/flutter-apk/${OUTPUT_NAME}.apk"
+          echo "OUTPUT_NAME=${OUTPUT_NAME}" >> "$GITHUB_ENV"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AI-VOC-Assistant-Android
-          path: build/app/outputs/flutter-apk/AI-VOC-Assistant.apk
+          name: ${{ env.OUTPUT_NAME }}
+          path: build/app/outputs/flutter-apk/${{ env.OUTPUT_NAME }}.apk

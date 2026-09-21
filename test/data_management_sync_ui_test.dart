@@ -1,8 +1,11 @@
 import 'package:ai_voc_assistant/core/constants/app_constants.dart';
 import 'package:ai_voc_assistant/core/theme/app_theme.dart';
+import 'package:ai_voc_assistant/domain/repositories/knowledge_base_repository.dart';
 import 'package:ai_voc_assistant/domain/repositories/settings_repository.dart';
 import 'package:ai_voc_assistant/domain/repositories/voc_repository.dart';
 import 'package:ai_voc_assistant/presentation/screens/settings/data_management_screen_v2.dart';
+import 'package:ai_voc_assistant/presentation/screens/settings/settings_screen_ax.dart';
+import 'package:ai_voc_assistant/presentation/viewmodels/ai_viewmodel.dart';
 import 'package:ai_voc_assistant/presentation/viewmodels/integration_viewmodel.dart';
 import 'package:ai_voc_assistant/presentation/viewmodels/settings_viewmodel.dart';
 import 'package:flutter/material.dart';
@@ -127,6 +130,57 @@ void main() {
     settings.dispose();
     await tester.pump();
   });
+
+  testWidgets('settings navigation opens the sync-enabled data screen', (
+    tester,
+  ) async {
+    await _setViewport(tester, const Size(1440, 1000));
+    final repository = _MemorySettingsRepository({
+      AppConstants.settingAppInstanceName: '본사 VOC',
+    });
+    final settings = SettingsViewModel(repository);
+    const vocRepository = _EmptyVocRepository();
+    final integration = IntegrationViewModel(vocRepository, settings);
+    final ai = AiViewModel(
+      const _EmptyKnowledgeRepository(),
+      vocRepository,
+      settings,
+    );
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<SettingsViewModel>.value(value: settings),
+          ChangeNotifierProvider<IntegrationViewModel>.value(
+            value: integration,
+          ),
+          ChangeNotifierProvider<AiViewModel>.value(value: ai),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.lightTheme,
+          home: const Scaffold(body: SettingsScreenAx()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    // The legacy General settings view emits a framework-only ListTile ink
+    // warning while it is the initially selected tab. This routing assertion
+    // concerns exceptions produced after opening Data Management.
+    tester.takeException();
+    await tester.tap(find.text('데이터 관리').first);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('voc-sync-settings-card')), findsOneWidget);
+    expect(find.text('VOC 동기화 설정'), findsOneWidget);
+    expect(find.text('AI VOC Assistant 간 동기화'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    integration.dispose();
+    ai.dispose();
+    settings.dispose();
+    await tester.pump();
+  });
 }
 
 Future<void> _setViewport(WidgetTester tester, Size size) async {
@@ -163,6 +217,13 @@ class _MemorySettingsRepository implements SettingsRepository {
 
 class _EmptyVocRepository implements VocRepository {
   const _EmptyVocRepository();
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _EmptyKnowledgeRepository implements KnowledgeBaseRepository {
+  const _EmptyKnowledgeRepository();
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);

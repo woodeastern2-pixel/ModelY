@@ -131,15 +131,20 @@ class IntegrationViewModel extends ChangeNotifier {
         final titleRaw =
             (row['VOC 제목'] ?? row['voc 제목'] ?? row['title'] ?? row['제목'] ?? '')
                 .trim();
-        final contentRaw =
-            (row['VOC 내용'] ?? row['voc 내용'] ?? row['content'] ?? row['내용'] ?? '')
-                .trim();
+        final contentRaw = (row['VOC 내용'] ??
+                row['voc 내용'] ??
+                row['content'] ??
+                row['내용'] ??
+                '')
+            .trim();
         final title = titleRaw.isEmpty ? '제목없음-${index + 2}' : titleRaw;
         final content = contentRaw.isEmpty ? '내용 없음' : contentRaw;
         final answers = _extractAnswers(row);
 
-        final projectName = (row['프로젝트명'] ?? row['project'] ?? '').toString().trim();
-        final businessType = (row['업무 구분'] ?? row['business_type'] ?? '').toString().trim();
+        final projectName =
+            (row['프로젝트명'] ?? row['project'] ?? '').toString().trim();
+        final businessType =
+            (row['업무 구분'] ?? row['business_type'] ?? '').toString().trim();
         final projectCode =
             (row['프로젝트 코드'] ?? row['project_code'] ?? '').toString().trim();
         final vocNumber =
@@ -152,20 +157,23 @@ class IntegrationViewModel extends ChangeNotifier {
 
         final key = _duplicateKeyByText(title, content);
         final existing = existingMap[key];
-        final shouldOverwrite = existing != null && duplicateStrategy == 'overwrite';
+        final shouldOverwrite =
+            existing != null && duplicateStrategy == 'overwrite';
         final shouldSkip = existing != null && duplicateStrategy == 'skip';
 
         final now = DateTime.now();
         final status = answers.isNotEmpty
             ? AppConstants.vocStatusResolved
-            : _requiredText(row['status'], fallback: AppConstants.vocStatusOpen);
+            : _requiredText(row['status'],
+                fallback: AppConstants.vocStatusOpen);
         final voc = VocEntity(
           id: shouldOverwrite ? existing.id : _uuid.v4(),
           title: title,
           content: content,
           category: (row['카테고리'] ?? row['category'] ?? '기능문의').trim(),
           tags: _optionalText(row['tags'] ?? row['태그']),
-          customer: _requiredText(row['고객명'] ?? row['customer'], fallback: '미입력'),
+          customer:
+              _requiredText(row['고객명'] ?? row['customer'], fallback: '미입력'),
           project: project,
           priority: _excel.normalizePriority(
             row['우선순위'] ?? row['priority'] ?? 'MEDIUM',
@@ -301,7 +309,8 @@ class IntegrationViewModel extends ChangeNotifier {
       int updated = 0;
       for (final voc in vocs) {
         final next = voc.copyWith(
-          embedding: VectorUtils.simpleTextEmbedding('${voc.title} ${voc.content}'),
+          embedding:
+              VectorUtils.simpleTextEmbedding('${voc.title} ${voc.content}'),
           updatedAt: DateTime.now(),
         );
         await _vocRepository.updateVoc(next);
@@ -434,7 +443,8 @@ class IntegrationViewModel extends ChangeNotifier {
         });
 
         for (final att in m.attachments) {
-          final savedPath = await _connectors.outlookCollector.saveAttachment(att);
+          final savedPath =
+              await _connectors.outlookCollector.saveAttachment(att);
           if (savedPath == null) continue;
           await db.insert(AppConstants.tableEmailAttachments, {
             'id': _uuid.v4(),
@@ -830,9 +840,10 @@ class IntegrationViewModel extends ChangeNotifier {
           );
           successTargets += 1;
 
-          final sourceApp = payload['source_app']?.toString().trim().isNotEmpty == true
-              ? payload['source_app'].toString().trim()
-              : 'unknown-app';
+          final sourceApp =
+              payload['source_app']?.toString().trim().isNotEmpty == true
+                  ? payload['source_app'].toString().trim()
+                  : 'unknown-app';
           final snapshot = payload['snapshot'] is Map
               ? Map<String, dynamic>.from(payload['snapshot'] as Map)
               : const <String, dynamic>{};
@@ -855,8 +866,10 @@ class IntegrationViewModel extends ChangeNotifier {
               continue;
             }
 
-            final createdAt = DateTime.tryParse(row['created_at']?.toString() ?? '');
-            final updatedAt = DateTime.tryParse(row['updated_at']?.toString() ?? '');
+            final createdAt =
+                DateTime.tryParse(row['created_at']?.toString() ?? '');
+            final updatedAt =
+                DateTime.tryParse(row['updated_at']?.toString() ?? '');
             final now = DateTime.now();
             final normalizedCategory = VocCategoryCatalog.normalize(
               row['category']?.toString(),
@@ -874,7 +887,8 @@ class IntegrationViewModel extends ChangeNotifier {
               tags: _optionalText(row['tags']),
               customer: _requiredText(row['customer'], fallback: '미입력'),
               project: _requiredText(row['project'], fallback: '미입력'),
-              priority: _excel.normalizePriority(row['priority'] ?? AppConstants.priorityMedium),
+              priority: _excel.normalizePriority(
+                  row['priority'] ?? AppConstants.priorityMedium),
               status: _normalizeVocStatus(row['status']?.toString()),
               aiCategory: _optionalText(row['ai_category']),
               urgency: _optionalText(row['urgency']),
@@ -893,7 +907,8 @@ class IntegrationViewModel extends ChangeNotifier {
             imported += 1;
           }
 
-          _appendSyncLog('상대 앱 VOC 가져오기 성공: $exportTarget (${vocs.length}건 확인)');
+          _appendSyncLog(
+              '상대 앱 VOC 가져오기 성공: $exportTarget (${vocs.length}건 확인)');
         } catch (e) {
           failedTargets.add(exportTarget);
           _appendSyncLog('상대 앱 VOC 가져오기 실패: $exportTarget / $e');
@@ -992,9 +1007,10 @@ class IntegrationViewModel extends ChangeNotifier {
             final title = (row['title']?.toString().trim().isNotEmpty == true)
                 ? row['title'].toString().trim()
                 : '제목없음';
-            final content = (row['content']?.toString().trim().isNotEmpty == true)
-                ? row['content'].toString().trim()
-                : '내용 없음';
+            final content =
+                (row['content']?.toString().trim().isNotEmpty == true)
+                    ? row['content'].toString().trim()
+                    : '내용 없음';
             final key = _duplicateKeyByText(title, content);
             if (existingVocKeys.contains(key)) {
               duplicateSkips += 1;
@@ -1019,7 +1035,8 @@ class IntegrationViewModel extends ChangeNotifier {
                 tags: row['tags']?.toString(),
                 customer: _requiredText(row['customer'], fallback: '미입력'),
                 project: _requiredText(row['project'], fallback: '미입력'),
-                priority: _excel.normalizePriority(row['priority'] ?? AppConstants.priorityMedium),
+                priority: _excel.normalizePriority(
+                    row['priority'] ?? AppConstants.priorityMedium),
                 status: _normalizeVocStatus(row['status']?.toString()),
                 aiCategory: row['ai_category']?.toString(),
                 urgency: row['urgency']?.toString(),
@@ -1027,7 +1044,8 @@ class IntegrationViewModel extends ChangeNotifier {
                 department: row['department']?.toString(),
                 assignee: row['assignee']?.toString(),
                 source: 'peer-bootstrap',
-                sourceRef: '${payload['source_app'] ?? 'peer'}:${row['id'] ?? key}',
+                sourceRef:
+                    '${payload['source_app'] ?? 'peer'}:${row['id'] ?? key}',
                 createdAt: now,
                 updatedAt: now,
               ),
@@ -1062,9 +1080,12 @@ class IntegrationViewModel extends ChangeNotifier {
                 'project': row['project']?.toString() ?? 'manual-upload',
                 'voc_id': row['voc_id']?.toString(),
                 'embedding': row['embedding']?.toString() ??
-                    jsonEncode(VectorUtils.simpleTextEmbedding('$question $answer')),
-                'resolved_at': row['resolved_at']?.toString() ?? now.toIso8601String(),
-                'created_at': row['created_at']?.toString() ?? now.toIso8601String(),
+                    jsonEncode(
+                        VectorUtils.simpleTextEmbedding('$question $answer')),
+                'resolved_at':
+                    row['resolved_at']?.toString() ?? now.toIso8601String(),
+                'created_at':
+                    row['created_at']?.toString() ?? now.toIso8601String(),
               },
               conflictAlgorithm: ConflictAlgorithm.replace,
             );
@@ -1072,7 +1093,8 @@ class IntegrationViewModel extends ChangeNotifier {
             importedManuals += 1;
           }
 
-          _appendSyncLog('초기 동기화 성공: $exportTarget (VOC ${vocs.length}건 / 매뉴얼 ${manuals.length}건)');
+          _appendSyncLog(
+              '초기 동기화 성공: $exportTarget (VOC ${vocs.length}건 / 매뉴얼 ${manuals.length}건)');
         } catch (e) {
           failedTargets.add(exportTarget);
           _appendSyncLog('초기 동기화 실패: $exportTarget / $e');
@@ -1206,8 +1228,7 @@ class IntegrationViewModel extends ChangeNotifier {
       return;
     }
 
-    final payloadCopy =
-        jsonDecode(jsonEncode(payload)) as Map<String, dynamic>;
+    final payloadCopy = jsonDecode(jsonEncode(payload)) as Map<String, dynamic>;
 
     _syncRetryQueue.add(
       _SyncRetryTask(
@@ -1285,9 +1306,8 @@ class IntegrationViewModel extends ChangeNotifier {
       _syncRetryQueue
         ..clear()
         ..addAll(
-          decoded
-              .whereType<Map>()
-              .map((e) => _SyncRetryTask.fromJson(Map<String, dynamic>.from(e))),
+          decoded.whereType<Map>().map(
+              (e) => _SyncRetryTask.fromJson(Map<String, dynamic>.from(e))),
         );
       notifyListeners();
     } catch (_) {
@@ -1396,7 +1416,8 @@ class IntegrationViewModel extends ChangeNotifier {
   }) async {
     _start();
     try {
-      final pageUrl = await _connectors.confluencePublisher.publishApprovedAnswer(
+      final pageUrl =
+          await _connectors.confluencePublisher.publishApprovedAnswer(
         voc: voc,
         approvedAnswer: approvedAnswer,
       );
@@ -1474,8 +1495,8 @@ class IntegrationViewModel extends ChangeNotifier {
     final receiver = InAppSyncReceiverService.instance;
     final running = receiver.isRunning;
     final lastError = receiver.lastError;
-    final receiverChanged =
-        running != _inAppReceiverRunning || lastError != _inAppReceiverLastError;
+    final receiverChanged = running != _inAppReceiverRunning ||
+        lastError != _inAppReceiverLastError;
     _inAppReceiverRunning = running;
     _inAppReceiverLastError = lastError;
 
@@ -1507,8 +1528,13 @@ class IntegrationViewModel extends ChangeNotifier {
           _recentInboundEvents.removeRange(60, _recentInboundEvents.length);
         }
 
-        final notifyText = _buildInboundEventNotificationText(event);
-        _onInboundSyncEvent?.call(notifyText);
+        final notifyText = notificationTextForEvent(
+          event,
+          ownAppName: _settingsViewModel.appInstanceName,
+        );
+        if (notifyText != null) {
+          _onInboundSyncEvent?.call(notifyText);
+        }
       }
 
       notifyListeners();
@@ -1520,18 +1546,25 @@ class IntegrationViewModel extends ChangeNotifier {
     }
   }
 
-  String _buildInboundEventNotificationText(InboundSyncEvent event) {
-    final source = event.sourceApp?.trim().isNotEmpty == true
-        ? event.sourceApp!.trim()
-        : '다른 앱';
+  @visibleForTesting
+  static String? notificationTextForEvent(
+    InboundSyncEvent event, {
+    required String ownAppName,
+  }) {
+    final source = event.sourceApp?.trim() ?? '';
+    if (source.isEmpty || source == ownAppName.trim()) return null;
+
     final counts = event.counts;
     final vocs = counts['vocs'] ?? 0;
     final manuals = counts['manuals'] ?? 0;
 
-    if (event.eventType == 'sync.full') {
+    if (event.eventType == 'voc.created' && event.status == 'created') {
+      return '$source에서 단건 VOC 동기화 수신';
+    }
+    if (event.eventType == 'sync.full' && event.status == 'applied') {
       return '$source에서 전체 동기화 수신 (VOC $vocs건, 매뉴얼 $manuals건)';
     }
-    return '$source에서 단건 VOC 동기화 수신';
+    return null;
   }
 }
 
