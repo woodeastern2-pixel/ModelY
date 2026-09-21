@@ -1,8 +1,11 @@
+import 'dart:convert';
+
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../constants/app_constants.dart';
-import '../../data/seeds/brity_manual_seed.dart';
+import '../utils/vector_utils.dart';
+import '../../data/seeds/brity_suite_manual_seed.dart';
 
 class DatabaseHelper {
   DatabaseHelper._internal();
@@ -31,11 +34,14 @@ class DatabaseHelper {
   Future<void> _onOpen(Database db) async {
     await _ensureVocTableColumns(db);
     await _ensureSyncEventTable(db);
-    await db.insert(AppConstants.tableSettings, {
-      'key': AppConstants.settingAdminPassword,
-      'value': AppConstants.defaultAdminPassword,
-      'updated_at': DateTime.now().toIso8601String(),
-    }, conflictAlgorithm: ConflictAlgorithm.replace);
+    await db.insert(
+        AppConstants.tableSettings,
+        {
+          'key': AppConstants.settingAdminPassword,
+          'value': AppConstants.defaultAdminPassword,
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -399,7 +405,7 @@ class DatabaseHelper {
       ''');
     }
 
-    if (oldVersion < 7) {
+    if (oldVersion < 8) {
       await _insertBrityManualData(db);
     }
   }
@@ -509,11 +515,14 @@ class DatabaseHelper {
     };
 
     for (final entry in defaults.entries) {
-      await db.insert(AppConstants.tableSettings, {
-        'key': entry.key,
-        'value': entry.value,
-        'updated_at': now,
-      }, conflictAlgorithm: ConflictAlgorithm.ignore);
+      await db.insert(
+          AppConstants.tableSettings,
+          {
+            'key': entry.key,
+            'value': entry.value,
+            'updated_at': now,
+          },
+          conflictAlgorithm: ConflictAlgorithm.ignore);
     }
   }
 
@@ -526,19 +535,28 @@ class DatabaseHelper {
     await db.delete(
       AppConstants.tableKnowledgeBase,
       where: 'id LIKE ?',
-      whereArgs: ['brity-manual-%'],
+      whereArgs: ['brity-%'],
     );
-    for (final entry in BrityManualSeed.entries) {
-      await db.insert(AppConstants.tableKnowledgeBase, {
-        ...entry,
-        'category': '시스템매뉴얼',
-        'customer': BrityManualSeed.sourceName,
-        'project': BrityManualSeed.project,
-        'voc_id': null,
-        'embedding': null,
-        'resolved_at': now,
-        'created_at': now,
-      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    for (final entry in BritySuiteManualSeed.entries) {
+      final question = entry['question']!;
+      final answer = entry['answer']!;
+      await db.insert(
+          AppConstants.tableKnowledgeBase,
+          {
+            'id': entry['id'],
+            'question': question,
+            'answer': answer,
+            'category': '시스템매뉴얼',
+            'customer': entry['sourceName'],
+            'project': entry['project'],
+            'voc_id': null,
+            'embedding': jsonEncode(
+              VectorUtils.simpleTextEmbedding('$question $answer'),
+            ),
+            'resolved_at': now,
+            'created_at': now,
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
 

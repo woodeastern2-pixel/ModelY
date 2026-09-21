@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+
 import '../../core/constants/app_constants.dart';
 import '../../data/services/ai_service.dart';
 import '../../domain/entities/knowledge_base_entity.dart';
@@ -21,9 +22,11 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
   String? _manualImportCurrentFile;
   String? _error;
   String _filterCategory = '';
+  String _filterProduct = '';
   String _searchQuery = '';
   String _manualFileFilter = '';
-  static const String _manualCategory = ManualDocumentImportService.manualCategory;
+  static const String _manualCategory =
+      ManualDocumentImportService.manualCategory;
   static const String _manualProjectMarker = 'manual-upload';
 
   KnowledgeBaseViewModel(this._repository, this._settingsViewModel) {
@@ -52,8 +55,10 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
     final ratio = _manualImportProcessedSections / _manualImportTotalSections;
     return ratio.clamp(0.0, 1.0);
   }
+
   String? get error => _error;
   String get filterCategory => _filterCategory;
+  String get filterProduct => _filterProduct;
   String get searchQuery => _searchQuery;
   String get manualFileFilter => _manualFileFilter;
 
@@ -62,18 +67,29 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
     if (_filterCategory.isNotEmpty) {
       list = list.where((e) => e.category == _filterCategory).toList();
     }
+    if (_filterProduct.isNotEmpty) {
+      list = list.where((e) => e.project == _filterProduct).toList();
+    }
     if (_manualFileFilter.isNotEmpty) {
       list = list
-          .where((entry) =>
-              _isManualEntry(entry) && _manualFileNameOf(entry) == _manualFileFilter)
+          .where(
+            (entry) =>
+                _isManualEntry(entry) &&
+                _manualFileNameOf(entry) == _manualFileFilter,
+          )
           .toList();
     }
     if (_searchQuery.isNotEmpty) {
       final q = _searchQuery.toLowerCase();
       list = list
-          .where((e) =>
-              e.question.toLowerCase().contains(q) ||
-              e.answer.toLowerCase().contains(q))
+          .where(
+            (e) =>
+                e.question.toLowerCase().contains(q) ||
+                e.answer.toLowerCase().contains(q) ||
+                (e.project ?? '').toLowerCase().contains(q) ||
+                (e.customer ?? '').toLowerCase().contains(q) ||
+                e.category.toLowerCase().contains(q),
+          )
           .toList();
     }
     return list;
@@ -100,7 +116,9 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<ManualImportResult?> importManualDocuments(List<String> filePaths) async {
+  Future<ManualImportResult?> importManualDocuments(
+    List<String> filePaths,
+  ) async {
     final normalized = filePaths
         .map((path) => path.trim())
         .where((path) => path.isNotEmpty)
@@ -125,37 +143,38 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
     try {
       final result = await _manualImportService.importDocuments(
         normalized,
-        qaGenerator: (fileName, sectionNumber, sectionTitle, sectionBody) async {
-          final pairs = await _aiService.generateManualQaPairs(
-            fileName: fileName,
-            sectionLabel: '매뉴얼 섹션 $sectionNumber: $sectionTitle',
-            sectionText: sectionBody,
-          );
+        qaGenerator:
+            (fileName, sectionNumber, sectionTitle, sectionBody) async {
+              final pairs = await _aiService.generateManualQaPairs(
+                fileName: fileName,
+                sectionLabel: '매뉴얼 섹션 $sectionNumber: $sectionTitle',
+                sectionText: sectionBody,
+              );
 
-          if (pairs.isEmpty) {
-            final fallbackQuestion =
-                '[$fileName] 매뉴얼 섹션 $sectionNumber $sectionTitle은 어떻게 하나요?';
-            final fallbackAnswer = await _aiService.refineManualAnswer(
-              question: fallbackQuestion,
-              sourceText: sectionBody,
-            );
-            return [
-              ManualGeneratedQa(
-                question: fallbackQuestion,
-                answer: fallbackAnswer,
-              ),
-            ];
-          }
+              if (pairs.isEmpty) {
+                final fallbackQuestion =
+                    '[$fileName] 매뉴얼 섹션 $sectionNumber $sectionTitle은 어떻게 하나요?';
+                final fallbackAnswer = await _aiService.refineManualAnswer(
+                  question: fallbackQuestion,
+                  sourceText: sectionBody,
+                );
+                return [
+                  ManualGeneratedQa(
+                    question: fallbackQuestion,
+                    answer: fallbackAnswer,
+                  ),
+                ];
+              }
 
-          return pairs
-              .map(
-                (item) => ManualGeneratedQa(
-                  question: item.question,
-                  answer: item.answer,
-                ),
-              )
-              .toList();
-        },
+              return pairs
+                  .map(
+                    (item) => ManualGeneratedQa(
+                      question: item.question,
+                      answer: item.answer,
+                    ),
+                  )
+                  .toList();
+            },
         onProgress: (progress) {
           _manualImportTotalSections = progress.totalSections;
           _manualImportProcessedSections = progress.processedSections;
@@ -245,9 +264,7 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
     }
 
     final sortedKeys = grouped.keys.toList()..sort();
-    return {
-      for (final key in sortedKeys) key: grouped[key]!,
-    };
+    return {for (final key in sortedKeys) key: grouped[key]!};
   }
 
   Future<int> deleteManualEntriesByFile(String fileName) async {
@@ -262,7 +279,9 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
       await _repository.deleteEntry(entry.id);
     }
 
-    _entries.removeWhere((entry) => toDelete.any((item) => item.id == entry.id));
+    _entries.removeWhere(
+      (entry) => toDelete.any((item) => item.id == entry.id),
+    );
     _sanitizeManualFileFilter();
     notifyListeners();
     return toDelete.length;
@@ -270,6 +289,11 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
 
   void setFilter(String category) {
     _filterCategory = category;
+    notifyListeners();
+  }
+
+  void setProductFilter(String product) {
+    _filterProduct = product.trim();
     notifyListeners();
   }
 
@@ -290,6 +314,16 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
     final cats = _entries.map((e) => e.category).toSet().toList();
     cats.sort();
     return cats;
+  }
+
+  List<String> get products {
+    final result = _entries
+        .map((entry) => (entry.project ?? '').trim())
+        .where((project) => project.startsWith('Brity '))
+        .toSet()
+        .toList();
+    result.sort();
+    return result;
   }
 
   Map<String, int> get categoryStats {

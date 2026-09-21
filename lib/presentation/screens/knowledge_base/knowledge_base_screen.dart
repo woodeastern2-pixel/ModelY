@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:provider/provider.dart';
+
 import '../../../domain/entities/knowledge_base_entity.dart';
 import '../../viewmodels/knowledge_base_viewmodel.dart';
 
@@ -21,7 +22,8 @@ class KnowledgeBaseScreen extends StatelessWidget {
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: () => context.read<KnowledgeBaseViewModel>().loadEntries(),
+            onPressed: () =>
+                context.read<KnowledgeBaseViewModel>().loadEntries(),
           ),
         ],
       ),
@@ -47,9 +49,7 @@ class KnowledgeBaseScreen extends StatelessWidget {
                     if ((vm.manualImportCurrentFile ?? '').isNotEmpty)
                       Text(
                         '현재 파일: ${vm.manualImportCurrentFile}',
-                        style: Theme.of(context)
-                            .textTheme
-                            .labelSmall
+                        style: Theme.of(context).textTheme.labelSmall
                             ?.copyWith(color: Colors.grey.shade600),
                       ),
                   ],
@@ -59,22 +59,26 @@ class KnowledgeBaseScreen extends StatelessWidget {
               _ImportErrorPanel(errorText: vm.error!),
             _SearchBar(vm: vm),
             _CategoryFilter(vm: vm),
+            _ProductFilter(vm: vm),
             _ManualUploadManager(vm: vm),
             Expanded(
               child: vm.isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : vm.entries.isEmpty
-                      ? const _EmptyState()
-                      : RefreshIndicator(
-                          onRefresh: vm.loadEntries,
-                          child: ListView.builder(
-                            padding: const EdgeInsets.only(
-                                left: 16, right: 16, bottom: 16),
-                            itemCount: vm.entries.length,
-                            itemBuilder: (_, i) =>
-                                _KbCard(entry: vm.entries[i], vm: vm),
-                          ),
+                  ? const _EmptyState()
+                  : RefreshIndicator(
+                      onRefresh: vm.loadEntries,
+                      child: ListView.builder(
+                        padding: const EdgeInsets.only(
+                          left: 16,
+                          right: 16,
+                          bottom: 16,
                         ),
+                        itemCount: vm.entries.length,
+                        itemBuilder: (_, i) =>
+                            _KbCard(entry: vm.entries[i], vm: vm),
+                      ),
+                    ),
             ),
           ],
         ),
@@ -87,7 +91,15 @@ class KnowledgeBaseScreen extends StatelessWidget {
     final selected = await FilePicker.platform.pickFiles(
       allowMultiple: true,
       type: FileType.custom,
-      allowedExtensions: const ['pdf', 'docx', 'xlsx', 'pptx', 'doc', 'xls', 'ppt'],
+      allowedExtensions: const [
+        'pdf',
+        'docx',
+        'xlsx',
+        'pptx',
+        'doc',
+        'xls',
+        'ppt',
+      ],
       withData: false,
     );
 
@@ -102,9 +114,8 @@ class KnowledgeBaseScreen extends StatelessWidget {
 
     if (paths.isEmpty) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('선택한 파일 경로를 읽지 못했습니다.')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('선택한 파일 경로를 읽지 못했습니다.')));
       return;
     }
 
@@ -145,18 +156,16 @@ class KnowledgeBaseScreen extends StatelessWidget {
         title: const Text('매뉴얼 추가 오류'),
         content: SizedBox(
           width: 560,
-          child: SingleChildScrollView(
-            child: SelectableText(message),
-          ),
+          child: SingleChildScrollView(child: SelectableText(message)),
         ),
         actions: [
           TextButton.icon(
             onPressed: () async {
               await Clipboard.setData(ClipboardData(text: message));
               if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('오류 메시지를 복사했습니다.')),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('오류 메시지를 복사했습니다.')));
             },
             icon: const Icon(Icons.copy_all_outlined),
             label: const Text('복사'),
@@ -164,6 +173,42 @@ class KnowledgeBaseScreen extends StatelessWidget {
           FilledButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('닫기'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProductFilter extends StatelessWidget {
+  final KnowledgeBaseViewModel vm;
+
+  const _ProductFilter({required this.vm});
+
+  @override
+  Widget build(BuildContext context) {
+    if (vm.products.isEmpty) return const SizedBox.shrink();
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+      child: Row(
+        children: [
+          FilterChip(
+            label: const Text('모든 제품', style: TextStyle(fontSize: 12)),
+            selected: vm.filterProduct.isEmpty,
+            onSelected: (_) => vm.setProductFilter(''),
+            visualDensity: VisualDensity.compact,
+          ),
+          ...vm.products.map(
+            (product) => Padding(
+              padding: const EdgeInsets.only(left: 6),
+              child: FilterChip(
+                label: Text(product, style: const TextStyle(fontSize: 12)),
+                selected: vm.filterProduct == product,
+                onSelected: (_) => vm.setProductFilter(product),
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
           ),
         ],
       ),
@@ -180,7 +225,8 @@ class _ImportErrorPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      color: Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.5),
+      color: Theme.of(context).colorScheme.errorContainer
+          .withValues(alpha: 0.5),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
         child: Column(
@@ -284,18 +330,20 @@ class _CategoryFilter extends StatelessWidget {
             onSelected: (_) => vm.setFilter(''),
             visualDensity: VisualDensity.compact,
           ),
-          ...vm.categories.map((c) => Padding(
-                padding: const EdgeInsets.only(left: 6),
-                child: FilterChip(
-                  label: Text(
-                    c == '시스템매뉴얼' ? '시스템 매뉴얼' : c,
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  selected: vm.filterCategory == c,
-                  onSelected: (_) => vm.setFilter(c),
-                  visualDensity: VisualDensity.compact,
+          ...vm.categories.map(
+            (c) => Padding(
+              padding: const EdgeInsets.only(left: 6),
+              child: FilterChip(
+                label: Text(
+                  c == '시스템매뉴얼' ? '시스템 매뉴얼' : c,
+                  style: const TextStyle(fontSize: 12),
                 ),
-              )),
+                selected: vm.filterCategory == c,
+                onSelected: (_) => vm.setFilter(c),
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -322,7 +370,10 @@ class _ManualUploadManagerState extends State<_ManualUploadManager> {
     }
 
     final selectedFile = widget.vm.manualFileFilter;
-    final totalSections = grouped.values.fold<int>(0, (sum, value) => sum + value);
+    final totalSections = grouped.values.fold<int>(
+      0,
+      (sum, value) => sum + value,
+    );
     final fileCount = grouped.length;
 
     return Card(
@@ -385,7 +436,8 @@ class _ManualUploadManagerState extends State<_ManualUploadManager> {
                           style: const TextStyle(fontSize: 12),
                         ),
                         selected: selectedFile == entry.key,
-                        onSelected: (_) => widget.vm.setManualFileFilter(entry.key),
+                        onSelected: (_) =>
+                            widget.vm.setManualFileFilter(entry.key),
                         visualDensity: VisualDensity.compact,
                       ),
                     ),
@@ -400,12 +452,24 @@ class _ManualUploadManagerState extends State<_ManualUploadManager> {
                   dense: true,
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.description_outlined, size: 18),
-                  title: Text(entry.key, maxLines: 1, overflow: TextOverflow.ellipsis),
-                  subtitle: Text('생성된 질문 ${entry.value}개', style: const TextStyle(fontSize: 12)),
+                  title: Text(
+                    entry.key,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: Text(
+                    '생성된 질문 ${entry.value}개',
+                    style: const TextStyle(fontSize: 12),
+                  ),
                   trailing: IconButton(
                     icon: const Icon(Icons.delete_outline, color: Colors.red),
                     tooltip: '이 매뉴얼 삭제',
-                    onPressed: () => _confirmDeleteGroup(context, widget.vm, entry.key, entry.value),
+                    onPressed: () => _confirmDeleteGroup(
+                      context,
+                      widget.vm,
+                      entry.key,
+                      entry.value,
+                    ),
                   ),
                 ),
               ),
@@ -426,7 +490,7 @@ class _ManualUploadManagerState extends State<_ManualUploadManager> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('매뉴얼 삭제'),
-          content: Text('$fileName에서 생성된 지식 자료 $count개를 삭제하시겠습니까?'),
+        content: Text('$fileName에서 생성된 지식 자료 $count개를 삭제하시겠습니까?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -469,9 +533,11 @@ class _KbCard extends StatelessWidget {
             color: Theme.of(context).colorScheme.primaryContainer,
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(Icons.question_mark,
-              size: 18,
-              color: Theme.of(context).colorScheme.primary),
+          child: Icon(
+            Icons.question_mark,
+            size: 18,
+            color: Theme.of(context).colorScheme.primary,
+          ),
         ),
         title: Text(
           entry.question,
@@ -485,6 +551,15 @@ class _KbCard extends StatelessWidget {
             runSpacing: 4,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
+              if ((entry.project ?? '').trim().isNotEmpty)
+                Chip(
+                  label: Text(
+                    entry.project!,
+                    style: const TextStyle(fontSize: 10),
+                  ),
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                ),
               if (isManual && manualName.isNotEmpty)
                 Chip(
                   label: Text(manualName, style: const TextStyle(fontSize: 10)),
@@ -515,18 +590,24 @@ class _KbCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Divider(),
-                const Text('답변:',
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 12)),
+                const Text(
+                  '답변:',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                ),
                 const SizedBox(height: 4),
-                Text(entry.answer, style: const TextStyle(fontSize: 13, height: 1.5)),
+                Text(
+                  entry.answer,
+                  style: const TextStyle(fontSize: 13, height: 1.5),
+                ),
                 const SizedBox(height: 8),
                 Row(
                   children: [
                     if (entry.embedding != null)
                       const Chip(
-                        label: Text('AI 검색 준비 완료',
-                            style: TextStyle(fontSize: 10)),
+                        label: Text(
+                          'AI 검색 준비 완료',
+                          style: TextStyle(fontSize: 10),
+                        ),
                         visualDensity: VisualDensity.compact,
                         padding: EdgeInsets.zero,
                       ),
@@ -554,11 +635,13 @@ class _KbCard extends StatelessWidget {
         content: const Text('이 지식 자료를 삭제하시겠습니까?'),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('취소')),
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('취소'),
+          ),
           FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('삭제')),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('삭제'),
+          ),
         ],
       ),
     );
@@ -577,13 +660,18 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.book_outlined, size: 64,
-              color: Theme.of(context).colorScheme.outline),
+          Icon(
+            Icons.book_outlined,
+            size: 64,
+            color: Theme.of(context).colorScheme.outline,
+          ),
           const SizedBox(height: 16),
           const Text('등록된 지식 자료가 없습니다'),
           const SizedBox(height: 8),
-          const Text('VOC 답변을 승인하거나 매뉴얼을 추가하면 지식 자료가 생성됩니다.',
-              style: TextStyle(fontSize: 12, color: Colors.grey)),
+          const Text(
+            'VOC 답변을 승인하거나 매뉴얼을 추가하면 지식 자료가 생성됩니다.',
+            style: TextStyle(fontSize: 12, color: Colors.grey),
+          ),
         ],
       ),
     );

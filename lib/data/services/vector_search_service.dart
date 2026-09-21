@@ -70,10 +70,11 @@ class VectorSearchService {
 
     // 쿼리 임베딩 생성
     List<double> queryEmbedding;
+    final localQueryEmbedding = VectorUtils.simpleTextEmbedding(query);
     try {
       queryEmbedding = await _generateEmbedding(query);
     } catch (_) {
-      queryEmbedding = VectorUtils.simpleTextEmbedding(query);
+      queryEmbedding = localQueryEmbedding;
     }
 
     // FAISS 브릿지 사용 가능 시 우선 사용
@@ -106,8 +107,12 @@ class VectorSearchService {
     final results = <SimilarVocResult>[];
     for (final entry in entriesWithEmb) {
       if (entry.embedding == null) continue;
+      final compatibleQuery =
+          entry.embedding!.length == localQueryEmbedding.length
+              ? localQueryEmbedding
+              : queryEmbedding;
       final score =
-          VectorUtils.cosineSimilarity(queryEmbedding, entry.embedding!);
+          VectorUtils.cosineSimilarity(compatibleQuery, entry.embedding!);
       if (score >= AppConstants.similarityThreshold) {
         results.add(
           SimilarVocResult(knowledgeBase: entry, similarityScore: score),
@@ -120,6 +125,15 @@ class VectorSearchService {
   }
 
   Future<void> _generateAndSaveEmbedding(KnowledgeBaseEntity entry) async {
+    if (entry.id.startsWith('brity-')) {
+      final text = '${entry.question} ${entry.answer}';
+      await _kbRepository.updateEmbedding(
+        entry.id,
+        VectorUtils.simpleTextEmbedding(text),
+      );
+      return;
+    }
+
     try {
       final text = '${entry.question} ${entry.answer}';
       final embedding = await _generateEmbedding(text);
