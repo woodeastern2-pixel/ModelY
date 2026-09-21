@@ -13,5 +13,6 @@ void main() {
     );
     expect(first.map((voc) => voc.id).toSet(), hasLength(first.length));
     expect(first.every((voc) => voc.source == 'demo'), isTrue);
+    expect(first.every((voc) => voc.project == 'Brity Messenger 모바일'), isTrue);
   });
 }

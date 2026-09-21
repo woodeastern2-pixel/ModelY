@@ -6,7 +6,7 @@ enum DemoPhase {
   generating, // 샘플 데이터 생성
   analyzing, // AI 분석
   workflow, // 워크플로우 실행
-  notifications, // Teams/Slack 알림
+  review, // 답변 검토
   dashboard, // 대시보드 업데이트
   completed, // 완료
 }
@@ -57,7 +57,7 @@ abstract class DemoModeService {
 class DefaultDemoModeService implements DemoModeService {
   DemoStatus? _currentStatus;
   bool _isRunning = false;
-  final Duration _demoDuration = const Duration(minutes: 3);
+  final Duration _demoDuration = const Duration(seconds: 45);
 
   @override
   Future<void> startDemo(DemoProgressCallback onProgress) async {
@@ -70,7 +70,7 @@ class DefaultDemoModeService implements DemoModeService {
     // Phase 1: 샘플 데이터 생성
     await _runPhase(
       phase: DemoPhase.generating,
-      duration: const Duration(seconds: 20),
+      duration: const Duration(seconds: 5),
       startTime: startTime,
       logs: logs,
       onProgress: onProgress,
@@ -85,7 +85,7 @@ class DefaultDemoModeService implements DemoModeService {
     // Phase 2: AI 분석
     await _runPhase(
       phase: DemoPhase.analyzing,
-      duration: const Duration(seconds: 30),
+      duration: const Duration(seconds: 8),
       startTime: startTime,
       logs: logs,
       onProgress: onProgress,
@@ -100,7 +100,7 @@ class DefaultDemoModeService implements DemoModeService {
     // Phase 3: 워크플로우 실행
     await _runPhase(
       phase: DemoPhase.workflow,
-      duration: const Duration(seconds: 30),
+      duration: const Duration(seconds: 8),
       startTime: startTime,
       logs: logs,
       onProgress: onProgress,
@@ -112,17 +112,16 @@ class DefaultDemoModeService implements DemoModeService {
 
     if (!_isRunning) return;
 
-    // Phase 4: 알림 발송
+    // Phase 4: 답변 검토
     await _runPhase(
-      phase: DemoPhase.notifications,
-      duration: const Duration(seconds: 20),
+      phase: DemoPhase.review,
+      duration: const Duration(seconds: 8),
       startTime: startTime,
       logs: logs,
       onProgress: onProgress,
       task: () async {
-        logs.add(
-            '업무 도구 안내: Jira·Confluence·Teams·Slack은 연결된 경우에만 사용할 수 있습니다.');
-        logs.add('기능 둘러보기 중에는 외부 시스템으로 데이터를 보내지 않습니다.');
+        logs.add('④ 답변 검토: 생성된 답변을 수정하고 승인 상태로 변경합니다.');
+        logs.add('승인 전 초안과 승인된 답변은 명확히 구분해 관리됩니다.');
       },
     );
 
@@ -131,7 +130,7 @@ class DefaultDemoModeService implements DemoModeService {
     // Phase 5: 대시보드 업데이트
     await _runPhase(
       phase: DemoPhase.dashboard,
-      duration: const Duration(seconds: 20),
+      duration: const Duration(seconds: 8),
       startTime: startTime,
       logs: logs,
       onProgress: onProgress,
@@ -170,11 +169,12 @@ class DefaultDemoModeService implements DemoModeService {
     while (_isRunning && DateTime.now().difference(phaseStart) < duration) {
       _currentStatus = DemoStatus(
         phase: phase,
-        progressPercent: ((DateTime.now().difference(startTime).inMilliseconds /
-                    _demoDuration.inMilliseconds) *
-                100)
-            .toInt()
-            .clamp(0, 99),
+        progressPercent:
+            ((DateTime.now().difference(startTime).inMilliseconds /
+                        _demoDuration.inMilliseconds) *
+                    100)
+                .toInt()
+                .clamp(0, 99),
         message: _getPhaseMessage(phase),
         logs: List.from(logs),
         elapsed: DateTime.now().difference(startTime),
@@ -198,8 +198,8 @@ class DefaultDemoModeService implements DemoModeService {
         return 'AI 분석 화면을 안내하고 있습니다.';
       case DemoPhase.workflow:
         return 'VOC 처리 과정을 안내하고 있습니다.';
-      case DemoPhase.notifications:
-        return '업무 도구 사용 방법을 안내하고 있습니다.';
+      case DemoPhase.review:
+        return '답변 검토 과정을 안내하고 있습니다.';
       case DemoPhase.dashboard:
         return 'VOC 현황 화면을 안내하고 있습니다.';
       case DemoPhase.completed:

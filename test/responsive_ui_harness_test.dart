@@ -51,7 +51,7 @@ void main() {
   }
 
   testWidgets(
-    'mobile More keeps collaboration, settings and privacy reachable',
+    'mobile More hides collaboration and keeps settings and privacy reachable',
     (tester) async {
       await _setViewport(tester, const Size(390, 844));
       final harness = createUiHarness();
@@ -62,7 +62,7 @@ void main() {
       await tester.tap(find.byKey(const Key('mobile-nav-more')));
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('more-collaboration')), findsOneWidget);
+      expect(find.byKey(const Key('more-collaboration')), findsNothing);
       expect(find.byKey(const Key('more-settings')), findsOneWidget);
       expect(find.byKey(const Key('more-privacy')), findsOneWidget);
       expect(tester.takeException(), isNull);

@@ -2,6 +2,7 @@ import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../constants/app_constants.dart';
+import '../../data/seeds/brity_manual_seed.dart';
 
 class DatabaseHelper {
   DatabaseHelper._internal();
@@ -30,15 +31,11 @@ class DatabaseHelper {
   Future<void> _onOpen(Database db) async {
     await _ensureVocTableColumns(db);
     await _ensureSyncEventTable(db);
-    await db.insert(
-      AppConstants.tableSettings,
-      {
-        'key': AppConstants.settingAdminPassword,
-        'value': AppConstants.defaultAdminPassword,
-        'updated_at': DateTime.now().toIso8601String(),
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await db.insert(AppConstants.tableSettings, {
+      'key': AppConstants.settingAdminPassword,
+      'value': AppConstants.defaultAdminPassword,
+      'updated_at': DateTime.now().toIso8601String(),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -401,6 +398,10 @@ class DatabaseHelper {
         )
       ''');
     }
+
+    if (oldVersion < 5) {
+      await _insertBrityManualData(db);
+    }
   }
 
   Future<void> _ensureVocTableColumns(Database db) async {
@@ -503,96 +504,36 @@ class DatabaseHelper {
       AppConstants.settingVocForwardWebhookTargets: '',
       AppConstants.settingUrgencyWebhookThreshold:
           AppConstants.defaultUrgencyWebhookThreshold,
-        AppConstants.settingAiAutoAnswerOnVocRegister:
+      AppConstants.settingAiAutoAnswerOnVocRegister:
           AppConstants.defaultAiAutoAnswerOnVocRegister,
     };
 
     for (final entry in defaults.entries) {
-      await db.insert(
-        AppConstants.tableSettings,
-        {
-          'key': entry.key,
-          'value': entry.value,
-          'updated_at': now,
-        },
-        conflictAlgorithm: ConflictAlgorithm.ignore,
-      );
+      await db.insert(AppConstants.tableSettings, {
+        'key': entry.key,
+        'value': entry.value,
+        'updated_at': now,
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
     }
   }
 
   Future<void> _insertSampleData(Database db) async {
+    await _insertBrityManualData(db);
+  }
+
+  Future<void> _insertBrityManualData(Database db) async {
     final now = DateTime.now().toIso8601String();
-
-    final sampleKb = [
-      {
-        'id': 'kb-001',
-        'question': '로그인이 안됩니다. 비밀번호를 잊어버렸어요.',
-        'answer':
-            '비밀번호 초기화를 위해 로그인 화면 하단의 "비밀번호 찾기"를 클릭하세요. 등록된 이메일로 초기화 링크가 발송됩니다. 이메일을 확인하시고 링크를 통해 비밀번호를 재설정해 주세요.',
-        'category': '사용법',
-        'customer': '샘플고객A',
-        'project': '포털시스템',
+    for (final entry in BrityManualSeed.entries) {
+      await db.insert(AppConstants.tableKnowledgeBase, {
+        ...entry,
+        'category': '시스템매뉴얼',
+        'customer': BrityManualSeed.sourceName,
+        'project': BrityManualSeed.project,
         'voc_id': null,
         'embedding': null,
         'resolved_at': now,
         'created_at': now,
-      },
-      {
-        'id': 'kb-002',
-        'question': '시스템이 갑자기 느려졌습니다. 화면이 로딩이 안 됩니다.',
-        'answer':
-            '현재 서버 모니터링 결과 특이사항이 없습니다. 브라우저 캐시 삭제 후 재시도해 주세요. Chrome 기준: 설정 > 개인정보 > 인터넷 사용 기록 삭제. 문제가 지속되면 사용 중인 브라우저와 OS 버전을 알려주시면 추가 확인하겠습니다.',
-        'category': '장애',
-        'customer': '샘플고객B',
-        'project': '업무시스템',
-        'voc_id': null,
-        'embedding': null,
-        'resolved_at': now,
-        'created_at': now,
-      },
-      {
-        'id': 'kb-003',
-        'question': '엑셀 다운로드 기능이 동작하지 않습니다.',
-        'answer':
-            '엑셀 다운로드 시 팝업이 차단되고 있을 수 있습니다. 브라우저 주소창 우측의 팝업 차단 아이콘을 클릭하여 팝업을 허용해 주세요. 또는 보안 소프트웨어가 파일 다운로드를 차단하는 경우 보안 설정을 확인해 주세요.',
-        'category': '기능문의',
-        'customer': '샘플고객C',
-        'project': '리포트시스템',
-        'voc_id': null,
-        'embedding': null,
-        'resolved_at': now,
-        'created_at': now,
-      },
-      {
-        'id': 'kb-004',
-        'question': '결재선 설정을 변경하고 싶습니다.',
-        'answer':
-            '결재선 변경은 [시스템 설정] > [결재 관리] > [결재선 설정] 메뉴에서 가능합니다. 단, 결재선 변경 권한은 관리자에게 있으므로 소속 부서의 시스템 관리자에게 요청해 주시기 바랍니다.',
-        'category': '사용법',
-        'customer': '샘플고객D',
-        'project': '전자결재',
-        'voc_id': null,
-        'embedding': null,
-        'resolved_at': now,
-        'created_at': now,
-      },
-      {
-        'id': 'kb-005',
-        'question': '데이터가 저장되지 않고 사라집니다.',
-        'answer':
-            '세션 만료로 인해 데이터가 저장되지 않는 경우가 발생할 수 있습니다. 장시간 작업 시 중간중간 저장을 권장합니다. 현상이 반복된다면 발생 시간과 수행 중이던 작업을 상세히 알려주시면 로그를 확인하여 원인을 파악하겠습니다.',
-        'category': '장애',
-        'customer': '샘플고객E',
-        'project': '데이터관리',
-        'voc_id': null,
-        'embedding': null,
-        'resolved_at': now,
-        'created_at': now,
-      },
-    ];
-
-    for (final kb in sampleKb) {
-      await db.insert(AppConstants.tableKnowledgeBase, kb);
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
 

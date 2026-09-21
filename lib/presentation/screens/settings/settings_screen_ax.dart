@@ -14,13 +14,15 @@ class SettingsScreenAx extends StatefulWidget {
 }
 
 class _SettingsScreenAxState extends State<SettingsScreenAx> {
-  int _section = 3;
+  int _section = AppConstants.showCollaborationTools ? 3 : 1;
   bool _aiUnlocked = false;
 
   static const _sections = [
     _SectionData('AI 설정', 'AI 연결 및 모델 관리', Icons.auto_awesome_outlined),
-    _SectionData('업무 도구', 'Jira 및 협업 도구 연결', Icons.workspaces_outline),
-    _SectionData('연동', '이메일·동기화·알림 설정', Icons.sync_alt_outlined),
+    if (AppConstants.showCollaborationTools)
+      _SectionData('업무 도구', '외부 업무 도구 연결', Icons.workspaces_outline),
+    if (AppConstants.showCollaborationTools)
+      _SectionData('연동', '이메일·동기화·알림 설정', Icons.sync_alt_outlined),
     _SectionData('일반', '사용자·화면·업무 기준 설정', Icons.tune_outlined),
   ];
 
@@ -62,9 +64,8 @@ class _SettingsScreenAxState extends State<SettingsScreenAx> {
     controller.dispose();
     final granted = value == AppConstants.defaultAdminPassword;
     if (!granted && value != null && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('관리자 비밀번호가 올바르지 않습니다.')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('관리자 비밀번호가 올바르지 않습니다.')));
     }
     return granted;
   }
@@ -90,14 +91,14 @@ class _SettingsScreenAxState extends State<SettingsScreenAx> {
   }
 
   Widget _body() => IndexedStack(
-        index: _section,
-        children: const [
-          _AiSettingsView(),
-          _WorkToolsView(),
-          _IntegrationView(),
-          _GeneralView(),
-        ],
-      );
+    index: _section,
+    children: const [
+      _AiSettingsView(),
+      if (AppConstants.showCollaborationTools) _WorkToolsView(),
+      if (AppConstants.showCollaborationTools) _IntegrationView(),
+      _GeneralView(),
+    ],
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -172,17 +173,13 @@ class _DesktopSettingsShell extends StatelessWidget {
                   children: [
                     Text(
                       '설정',
-                      style: Theme.of(context)
-                          .textTheme
-                          .headlineSmall
+                      style: Theme.of(context).textTheme.headlineSmall
                           ?.copyWith(fontWeight: FontWeight.w800),
                     ),
                     const SizedBox(height: 6),
                     Text(
                       '필요한 항목만 선택해 관리하세요.',
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodySmall
+                      style: Theme.of(context).textTheme.bodySmall
                           ?.copyWith(color: cs.onSurfaceVariant),
                     ),
                     const SizedBox(height: 22),
@@ -225,16 +222,12 @@ class _DesktopSettingsShell extends StatelessWidget {
                         children: [
                           Text(
                             sections[section].title,
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleLarge
+                            style: Theme.of(context).textTheme.titleLarge
                                 ?.copyWith(fontWeight: FontWeight.w800),
                           ),
                           Text(
                             sections[section].subtitle,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
+                            style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(color: cs.onSurfaceVariant),
                           ),
                         ],
@@ -288,8 +281,7 @@ class _DesktopSectionTile extends StatelessWidget {
                   ),
                 ),
               ),
-              if (selected)
-                Icon(Icons.chevron_right, color: fg, size: 20),
+              if (selected) Icon(Icons.chevron_right, color: fg, size: 20),
             ],
           ),
         ),
@@ -429,18 +421,14 @@ class _Panel extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleMedium
+                      style: Theme.of(context).textTheme.titleMedium
                           ?.copyWith(fontWeight: FontWeight.w800),
                     ),
                     if (subtitle != null) ...[
                       const SizedBox(height: 3),
                       Text(
                         subtitle!,
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodySmall
+                        style: Theme.of(context).textTheme.bodySmall
                             ?.copyWith(color: cs.onSurfaceVariant),
                       ),
                     ],
@@ -481,9 +469,7 @@ class _InfoNote extends StatelessWidget {
           Expanded(
             child: Text(
               text,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
+              style: Theme.of(context).textTheme.bodySmall
                   ?.copyWith(color: cs.onSurfaceVariant),
             ),
           ),
@@ -582,38 +568,38 @@ class _AiSettingsViewState extends State<_AiSettingsView> {
   }
 
   Map<String, String> _values() => {
-        AppConstants.settingAiProvider: _provider,
-        AppConstants.settingOllamaUrl: _ollamaUrl.text.trim(),
-        AppConstants.settingOllamaModel: _ollamaModel.text.trim(),
-        AppConstants.settingOpenAiKey: _openAiKey.text.trim(),
-        AppConstants.settingOpenAiModel: _openAiModel.text.trim(),
-        AppConstants.settingGeminiKey: _geminiKey.text.trim(),
-        AppConstants.settingGeminiModel: _geminiModel.text.trim(),
-        AppConstants.settingClaudeKey: _claudeKey.text.trim(),
-        AppConstants.settingClaudeModel: _claudeModel.text.trim(),
-        AppConstants.settingClaudeBaseUrl: _claudeBase.text.trim(),
-        AppConstants.settingFaissEndpoint: _faiss.text.trim(),
-      };
+    AppConstants.settingAiProvider: _provider,
+    AppConstants.settingOllamaUrl: _ollamaUrl.text.trim(),
+    AppConstants.settingOllamaModel: _ollamaModel.text.trim(),
+    AppConstants.settingOpenAiKey: _openAiKey.text.trim(),
+    AppConstants.settingOpenAiModel: _openAiModel.text.trim(),
+    AppConstants.settingGeminiKey: _geminiKey.text.trim(),
+    AppConstants.settingGeminiModel: _geminiModel.text.trim(),
+    AppConstants.settingClaudeKey: _claudeKey.text.trim(),
+    AppConstants.settingClaudeModel: _claudeModel.text.trim(),
+    AppConstants.settingClaudeBaseUrl: _claudeBase.text.trim(),
+    AppConstants.settingFaissEndpoint: _faiss.text.trim(),
+  };
 
   String get _title => switch (_provider) {
-        AppConstants.aiProviderOpenAi => 'OpenAI',
-        AppConstants.aiProviderGemini => 'Google Gemini',
-        AppConstants.aiProviderClaude => 'Anthropic Claude',
-        _ => '사내·로컬 AI',
-      };
+    AppConstants.aiProviderOpenAi => 'OpenAI',
+    AppConstants.aiProviderGemini => 'Google Gemini',
+    AppConstants.aiProviderClaude => 'Anthropic Claude',
+    _ => '사내·로컬 AI',
+  };
 
   Widget _secret(TextEditingController controller, String label) => TextField(
-        controller: controller,
-        obscureText: _obscure,
-        decoration: InputDecoration(
-          labelText: label,
-          prefixIcon: const Icon(Icons.key_outlined),
-          suffixIcon: IconButton(
-            onPressed: () => setState(() => _obscure = !_obscure),
-            icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
-          ),
-        ),
-      );
+    controller: controller,
+    obscureText: _obscure,
+    decoration: InputDecoration(
+      labelText: label,
+      prefixIcon: const Icon(Icons.key_outlined),
+      suffixIcon: IconButton(
+        onPressed: () => setState(() => _obscure = !_obscure),
+        icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
+      ),
+    ),
+  );
 
   Widget _fields() {
     switch (_provider) {
@@ -787,9 +773,9 @@ class _AiSettingsViewState extends State<_AiSettingsView> {
                   child: TextButton.icon(
                     onPressed: () => setState(() => _advanced = !_advanced),
                     icon: Icon(
-                        _advanced ? Icons.expand_less : Icons.expand_more),
-                    label: Text(
-                        _advanced ? '고급 설정 닫기' : '고급 설정 보기'),
+                      _advanced ? Icons.expand_less : Icons.expand_more,
+                    ),
+                    label: Text(_advanced ? '고급 설정 닫기' : '고급 설정 보기'),
                   ),
                 ),
                 if (_advanced)
@@ -804,11 +790,7 @@ class _AiSettingsViewState extends State<_AiSettingsView> {
             );
             if (!desktop) {
               return Column(
-                children: [
-                  selector,
-                  const SizedBox(height: 14),
-                  details,
-                ],
+                children: [selector, const SizedBox(height: 14), details],
               );
             }
             return Row(
@@ -891,14 +873,11 @@ class _ProviderRow extends StatelessWidget {
                       ),
                       Text(
                         subtitle,
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodySmall
-                            ?.copyWith(
-                              color: selected
-                                  ? cs.onPrimaryContainer
-                                  : cs.onSurfaceVariant,
-                            ),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: selected
+                              ? cs.onPrimaryContainer
+                              : cs.onSurfaceVariant,
+                        ),
                       ),
                     ],
                   ),
@@ -990,9 +969,8 @@ class _ToolListRow extends StatelessWidget {
           field.key: controllers[field.key]!.text.trim(),
       });
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${data.name} 설정을 저장했습니다.')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('${data.name} 설정을 저장했습니다.')));
       }
     }
     for (final controller in controllers.values) {
@@ -1024,14 +1002,14 @@ class _ToolListRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(data.name,
-                      style: const TextStyle(fontWeight: FontWeight.w800)),
+                  Text(
+                    data.name,
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
                   const SizedBox(height: 2),
                   Text(
                     data.description,
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodySmall
+                    style: Theme.of(context).textTheme.bodySmall
                         ?.copyWith(color: cs.onSurfaceVariant),
                   ),
                 ],
@@ -1062,10 +1040,17 @@ class _WorkToolsView extends StatelessWidget {
         [
           _ToolField(AppConstants.settingJiraUrl, 'Jira 주소', vm.jiraUrl),
           _ToolField(
-              AppConstants.settingJiraProjectKey, '프로젝트 키', vm.jiraProjectKey),
+            AppConstants.settingJiraProjectKey,
+            '프로젝트 키',
+            vm.jiraProjectKey,
+          ),
           _ToolField(AppConstants.settingJiraEmail, '계정 이메일', vm.jiraEmail),
-          _ToolField(AppConstants.settingJiraToken, 'API 토큰', vm.jiraToken,
-              secret: true),
+          _ToolField(
+            AppConstants.settingJiraToken,
+            'API 토큰',
+            vm.jiraToken,
+            secret: true,
+          ),
         ],
       ),
       _ToolData(
@@ -1075,11 +1060,20 @@ class _WorkToolsView extends StatelessWidget {
         vm.isConfluenceConfigured,
         [
           _ToolField(
-              AppConstants.settingConfluenceUrl, 'Confluence 주소', vm.confluenceUrl),
+            AppConstants.settingConfluenceUrl,
+            'Confluence 주소',
+            vm.confluenceUrl,
+          ),
           _ToolField(
-              AppConstants.settingConfluenceSpace, '스페이스 키', vm.confluenceSpace),
+            AppConstants.settingConfluenceSpace,
+            '스페이스 키',
+            vm.confluenceSpace,
+          ),
           _ToolField(
-              AppConstants.settingConfluenceEmail, '계정 이메일', vm.confluenceEmail),
+            AppConstants.settingConfluenceEmail,
+            '계정 이메일',
+            vm.confluenceEmail,
+          ),
           _ToolField(
             AppConstants.settingConfluenceToken,
             'API 토큰',
@@ -1094,11 +1088,22 @@ class _WorkToolsView extends StatelessWidget {
         Icons.assignment_outlined,
         vm.isRedmineConfigured,
         [
-          _ToolField(AppConstants.settingRedmineUrl, 'Redmine 주소', vm.redmineUrl),
-          _ToolField(AppConstants.settingRedmineProject, '프로젝트', vm.redmineProject),
           _ToolField(
-              AppConstants.settingRedmineApiKey, 'API 키', vm.redmineApiKey,
-              secret: true),
+            AppConstants.settingRedmineUrl,
+            'Redmine 주소',
+            vm.redmineUrl,
+          ),
+          _ToolField(
+            AppConstants.settingRedmineProject,
+            '프로젝트',
+            vm.redmineProject,
+          ),
+          _ToolField(
+            AppConstants.settingRedmineApiKey,
+            'API 키',
+            vm.redmineApiKey,
+            secret: true,
+          ),
         ],
       ),
       _ToolData(
@@ -1108,11 +1113,21 @@ class _WorkToolsView extends StatelessWidget {
         vm.isNotionConfigured,
         [
           _ToolField(
-              AppConstants.settingNotionWorkspace, '워크스페이스', vm.notionWorkspace),
+            AppConstants.settingNotionWorkspace,
+            '워크스페이스',
+            vm.notionWorkspace,
+          ),
           _ToolField(
-              AppConstants.settingNotionDatabaseId, '데이터베이스 ID', vm.notionDatabaseId),
-          _ToolField(AppConstants.settingNotionApiKey, 'API 키', vm.notionApiKey,
-              secret: true),
+            AppConstants.settingNotionDatabaseId,
+            '데이터베이스 ID',
+            vm.notionDatabaseId,
+          ),
+          _ToolField(
+            AppConstants.settingNotionApiKey,
+            'API 키',
+            vm.notionApiKey,
+            secret: true,
+          ),
         ],
       ),
       _ToolData(
@@ -1122,8 +1137,12 @@ class _WorkToolsView extends StatelessWidget {
         vm.isGithubConfigured,
         [
           _ToolField(AppConstants.settingGithubRepo, '저장소', vm.githubRepo),
-          _ToolField(AppConstants.settingGithubToken, '액세스 토큰', vm.githubToken,
-              secret: true),
+          _ToolField(
+            AppConstants.settingGithubToken,
+            '액세스 토큰',
+            vm.githubToken,
+            secret: true,
+          ),
         ],
       ),
       _ToolData(
@@ -1133,10 +1152,17 @@ class _WorkToolsView extends StatelessWidget {
         vm.isAsanaConfigured,
         [
           _ToolField(
-              AppConstants.settingAsanaWorkspace, '워크스페이스', vm.asanaWorkspace),
+            AppConstants.settingAsanaWorkspace,
+            '워크스페이스',
+            vm.asanaWorkspace,
+          ),
           _ToolField(AppConstants.settingAsanaProject, '프로젝트', vm.asanaProject),
-          _ToolField(AppConstants.settingAsanaToken, '액세스 토큰', vm.asanaToken,
-              secret: true),
+          _ToolField(
+            AppConstants.settingAsanaToken,
+            '액세스 토큰',
+            vm.asanaToken,
+            secret: true,
+          ),
         ],
       ),
     ];
@@ -1192,13 +1218,22 @@ class _IntegrationView extends StatelessWidget {
                 Icons.mail_outline,
                 vm.isOutlookConfigured,
                 [
-                  _ToolField(AppConstants.settingOutlookAccessToken, '액세스 토큰',
-                      vm.outlookAccessToken,
-                      secret: true),
                   _ToolField(
-                      AppConstants.settingOutlookMailbox, '메일함', vm.outlookMailbox),
+                    AppConstants.settingOutlookAccessToken,
+                    '액세스 토큰',
+                    vm.outlookAccessToken,
+                    secret: true,
+                  ),
                   _ToolField(
-                      AppConstants.settingOutlookFolder, '폴더', vm.outlookFolder),
+                    AppConstants.settingOutlookMailbox,
+                    '메일함',
+                    vm.outlookMailbox,
+                  ),
+                  _ToolField(
+                    AppConstants.settingOutlookFolder,
+                    '폴더',
+                    vm.outlookFolder,
+                  ),
                 ],
               ),
             ),
@@ -1238,7 +1273,8 @@ class _IntegrationView extends StatelessWidget {
               title: const Text('VOC 자동 전달'),
               subtitle: const Text('새 VOC를 등록하면 활성화된 대상에 자동으로 전달합니다.'),
               value: vm.vocAutoForwardEnabled,
-              onChanged: (value) => context.read<SettingsViewModel>().saveSetting(
+              onChanged: (value) =>
+                  context.read<SettingsViewModel>().saveSetting(
                     AppConstants.settingVocAutoForwardEnabled,
                     value.toString(),
                   ),
@@ -1258,9 +1294,15 @@ class _IntegrationView extends StatelessWidget {
                 vm.isTeamsConfigured,
                 [
                   _ToolField(
-                      AppConstants.settingTeamsWebhook, 'Teams 웹훅 URL', vm.teamsWebhook),
-                  _ToolField(AppConstants.settingUrgencyWebhookThreshold, '알림 기준',
-                      vm.urgencyWebhookThreshold),
+                    AppConstants.settingTeamsWebhook,
+                    'Teams 웹훅 URL',
+                    vm.teamsWebhook,
+                  ),
+                  _ToolField(
+                    AppConstants.settingUrgencyWebhookThreshold,
+                    '알림 기준',
+                    vm.urgencyWebhookThreshold,
+                  ),
                 ],
               ),
             ),
@@ -1273,9 +1315,15 @@ class _IntegrationView extends StatelessWidget {
                 vm.isSlackConfigured,
                 [
                   _ToolField(
-                      AppConstants.settingSlackWebhook, 'Slack 웹훅 URL', vm.slackWebhook),
-                  _ToolField(AppConstants.settingUrgencyWebhookThreshold, '알림 기준',
-                      vm.urgencyWebhookThreshold),
+                    AppConstants.settingSlackWebhook,
+                    'Slack 웹훅 URL',
+                    vm.slackWebhook,
+                  ),
+                  _ToolField(
+                    AppConstants.settingUrgencyWebhookThreshold,
+                    '알림 기준',
+                    vm.urgencyWebhookThreshold,
+                  ),
                 ],
               ),
             ),
@@ -1340,13 +1388,13 @@ class _NavigationRow extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title,
-                        style: const TextStyle(fontWeight: FontWeight.w800)),
+                    Text(
+                      title,
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
                     Text(
                       subtitle,
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodySmall
+                      style: Theme.of(context).textTheme.bodySmall
                           ?.copyWith(color: cs.onSurfaceVariant),
                     ),
                   ],
@@ -1354,8 +1402,10 @@ class _NavigationRow extends StatelessWidget {
               ),
               if (badge != null) ...[
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: cs.primaryContainer,
                     borderRadius: BorderRadius.circular(999),
@@ -1489,8 +1539,9 @@ class _VocSyncEditorState extends State<_VocSyncEditor> {
   Future<void> _edit(int index) async {
     final value = await _askUrl(initial: _urls[index]);
     if (value == null || !mounted) return;
-    if (_urls.asMap().entries.any((entry) =>
-        entry.key != index && entry.value == value)) {
+    if (_urls.asMap().entries.any(
+      (entry) => entry.key != index && entry.value == value,
+    )) {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('이미 등록된 URL입니다.')));
       return;
@@ -1509,9 +1560,8 @@ class _VocSyncEditorState extends State<_VocSyncEditor> {
         AppConstants.settingVocForwardWebhookTargets: _urls.join('\n'),
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('VOC 동기화 설정을 저장했습니다.')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('VOC 동기화 설정을 저장했습니다.')));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -1530,18 +1580,21 @@ class _VocSyncEditorState extends State<_VocSyncEditor> {
             ),
             child: Column(
               children: [
-                Icon(Icons.link_off_outlined,
-                    color: cs.onSurfaceVariant, size: 30),
+                Icon(
+                  Icons.link_off_outlined,
+                  color: cs.onSurfaceVariant,
+                  size: 30,
+                ),
                 const SizedBox(height: 8),
-                const Text('등록된 동기화 대상이 없습니다.',
-                    style: TextStyle(fontWeight: FontWeight.w700)),
+                const Text(
+                  '등록된 동기화 대상이 없습니다.',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
                 const SizedBox(height: 4),
                 Text(
                   '대상 URL을 추가하면 해당 시스템으로 VOC를 동기화할 수 있습니다.',
                   textAlign: TextAlign.center,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
+                  style: Theme.of(context).textTheme.bodySmall
                       ?.copyWith(color: cs.onSurfaceVariant),
                 ),
               ],
@@ -1551,8 +1604,10 @@ class _VocSyncEditorState extends State<_VocSyncEditor> {
             children: [
               for (var i = 0; i < _urls.length; i++) ...[
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     color: cs.surfaceContainerLow,
                     borderRadius: BorderRadius.circular(12),
@@ -1587,8 +1642,7 @@ class _VocSyncEditorState extends State<_VocSyncEditor> {
                       IconButton(
                         tooltip: '삭제',
                         onPressed: () => _remove(i),
-                        icon: Icon(Icons.delete_outline,
-                            color: cs.error),
+                        icon: Icon(Icons.delete_outline, color: cs.error),
                       ),
                     ],
                   ),
@@ -1630,9 +1684,7 @@ class _VocSyncEditorState extends State<_VocSyncEditor> {
             Expanded(
               child: Text(
                 '동기화 대상 URL',
-                style: Theme.of(context)
-                    .textTheme
-                    .titleSmall
+                style: Theme.of(context).textTheme.titleSmall
                     ?.copyWith(fontWeight: FontWeight.w800),
               ),
             ),
@@ -1689,10 +1741,8 @@ class _GeneralViewState extends State<_GeneralView> {
     final vm = context.read<SettingsViewModel>();
     _name = TextEditingController(text: vm.userName);
     _codes = TextEditingController(text: vm.projectCodes.join(', '));
-    _business =
-        TextEditingController(text: vm.businessTypeOptions.join(', '));
-    _projects =
-        TextEditingController(text: vm.projectNameOptions.join(', '));
+    _business = TextEditingController(text: vm.businessTypeOptions.join(', '));
+    _projects = TextEditingController(text: vm.projectNameOptions.join(', '));
     _loaded = true;
   }
 
@@ -1756,17 +1806,15 @@ class _GeneralViewState extends State<_GeneralView> {
                       initialValue: vm.themeModeString,
                       decoration: const InputDecoration(labelText: '테마'),
                       items: const [
-                        DropdownMenuItem(
-                            value: 'light', child: Text('라이트 모드')),
-                        DropdownMenuItem(
-                            value: 'dark', child: Text('다크 모드')),
+                        DropdownMenuItem(value: 'light', child: Text('라이트 모드')),
+                        DropdownMenuItem(value: 'dark', child: Text('다크 모드')),
                       ],
                       onChanged: (value) {
                         if (value != null) {
                           context.read<SettingsViewModel>().saveSetting(
-                                AppConstants.settingThemeMode,
-                                value,
-                              );
+                            AppConstants.settingThemeMode,
+                            value,
+                          );
                         }
                       },
                     ),
@@ -1783,9 +1831,9 @@ class _GeneralViewState extends State<_GeneralView> {
                       onChanged: (value) {
                         if (value != null) {
                           context.read<SettingsViewModel>().saveSetting(
-                                AppConstants.settingTextScale,
-                                value,
-                              );
+                            AppConstants.settingTextScale,
+                            value,
+                          );
                         }
                       },
                     ),
@@ -1851,9 +1899,9 @@ class _GeneralViewState extends State<_GeneralView> {
                     value: vm.aiAutoAnswerOnVocRegister,
                     onChanged: (value) =>
                         context.read<SettingsViewModel>().saveSetting(
-                              AppConstants.settingAiAutoAnswerOnVocRegister,
-                              value.toString(),
-                            ),
+                          AppConstants.settingAiAutoAnswerOnVocRegister,
+                          value.toString(),
+                        ),
                   ),
                   children: [
                     Text(
@@ -1866,11 +1914,7 @@ class _GeneralViewState extends State<_GeneralView> {
             );
             if (!desktop) {
               return Column(
-                children: [
-                  left,
-                  const SizedBox(height: 14),
-                  right,
-                ],
+                children: [left, const SizedBox(height: 14), right],
               );
             }
             return Row(

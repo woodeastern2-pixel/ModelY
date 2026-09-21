@@ -55,7 +55,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.play_circle_fill_outlined),
-            tooltip: '샘플 VOC로 둘러보기',
+            tooltip: '시연 데이터로 둘러보기',
             onPressed: () => _showDemoModeDialog(context),
           ),
           IconButton(
@@ -81,8 +81,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   child: LayoutBuilder(
                     builder: (context, constraints) {
                       final compact = constraints.maxWidth < 600;
-                      final pagePadding =
-                          compact ? AppSpacing.sm : AppSpacing.lg;
+                      final pagePadding = compact
+                          ? AppSpacing.sm
+                          : AppSpacing.lg;
                       return Padding(
                         padding: EdgeInsets.all(pagePadding),
                         child: Column(
@@ -196,7 +197,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return StatefulBuilder(
           builder: (ctx, setState) {
             return AlertDialog(
-                title: const Text('3분 기능 둘러보기'),
+              title: const Text('시연 모드'),
               content: SizedBox(
                 width: 520,
                 child: Column(
@@ -211,17 +212,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: const Text(
-                        '샘플 VOC가 현재 데이터에 추가됩니다. 기존 VOC와 설정은 변경되지 않습니다.',
+                        '고객지원 시연용 VOC가 현재 데이터에 추가됩니다. 기존 VOC와 설정은 변경되지 않습니다.',
                       ),
                     ),
                     const SizedBox(height: 12),
                     LinearProgressIndicator(
                       value:
                           (service.getCurrentStatus()?.progressPercent ?? 0) /
-                              100,
+                          100,
                     ),
                     const SizedBox(height: 12),
-                    Text(service.getCurrentStatus()?.message ?? '기능 둘러보기를 준비하고 있습니다.'),
+                    Text(
+                      service.getCurrentStatus()?.message ??
+                          '기능 둘러보기를 준비하고 있습니다.',
+                    ),
                     const SizedBox(height: 12),
                     SizedBox(
                       height: 220,
@@ -254,7 +258,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           final count = await context
                               .read<VocViewModel>()
                               .importSampleVocs(samples);
-                          logs.add('샘플 VOC $count건을 추가했습니다.');
+                          logs.add('시연용 VOC $count건을 추가했습니다.');
 
                           await service.startDemo((status) {
                             logs
@@ -268,7 +272,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           }
                         },
                   icon: const Icon(Icons.play_arrow),
-                  label: const Text('둘러보기 시작'),
+                  label: const Text('시연 데이터 준비'),
                 ),
               ],
             );
@@ -350,29 +354,28 @@ class _DashboardHero extends StatelessWidget {
                   Text(
                     '오늘의 현황',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: const Color(0xFFB9BED0),
-                          letterSpacing: 1.2,
-                          fontWeight: FontWeight.w700,
-                        ),
+                      color: const Color(0xFFB9BED0),
+                      letterSpacing: 1.2,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ],
               ),
               const SizedBox(height: AppSpacing.md),
               Text(
                 title,
-                style: (compact
-                        ? Theme.of(context).textTheme.headlineMedium
-                        : Theme.of(context).textTheme.displaySmall)
-                    ?.copyWith(color: Colors.white),
+                style:
+                    (compact
+                            ? Theme.of(context).textTheme.headlineMedium
+                            : Theme.of(context).textTheme.displaySmall)
+                        ?.copyWith(color: Colors.white),
               ),
               const SizedBox(height: AppSpacing.xs),
               ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 620),
                 child: Text(
                   description,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyMedium
+                  style: Theme.of(context).textTheme.bodyMedium
                       ?.copyWith(color: const Color(0xFFC7CBD8), height: 1.55),
                 ),
               ),
@@ -456,9 +459,7 @@ class _HeroPulse extends StatelessWidget {
         children: [
           Text(
             '미완료 VOC',
-            style: Theme.of(context)
-                .textTheme
-                .labelMedium
+            style: Theme.of(context).textTheme.labelMedium
                 ?.copyWith(color: const Color(0xFFB9BED0)),
           ),
           const SizedBox(height: AppSpacing.xxs),
@@ -467,9 +468,7 @@ class _HeroPulse extends StatelessWidget {
             children: [
               Text(
                 vm.backlogVocs.toString(),
-                style: Theme.of(context)
-                    .textTheme
-                    .displayMedium
+                style: Theme.of(context).textTheme.displayMedium
                     ?.copyWith(color: Colors.white, height: 1),
               ),
               const SizedBox(width: AppSpacing.xs),
@@ -477,9 +476,7 @@ class _HeroPulse extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: 4),
                 child: Text(
                   '건',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyMedium
+                  style: Theme.of(context).textTheme.bodyMedium
                       ?.copyWith(color: const Color(0xFFB9BED0)),
                 ),
               ),
@@ -527,17 +524,13 @@ class _HeroProgress extends StatelessWidget {
             Expanded(
               child: Text(
                 label,
-                style: Theme.of(context)
-                    .textTheme
-                    .labelSmall
+                style: Theme.of(context).textTheme.labelSmall
                     ?.copyWith(color: const Color(0xFFB9BED0)),
               ),
             ),
             Text(
               display,
-              style: Theme.of(context)
-                  .textTheme
-                  .labelMedium
+              style: Theme.of(context).textTheme.labelMedium
                   ?.copyWith(color: Colors.white),
             ),
           ],
@@ -576,18 +569,16 @@ class _SectionHeading extends StatelessWidget {
         Text(
           eyebrow,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: Theme.of(context).colorScheme.primary,
-                letterSpacing: 1.15,
-              ),
+            color: Theme.of(context).colorScheme.primary,
+            letterSpacing: 1.15,
+          ),
         ),
         const SizedBox(height: AppSpacing.xxs),
         Text(title, style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 2),
         Text(
           description,
-          style: Theme.of(context)
-              .textTheme
-              .bodySmall
+          style: Theme.of(context).textTheme.bodySmall
               ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
         ),
       ],
@@ -777,10 +768,7 @@ class _ExecutiveInsightsPanel extends StatelessWidget {
             ),
             if (aiRecommendations.isNotEmpty) ...[
               const SizedBox(height: 14),
-              Text(
-                'AI 권장 조치',
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
+              Text('AI 권장 조치', style: Theme.of(context).textTheme.titleSmall),
               if (aiUpdatedAt != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 2, bottom: 6),
@@ -790,7 +778,9 @@ class _ExecutiveInsightsPanel extends StatelessWidget {
                   ),
                 ),
               const SizedBox(height: 6),
-              ...aiRecommendations.take(4).map(
+              ...aiRecommendations
+                  .take(4)
+                  .map(
                     (r) => Padding(
                       padding: const EdgeInsets.only(bottom: 4),
                       child: Text(
@@ -836,8 +826,8 @@ class _ExecutiveInsightsPanel extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ),
             ],
@@ -847,9 +837,7 @@ class _ExecutiveInsightsPanel extends StatelessWidget {
             value,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
+            style: Theme.of(context).textTheme.titleMedium
                 ?.copyWith(color: color, fontWeight: FontWeight.w800),
           ),
           if (subtitle != null && subtitle.trim().isNotEmpty)
@@ -860,8 +848,8 @@ class _ExecutiveInsightsPanel extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
         ],
@@ -876,10 +864,10 @@ class _ExecutiveInsightsPanel extends StatelessWidget {
     NumberFormat won,
   ) {
     final hourlyCost = ((input?.hourlyLaborCost ?? 35.0) * 1400).round();
-    final maintenanceCost =
-        ((input?.monthlyAiMaintenanceCost ?? 2500) * 1400).round();
-    final implementationCost =
-        ((input?.aiImplementationCost ?? 50000) * 1400).round();
+    final maintenanceCost = ((input?.monthlyAiMaintenanceCost ?? 2500) * 1400)
+        .round();
+    final implementationCost = ((input?.aiImplementationCost ?? 50000) * 1400)
+        .round();
 
     return Container(
       width: double.infinity,
@@ -1030,8 +1018,8 @@ class _OperationalMetricCards extends StatelessWidget {
         final crossCount = constraints.maxWidth >= 1100
             ? 5
             : constraints.maxWidth >= 700
-                ? 3
-                : 2;
+            ? 3
+            : 2;
         return GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -1094,7 +1082,8 @@ class _SummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isClickable = data.statusFilter.isNotEmpty ||
+    final isClickable =
+        data.statusFilter.isNotEmpty ||
         data.label == '전체 VOC' ||
         data.label == '지식 자료';
 
@@ -1127,9 +1116,8 @@ class _SummaryCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                            color:
-                                Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ),
                   if (isClickable)
@@ -1145,9 +1133,9 @@ class _SummaryCard extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.7,
-                    ),
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.7,
+                ),
               ),
             ],
           ),
@@ -1182,8 +1170,8 @@ class _CategorySection extends StatelessWidget {
     final end = totalPages == 0
         ? 0
         : (start + pageSize > entries.length
-            ? entries.length
-            : start + pageSize);
+              ? entries.length
+              : start + pageSize);
     final visibleEntries = totalPages == 0
         ? <MapEntry<String, int>>[]
         : entries.sublist(start, end);
