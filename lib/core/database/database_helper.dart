@@ -399,7 +399,7 @@ class DatabaseHelper {
       ''');
     }
 
-    if (oldVersion < 5) {
+    if (oldVersion < 6) {
       await _insertBrityManualData(db);
     }
   }
@@ -523,6 +523,11 @@ class DatabaseHelper {
 
   Future<void> _insertBrityManualData(Database db) async {
     final now = DateTime.now().toIso8601String();
+    await db.delete(
+      AppConstants.tableKnowledgeBase,
+      where: 'id LIKE ?',
+      whereArgs: ['brity-manual-%'],
+    );
     for (final entry in BrityManualSeed.entries) {
       await db.insert(AppConstants.tableKnowledgeBase, {
         ...entry,

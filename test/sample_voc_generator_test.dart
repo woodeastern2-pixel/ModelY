@@ -6,13 +6,13 @@ void main() {
     final first = SampleVocGenerator.generateSampleVocs();
     final second = SampleVocGenerator.generateSampleVocs();
 
-    expect(first, hasLength(10));
+    expect(first, hasLength(8));
     expect(
       first.map((voc) => voc.id),
       orderedEquals(second.map((voc) => voc.id)),
     );
     expect(first.map((voc) => voc.id).toSet(), hasLength(first.length));
     expect(first.every((voc) => voc.source == 'demo'), isTrue);
-    expect(first.every((voc) => voc.project == 'Brity Messenger 모바일'), isTrue);
+    expect(first.every((voc) => voc.project == 'Brity Mail'), isTrue);
   });
 }

@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('Brity manual seed contains unique source-grounded entries', () {
-    expect(BrityManualSeed.entries, hasLength(20));
+    expect(BrityManualSeed.entries, hasLength(16));
     expect(
       BrityManualSeed.entries.map((entry) => entry['id']).toSet(),
       hasLength(BrityManualSeed.entries.length),
@@ -12,9 +12,13 @@ void main() {
       BrityManualSeed.entries.every(
         (entry) =>
             (entry['question'] ?? '').isNotEmpty &&
-            (entry['answer'] ?? '').contains('쪽'),
+            (entry['answer'] ?? '').contains(RegExp(r'\(\d+\.')),
       ),
       isTrue,
+    );
+    expect(
+      BrityManualSeed.sourceUrl,
+      startsWith('https://manual.brityworks.com/'),
     );
   });
 }
