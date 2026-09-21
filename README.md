@@ -24,6 +24,13 @@
 
 UI 변경은 10개 화면·텍스트 배율 조합의 반응형 하네스와 실제 렌더 프리뷰로 검증합니다.
 
+### Release 1.1.1 (build 3)
+
+- 내부망 VOC 동기화 설정을 데이터 관리 화면에 상시 노출
+- 실제 연결 앱에서 데이터가 수신된 경우에만 동기화 알림 표시
+- 실행 중인 앱 버전과 연결 앱 수를 사이드바에 표시
+- Windows 설치 파일과 Android APK 이름에 버전 및 빌드 번호 포함
+
 ```bash
 flutter test --exclude-tags=golden
 flutter test test/ui_preview_golden_test.dart
