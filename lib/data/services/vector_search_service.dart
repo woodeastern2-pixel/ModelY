@@ -1,5 +1,6 @@
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/privacy_masking_service.dart';
+import '../../core/utils/search_query_expander.dart';
 import '../../core/utils/vector_utils.dart';
 import '../../domain/entities/knowledge_base_entity.dart';
 import '../../domain/repositories/knowledge_base_repository.dart';
@@ -53,6 +54,7 @@ class VectorSearchService {
   }) async {
     final allEntries = await _kbRepository.getAllEntries();
     if (allEntries.isEmpty) return [];
+    final expandedQuery = SearchQueryExpander.expand(query);
 
     // 임베딩이 없는 항목들 임베딩 생성
     for (final entry in allEntries) {
@@ -70,9 +72,9 @@ class VectorSearchService {
 
     // 쿼리 임베딩 생성
     List<double> queryEmbedding;
-    final localQueryEmbedding = VectorUtils.simpleTextEmbedding(query);
+    final localQueryEmbedding = VectorUtils.simpleTextEmbedding(expandedQuery);
     try {
-      queryEmbedding = await _generateEmbedding(query);
+      queryEmbedding = await _generateEmbedding(expandedQuery);
     } catch (_) {
       queryEmbedding = localQueryEmbedding;
     }
@@ -107,13 +109,18 @@ class VectorSearchService {
     final results = <SimilarVocResult>[];
     for (final entry in entriesWithEmb) {
       if (entry.embedding == null) continue;
+      final corpus = _searchableText(entry);
       final compatibleQuery =
           entry.embedding!.length == localQueryEmbedding.length
               ? localQueryEmbedding
               : queryEmbedding;
-      final score =
+      final semanticScore =
           VectorUtils.cosineSimilarity(compatibleQuery, entry.embedding!);
-      if (score >= AppConstants.similarityThreshold) {
+      final lexicalScore = SearchQueryExpander.matchRatio(query, corpus);
+      final score = lexicalScore > 0
+          ? (semanticScore * 0.7 + lexicalScore * 0.3).clamp(0.0, 1.0)
+          : semanticScore;
+      if (lexicalScore > 0 || score >= AppConstants.similarityThreshold) {
         results.add(
           SimilarVocResult(knowledgeBase: entry, similarityScore: score),
         );
@@ -126,7 +133,7 @@ class VectorSearchService {
 
   Future<void> _generateAndSaveEmbedding(KnowledgeBaseEntity entry) async {
     if (entry.id.startsWith('brity-')) {
-      final text = '${entry.question} ${entry.answer}';
+      final text = SearchQueryExpander.expand(_searchableText(entry));
       await _kbRepository.updateEmbedding(
         entry.id,
         VectorUtils.simpleTextEmbedding(text),
@@ -135,7 +142,7 @@ class VectorSearchService {
     }
 
     try {
-      final text = '${entry.question} ${entry.answer}';
+      final text = SearchQueryExpander.expand(_searchableText(entry));
       final embedding = await _generateEmbedding(text);
       await _kbRepository.updateEmbedding(entry.id, embedding);
       if (_faissService != null) {
@@ -151,7 +158,7 @@ class VectorSearchService {
       }
     } catch (_) {
       // 임베딩 생성 실패 시 폴백 저장
-      final text = '${entry.question} ${entry.answer}';
+      final text = SearchQueryExpander.expand(_searchableText(entry));
       final embedding = VectorUtils.simpleTextEmbedding(text);
       await _kbRepository.updateEmbedding(entry.id, embedding);
     }
@@ -176,11 +183,18 @@ class VectorSearchService {
     List<KnowledgeBaseEntity> entries,
     int? topK,
   ) {
-    final queryEmb = VectorUtils.simpleTextEmbedding(query);
+    final queryEmb =
+        VectorUtils.simpleTextEmbedding(SearchQueryExpander.expand(query));
     final results = entries.map((entry) {
-      final text = '${entry.question} ${entry.answer}';
-      final entryEmb = VectorUtils.simpleTextEmbedding(text);
-      final score = VectorUtils.cosineSimilarity(queryEmb, entryEmb);
+      final text = _searchableText(entry);
+      final entryEmb = VectorUtils.simpleTextEmbedding(
+        SearchQueryExpander.expand(text),
+      );
+      final semanticScore = VectorUtils.cosineSimilarity(queryEmb, entryEmb);
+      final lexicalScore = SearchQueryExpander.matchRatio(query, text);
+      final score = lexicalScore > 0
+          ? (semanticScore * 0.7 + lexicalScore * 0.3).clamp(0.0, 1.0)
+          : semanticScore;
       return SimilarVocResult(
         knowledgeBase: entry,
         similarityScore: score,
@@ -195,5 +209,15 @@ class VectorSearchService {
   /// 새 지식베이스 항목 임베딩 즉시 생성
   Future<void> indexEntry(KnowledgeBaseEntity entry) async {
     await _generateAndSaveEmbedding(entry);
+  }
+
+  String _searchableText(KnowledgeBaseEntity entry) {
+    return [
+      entry.question,
+      entry.answer,
+      entry.project ?? '',
+      entry.customer ?? '',
+      entry.category,
+    ].where((value) => value.trim().isNotEmpty).join(' ');
   }
 }

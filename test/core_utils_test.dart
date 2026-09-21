@@ -1,3 +1,4 @@
+import 'package:ai_voc_assistant/core/utils/search_query_expander.dart';
 import 'package:ai_voc_assistant/core/utils/vector_utils.dart';
 import 'package:ai_voc_assistant/core/utils/voc_category_catalog.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -26,6 +27,50 @@ void main() {
       expect(embedding, hasLength(32));
       expect(squaredNorm, closeTo(1, 1e-12));
     });
+  });
+
+  group('SearchQueryExpander', () {
+    test('expands Korean and English Brity product names bidirectionally', () {
+      expect(SearchQueryExpander.expand('미팅 화면 공유'), contains('meeting'));
+      expect(SearchQueryExpander.expand('meeting 화면 공유'), contains('미팅'));
+      expect(SearchQueryExpander.expand('메신저 알림'), contains('messenger'));
+      expect(SearchQueryExpander.expand('drive 권한'), contains('드라이브'));
+      expect(SearchQueryExpander.expand('코파일럿 요약'), contains('copilot'));
+    });
+
+    test(
+      'matches a Korean product query against English knowledge metadata',
+      () {
+        expect(
+          SearchQueryExpander.matches(
+            '미팅 화면 공유',
+            'Brity Meeting에서 화면 공유 기능은 어떻게 사용하나요?',
+          ),
+          isTrue,
+        );
+        expect(
+          SearchQueryExpander.matches(
+            '메신저 로그인',
+            'Brity Messenger Desktop 로그인 및 계정 설정',
+          ),
+          isTrue,
+        );
+        expect(
+          SearchQueryExpander.matches(
+            '드라이브 권한',
+            'Brity Drive 권한 안내',
+          ),
+          isTrue,
+        );
+        expect(
+          SearchQueryExpander.matches(
+            '미팅에서 화면 공유',
+            'Brity Meeting에서 화면 공유 기능은 어떻게 사용하나요?',
+          ),
+          isTrue,
+        );
+      },
+    );
   });
 
   group('VocCategoryCatalog', () {

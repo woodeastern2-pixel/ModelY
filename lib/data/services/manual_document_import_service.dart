@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 import 'package:xml/xml.dart';
 
+import '../../core/utils/search_query_expander.dart';
 import '../../core/utils/vector_utils.dart';
 import '../../domain/entities/knowledge_base_entity.dart';
 import '../../domain/repositories/knowledge_base_repository.dart';
@@ -175,7 +176,11 @@ class ManualDocumentImportService {
               qa.answer,
             );
             final now = DateTime.now();
-            final embedding = VectorUtils.simpleTextEmbedding('${qa.question} ${qa.answer}');
+            final embedding = VectorUtils.simpleTextEmbedding(
+              SearchQueryExpander.expand(
+                '${qa.question} ${qa.answer} ${doc.fileName}',
+              ),
+            );
 
             final entity = KnowledgeBaseEntity(
               id: id,
@@ -229,7 +234,8 @@ class ManualDocumentImportService {
 
   bool isSupported(String fileName) {
     final ext = p.extension(fileName).toLowerCase().replaceAll('.', '');
-    return const ['pdf', 'docx', 'xlsx', 'pptx', 'doc', 'xls', 'ppt'].contains(ext);
+    return const ['pdf', 'docx', 'xlsx', 'pptx', 'doc', 'xls', 'ppt']
+        .contains(ext);
   }
 
   Future<String> _extractText(String filePath, String extension) async {
@@ -247,7 +253,9 @@ class ManualDocumentImportService {
     }
 
     if (extension == 'doc' || extension == 'xls' || extension == 'ppt') {
-      throw Exception('구형 포맷($extension)은 직접 파싱이 어렵습니다. OpenXML(docx/xlsx/pptx)로 저장 후 업로드해 주세요.');
+      throw Exception(
+        '구형 포맷($extension)은 직접 파싱이 어렵습니다. OpenXML(docx/xlsx/pptx)로 저장 후 업로드해 주세요.',
+      );
     }
 
     throw Exception('지원하지 않는 확장자: $extension');
@@ -255,6 +263,15 @@ class ManualDocumentImportService {
 
   Future<String> _extractFromPdf(String filePath) async {
     final bytes = await File(filePath).readAsBytes();
+    final signature = ascii.decode(
+      bytes.take(64).toList(),
+      allowInvalid: true,
+    );
+    if (signature.contains('NASCA DRM FILE')) {
+      throw Exception(
+        'NASCA DRM으로 보호된 문서입니다. DRM이 해제된 PDF로 저장한 뒤 다시 추가해 주세요.',
+      );
+    }
     final document = PdfDocument(inputBytes: bytes);
     try {
       final extractor = PdfTextExtractor(document);

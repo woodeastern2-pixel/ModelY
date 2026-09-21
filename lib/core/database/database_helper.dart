@@ -3,9 +3,10 @@ import 'dart:convert';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
-import '../constants/app_constants.dart';
-import '../utils/vector_utils.dart';
 import '../../data/seeds/brity_suite_manual_seed.dart';
+import '../constants/app_constants.dart';
+import '../utils/search_query_expander.dart';
+import '../utils/vector_utils.dart';
 
 class DatabaseHelper {
   DatabaseHelper._internal();
@@ -405,7 +406,7 @@ class DatabaseHelper {
       ''');
     }
 
-    if (oldVersion < 8) {
+    if (oldVersion < 9) {
       await _insertBrityManualData(db);
     }
   }
@@ -551,7 +552,11 @@ class DatabaseHelper {
             'project': entry['project'],
             'voc_id': null,
             'embedding': jsonEncode(
-              VectorUtils.simpleTextEmbedding('$question $answer'),
+              VectorUtils.simpleTextEmbedding(
+                SearchQueryExpander.expand(
+                  '$question $answer ${entry['project']} ${entry['sourceName']}',
+                ),
+              ),
             ),
             'resolved_at': now,
             'created_at': now,

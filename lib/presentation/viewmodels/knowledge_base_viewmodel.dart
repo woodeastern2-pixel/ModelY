@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../core/constants/app_constants.dart';
+import '../../core/utils/search_query_expander.dart';
 import '../../data/services/ai_service.dart';
 import '../../domain/entities/knowledge_base_entity.dart';
 import '../../domain/repositories/knowledge_base_repository.dart';
@@ -80,15 +81,18 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
           .toList();
     }
     if (_searchQuery.isNotEmpty) {
-      final q = _searchQuery.toLowerCase();
       list = list
           .where(
-            (e) =>
-                e.question.toLowerCase().contains(q) ||
-                e.answer.toLowerCase().contains(q) ||
-                (e.project ?? '').toLowerCase().contains(q) ||
-                (e.customer ?? '').toLowerCase().contains(q) ||
-                e.category.toLowerCase().contains(q),
+            (e) => SearchQueryExpander.matches(
+              _searchQuery,
+              [
+                e.question,
+                e.answer,
+                e.project ?? '',
+                e.customer ?? '',
+                e.category,
+              ].join(' '),
+            ),
           )
           .toList();
     }

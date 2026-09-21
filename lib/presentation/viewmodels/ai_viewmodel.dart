@@ -4,6 +4,7 @@ import 'dart:convert';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/database/database_helper.dart';
+import '../../core/utils/search_query_expander.dart';
 import '../../core/utils/vector_utils.dart';
 import '../../domain/entities/ai_chat_message_entity.dart';
 import '../../domain/entities/knowledge_base_entity.dart';
@@ -230,8 +231,10 @@ class AiViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
+      final expandedQuery = SearchQueryExpander.expand(query);
       final kbSimilar = await _vectorSearch.searchSimilar(query, topK: null);
-      final vocResponseSimilar = await _searchSimilarFromVocResponses(query);
+      final vocResponseSimilar =
+          await _searchSimilarFromVocResponses(expandedQuery);
 
       final merged = <String, SimilarVocResult>{};
       for (final item in [...kbSimilar, ...vocResponseSimilar]) {
@@ -249,7 +252,7 @@ class AiViewModel extends ChangeNotifier {
         if (!_isManualEntry(item)) return false;
         final kb = item.knowledgeBase;
         final corpus = '${kb.question} ${kb.answer}'.toLowerCase();
-        return _keywordOverlapRatio(query.toLowerCase(), corpus) >= 0.2 ||
+        return _keywordOverlapRatio(query, corpus) >= 0.2 ||
             item.similarityScore >= AppConstants.similarityThreshold;
       });
 
@@ -258,7 +261,7 @@ class AiViewModel extends ChangeNotifier {
       // 매뉴얼 적중이 없으면 기존 VOC 이력을 강제 폴백 후보로 추가한다.
       if (!hasManualReference) {
         final vocFallback = await _searchSimilarFromVocResponses(
-          query,
+          expandedQuery,
           minSimilarity: 0.0,
           topK: null,
           includeLowSimilarityFallback: true,
@@ -278,7 +281,7 @@ class AiViewModel extends ChangeNotifier {
       }
 
       final reranked = await _aiService.rerankSimilarCases(
-        query: query,
+        query: expandedQuery,
         candidates: candidates,
       );
 
@@ -345,15 +348,7 @@ class AiViewModel extends ChangeNotifier {
   }
 
   double _keywordOverlapRatio(String queryLower, String corpus) {
-    final tokens = queryLower
-        .replaceAll(RegExp(r'[^0-9a-z가-힣\s]'), ' ')
-        .split(RegExp(r'\s+'))
-        .map((e) => e.trim())
-        .where((e) => e.length >= 2)
-        .toSet();
-    if (tokens.isEmpty) return 0.0;
-    final hits = tokens.where(corpus.contains).length;
-    return hits / tokens.length;
+    return SearchQueryExpander.matchRatio(queryLower, corpus);
   }
 
   Future<List<SimilarVocResult>> _searchSimilarFromVocResponses(
@@ -361,9 +356,10 @@ class AiViewModel extends ChangeNotifier {
     double minSimilarity = AppConstants.similarityThreshold,
     int? topK,
     bool includeLowSimilarityFallback = false,
-  }
-  ) async {
-    final queryEmb = VectorUtils.simpleTextEmbedding(query);
+  }) async {
+    final queryEmb = VectorUtils.simpleTextEmbedding(
+      SearchQueryExpander.expand(query),
+    );
     final vocs = await _vocRepository.getAllVocs();
     final results = <SimilarVocResult>[];
 
@@ -379,8 +375,8 @@ class AiViewModel extends ChangeNotifier {
         orElse: () => responses.first,
       );
 
-      final vocEmb =
-          voc.embedding ?? VectorUtils.simpleTextEmbedding('${voc.title} ${voc.content}');
+      final vocEmb = voc.embedding ??
+          VectorUtils.simpleTextEmbedding('${voc.title} ${voc.content}');
       final answerEmb = VectorUtils.simpleTextEmbedding(selected.content);
 
       final vocScore = VectorUtils.cosineSimilarity(queryEmb, vocEmb);
@@ -756,9 +752,10 @@ class AiViewModel extends ChangeNotifier {
     String query, {
     List<String> preferredVocIds = const [],
   }) async {
+    final expandedQuery = SearchQueryExpander.expand(query);
     final knowledgeReferences = await _vectorSearch.searchSimilar(query, topK: 20);
     final vocReferences = await _searchRegisteredVocReferences(
-      query,
+      expandedQuery,
       topK: 20,
       preferredVocIds: preferredVocIds,
     );
@@ -773,7 +770,7 @@ class AiViewModel extends ChangeNotifier {
     }
 
     final reranked = await _aiService.rerankSimilarCases(
-      query: query,
+      query: expandedQuery,
       candidates: merged.values.toList(),
     );
     final prioritized = _prioritizeVocReferences(reranked);
@@ -785,7 +782,9 @@ class AiViewModel extends ChangeNotifier {
     int topK = 20,
     List<String> preferredVocIds = const [],
   }) async {
-    final queryEmbedding = VectorUtils.simpleTextEmbedding(query);
+    final queryEmbedding = VectorUtils.simpleTextEmbedding(
+      SearchQueryExpander.expand(query),
+    );
     final vocs = await _vocRepository.getAllVocs();
     final results = <SimilarVocResult>[];
 
@@ -801,8 +800,10 @@ class AiViewModel extends ChangeNotifier {
         voc.priority,
         voc.status,
       ].where((value) => value.trim().isNotEmpty).join(' ');
-      final vocEmbedding = voc.embedding ?? VectorUtils.simpleTextEmbedding(corpus);
-      final semanticScore = VectorUtils.cosineSimilarity(queryEmbedding, vocEmbedding);
+      final vocEmbedding =
+          voc.embedding ?? VectorUtils.simpleTextEmbedding(corpus);
+      final semanticScore =
+          VectorUtils.cosineSimilarity(queryEmbedding, vocEmbedding);
       final lexicalScore = _keywordOverlapRatio(
         query.toLowerCase(),
         corpus.toLowerCase(),

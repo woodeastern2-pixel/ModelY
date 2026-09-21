@@ -1,9 +1,9 @@
 #define MyAppName "AI VOC Assistant"
 #ifndef MyAppVersion
-  #define MyAppVersion "1.1.2"
+  #define MyAppVersion "1.1.3"
 #endif
 #ifndef MyAppBuild
-  #define MyAppBuild "4"
+  #define MyAppBuild "5"
 #endif
 #define MyAppPublisher "Easternwood"
 #define MyAppExeName "ai_voc_assistant.exe"
