@@ -27,27 +27,24 @@ jobs:
       - name: Build Windows release
         run: flutter build windows --release
 
-      - name: Package Windows artifacts
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
+      - name: Build Windows installer
         shell: pwsh
         run: |
-          $releaseDir = "build/windows/x64/runner/Release"
           $outDir = "release_artifacts/windows"
           New-Item -ItemType Directory -Force -Path $outDir | Out-Null
-
-          $zipName = "ai_voc_assistant-latest-windows-x64-release.zip"
-          $zipPath = Join-Path $outDir $zipName
-          if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
-
-          Compress-Archive -Path "$releaseDir/*" -DestinationPath $zipPath -CompressionLevel Optimal
-
-          $hashPath = Join-Path $outDir "$zipName.sha256"
-          $hash = (Get-FileHash $zipPath -Algorithm SHA256).Hash.ToLower()
-          "$hash  $zipName" | Set-Content $hashPath
+          iscc "windows\installer\AI-VOC-Assistant.iss"
+          $setupPath = Join-Path $outDir "AI-VOC-Assistant-Setup.exe"
+          $hash = (Get-FileHash $setupPath -Algorithm SHA256).Hash.ToLower()
+          "$hash  AI-VOC-Assistant-Setup.exe" | Set-Content (Join-Path $outDir "AI-VOC-Assistant-Setup.exe.sha256")
 
       - name: Archive Windows artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ai_voc_assistant-latest-windows-x64-release
+          name: AI-VOC-Assistant-Windows-Installer
           path: |
-            release_artifacts/windows/ai_voc_assistant-latest-windows-x64-release.zip
-            release_artifacts/windows/ai_voc_assistant-latest-windows-x64-release.zip.sha256
+            release_artifacts/windows/AI-VOC-Assistant-Setup.exe
+            release_artifacts/windows/AI-VOC-Assistant-Setup.exe.sha256

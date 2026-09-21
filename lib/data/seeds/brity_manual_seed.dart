@@ -1,3 +1,5 @@
+import 'brity_manual_full_seed.dart';
+
 class BrityManualSeed {
   BrityManualSeed._();
 
@@ -7,7 +9,7 @@ class BrityManualSeed {
       'https://manual.brityworks.com/user/ko/index.html';
   static const String project = 'Brity Mail';
 
-  static const List<Map<String, String>> entries = [
+  static const List<Map<String, String>> curatedEntries = [
     {
       'id': 'brity-manual-001',
       'question': 'Brity Mail에서 새 메일을 작성하려면 어떻게 하나요?',
@@ -88,5 +90,10 @@ class BrityManualSeed {
       'question': '받은 메일을 바탕으로 Copilot 답장을 만들 수 있나요?',
       'answer': '받은 메일함에서 대상 메일을 열어 답장, 전체 답장 또는 전달을 선택한 뒤 통합 작성창의 답장쓰기를 클릭합니다. 요청 내용을 입력하면 수신 메일을 기반으로 답장이 작성되며, 답변 언어와 길이·스타일을 조정한 후 본문에 추가할 수 있습니다. (14.4 메일 답장 쓰기)',
     },
+  ];
+
+  static const List<Map<String, String>> entries = [
+    ...curatedEntries,
+    ...BrityManualFullSeed.entries,
   ];
 }

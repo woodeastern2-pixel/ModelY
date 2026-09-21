@@ -399,7 +399,7 @@ class DatabaseHelper {
       ''');
     }
 
-    if (oldVersion < 6) {
+    if (oldVersion < 7) {
       await _insertBrityManualData(db);
     }
   }

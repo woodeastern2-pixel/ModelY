@@ -10,7 +10,7 @@ class AppConstants {
 
   // DB
   static const String dbName = 'voc_assistant.db';
-  static const int dbVersion = 6;
+  static const int dbVersion = 7;
 
   // Tables
   static const String tableVocs = 'vocs';

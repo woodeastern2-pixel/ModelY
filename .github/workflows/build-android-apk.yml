@@ -28,10 +28,12 @@ jobs:
         run: flutter pub get
 
       - name: Build release APK
-        run: flutter build apk --release
+        run: |
+          flutter build apk --release
+          cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/AI-VOC-Assistant.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ai-voc-assistant-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          name: AI-VOC-Assistant-Android
+          path: build/app/outputs/flutter-apk/AI-VOC-Assistant.apk
