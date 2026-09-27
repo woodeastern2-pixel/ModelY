@@ -11,6 +11,7 @@ import '../../domain/entities/knowledge_base_entity.dart';
 import '../../domain/repositories/knowledge_base_repository.dart';
 import '../../domain/repositories/voc_repository.dart';
 import '../../data/services/ai_service.dart';
+import '../../data/services/local_answer_service.dart';
 import '../../data/services/vector_search_service.dart';
 import 'settings_viewmodel.dart';
 
@@ -38,6 +39,7 @@ class AiViewModel extends ChangeNotifier {
 
   late final AiService _aiService;
   late final VectorSearchService _vectorSearch;
+  final LocalAnswerService _localAnswers = LocalAnswerService();
 
   bool _isAnalyzing = false;
   bool _isGenerating = false;
@@ -229,70 +231,11 @@ class AiViewModel extends ChangeNotifier {
     _isSearching = true;
     _error = null;
     notifyListeners();
-
     try {
-      final expandedQuery = SearchQueryExpander.expand(query);
-      final kbSimilar = await _vectorSearch.searchSimilar(query, topK: null);
-      final vocResponseSimilar =
-          await _searchSimilarFromVocResponses(expandedQuery);
-
-      final merged = <String, SimilarVocResult>{};
-      for (final item in [...kbSimilar, ...vocResponseSimilar]) {
-        final key = item.knowledgeBase.id;
-        final prev = merged[key];
-        if (prev == null || item.similarityScore > prev.similarityScore) {
-          merged[key] = item;
-        }
-      }
-
-      final mergedList = merged.values.toList()
-        ..sort((a, b) => b.similarityScore.compareTo(a.similarityScore));
-
-      final hasManualReference = mergedList.any((item) {
-        if (!_isManualEntry(item)) return false;
-        final kb = item.knowledgeBase;
-        final corpus = '${kb.question} ${kb.answer}'.toLowerCase();
-        return _keywordOverlapRatio(query, corpus) >= 0.2 ||
-            item.similarityScore >= AppConstants.similarityThreshold;
-      });
-
-      List<SimilarVocResult> candidates = mergedList.toList();
-
-      // 매뉴얼 적중이 없으면 기존 VOC 이력을 강제 폴백 후보로 추가한다.
-      if (!hasManualReference) {
-        final vocFallback = await _searchSimilarFromVocResponses(
-          expandedQuery,
-          minSimilarity: 0.0,
-          topK: null,
-          includeLowSimilarityFallback: true,
-        );
-
-        final fallbackMerged = <String, SimilarVocResult>{
-          for (final item in candidates) item.knowledgeBase.id: item,
-        };
-        for (final item in vocFallback) {
-          final prev = fallbackMerged[item.knowledgeBase.id];
-          if (prev == null || item.similarityScore > prev.similarityScore) {
-            fallbackMerged[item.knowledgeBase.id] = item;
-          }
-        }
-        candidates = fallbackMerged.values.toList();
-        candidates.sort((a, b) => b.similarityScore.compareTo(a.similarityScore));
-      }
-
-      final reranked = await _aiService.rerankSimilarCases(
-        query: expandedQuery,
-        candidates: candidates,
-      );
-
-      final prioritized = hasManualReference
-          ? _prioritizeManualReferences(query, reranked)
-          : _prioritizeVocReferences(reranked);
-
-      _similarVocs = prioritized;
+      _similarVocs = await _localReferences(query);
       return _similarVocs;
     } catch (e) {
-      _error = '유사 VOC 검색 실패: $e';
+      _error = '자료 검색 실패: $e';
       _similarVocs = [];
       return [];
     } finally {
@@ -461,21 +404,24 @@ class AiViewModel extends ChangeNotifier {
 
   /// 3단계: AI 답변 생성 (RAG)
   Future<AiAnswerResult?> generateAnswer(String title, String content) async {
-    if (!_ensureAiConfigured()) {
-      return null;
-    }
     _isGenerating = true;
     _error = null;
     _answerResult = null;
     notifyListeners();
 
     try {
-      // 유사 VOC 검색 (없으면 다시 검색)
-      if (_similarVocs.isEmpty) {
-        await searchSimilarVocs('$title $content');
-      }
-      final answerCases = _similarVocs;
-      _answerResult = await _aiService.generateAnswer(title, content, answerCases);
+      await searchSimilarVocs('$title $content');
+      final answerCases = _similarVocs
+          .where((item) => !item.knowledgeBase.id.startsWith('registered-voc-'))
+          .toList();
+      _answerResult = AiAnswerResult(
+        answer: _localAnswers.answer(answerCases),
+        confidence: answerCases.isEmpty ? 0 : answerCases.first.similarityScore,
+        referencedCases: answerCases.isEmpty
+            ? const []
+            : [answerCases.first.knowledgeBase.question],
+        notes: '저장된 자료의 원문을 표시했습니다. 적용 전에 담당자가 확인해 주세요.',
+      );
       return _answerResult;
     } catch (e) {
       _error = '답변 생성 실패: $e';
@@ -526,8 +472,6 @@ class AiViewModel extends ChangeNotifier {
       createdAt: now,
     );
     final saved = await _kbRepository.createEntry(entry);
-    // 백그라운드로 임베딩 인덱싱
-    _vectorSearch.indexEntry(saved);
     return saved;
   }
 
@@ -613,9 +557,6 @@ class AiViewModel extends ChangeNotifier {
   }
 
   Future<AiChatMessageEntity?> sendChatMessage(String content) async {
-    if (!_ensureAiConfigured(forChat: true)) {
-      return null;
-    }
     final sessionId = _activeChatSessionId;
     if (sessionId == null) {
       _chatError = '채팅 세션이 초기화되지 않았습니다.';
@@ -652,11 +593,7 @@ class AiViewModel extends ChangeNotifier {
         preferredVocIds:
             _isContextFollowUp(trimmed) ? previousReferenceIds : const [],
       );
-      final reply = await _aiService.generateChatReply(
-        message: trimmed,
-        history: _chatMessages.take(_chatMessages.length - 1).toList(),
-        references: references,
-      );
+      final reply = _localAnswers.answer(references);
 
       final assistantMessage = await _insertChatMessage(
         sessionId: sessionId,
@@ -751,30 +688,49 @@ class AiViewModel extends ChangeNotifier {
   Future<List<SimilarVocResult>> resolveChatReferences(
     String query, {
     List<String> preferredVocIds = const [],
-  }) async {
-    final expandedQuery = SearchQueryExpander.expand(query);
-    final knowledgeReferences = await _vectorSearch.searchSimilar(query, topK: 20);
-    final vocReferences = await _searchRegisteredVocReferences(
-      expandedQuery,
-      topK: 20,
-      preferredVocIds: preferredVocIds,
-    );
+  }) => _localReferences(query, preferredVocIds: preferredVocIds);
 
-    final merged = <String, SimilarVocResult>{};
-    for (final item in [...knowledgeReferences, ...vocReferences]) {
-      final key = item.knowledgeBase.id;
-      final previous = merged[key];
-      if (previous == null || item.similarityScore > previous.similarityScore) {
-        merged[key] = item;
+  Future<List<SimilarVocResult>> _localReferences(
+    String query, {
+    List<String> preferredVocIds = const [],
+  }) async {
+    final entries = <KnowledgeBaseEntity>[
+      ...await _kbRepository.getAllEntries(),
+    ];
+    for (final voc in await _vocRepository.getAllVocs()) {
+      final approved = (await _vocRepository.getResponsesByVocId(voc.id))
+          .where((response) => response.isApproved)
+          .toList()
+        ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      if (approved.isNotEmpty) {
+        final response = approved.first;
+        entries.add(KnowledgeBaseEntity(
+          id: 'approved-voc-${voc.id}-${response.id}',
+          question: '${voc.title} ${voc.content}',
+          answer: response.content,
+          category: voc.category,
+          customer: voc.customer,
+          project: voc.project,
+          vocId: voc.id,
+          resolvedAt: response.updatedAt,
+          createdAt: response.createdAt,
+        ));
+      } else {
+        entries.add(KnowledgeBaseEntity(
+          id: 'registered-voc-${voc.id}',
+          question: '${voc.title} ${voc.content}',
+          answer: '등록된 VOC 상태: ${voc.status}\n내용: ${voc.content}',
+          category: voc.category,
+          customer: voc.customer,
+          project: voc.project,
+          vocId: voc.id,
+          resolvedAt: voc.updatedAt,
+          createdAt: voc.createdAt,
+        ));
       }
     }
-
-    final reranked = await _aiService.rerankSimilarCases(
-      query: expandedQuery,
-      candidates: merged.values.toList(),
-    );
-    final prioritized = _prioritizeVocReferences(reranked);
-    return prioritized.take(5).toList();
+    return _localAnswers.rank(query, entries,
+        preferredVocIds: preferredVocIds);
   }
 
   Future<List<SimilarVocResult>> _searchRegisteredVocReferences(
