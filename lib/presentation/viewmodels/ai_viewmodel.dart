@@ -414,10 +414,13 @@ class AiViewModel extends ChangeNotifier {
       final answerCases = _similarVocs
           .where((item) => !item.knowledgeBase.id.startsWith('registered-voc-'))
           .toList();
+      final needsWholeDataset = _localAnswers.needsWholeDataset('$title $content');
       _answerResult = AiAnswerResult(
-        answer: _localAnswers.answer(answerCases),
-        confidence: answerCases.isEmpty ? 0 : answerCases.first.similarityScore,
-        referencedCases: answerCases.isEmpty
+        answer: _localAnswers.answerForQuery('$title $content', answerCases),
+        confidence: answerCases.isEmpty || needsWholeDataset
+            ? 0
+            : answerCases.first.similarityScore,
+        referencedCases: answerCases.isEmpty || needsWholeDataset
             ? const []
             : [answerCases.first.knowledgeBase.question],
         notes: '저장된 자료의 원문을 표시했습니다. 적용 전에 담당자가 확인해 주세요.',
@@ -593,15 +596,18 @@ class AiViewModel extends ChangeNotifier {
         preferredVocIds:
             _isContextFollowUp(trimmed) ? previousReferenceIds : const [],
       );
-      final reply = _localAnswers.answer(references);
+      final reply = _localAnswers.answerForQuery(trimmed, references);
+      final citedReferences = _localAnswers.needsWholeDataset(trimmed)
+          ? <SimilarVocResult>[]
+          : references;
 
       final assistantMessage = await _insertChatMessage(
         sessionId: sessionId,
         role: 'assistant',
         content: reply,
         category: 'general',
-        referencedVocIds: references.map((item) => item.knowledgeBase.vocId).whereType<String>().toList(),
-        confidence: references.isEmpty ? null : references.first.similarityScore,
+        referencedVocIds: citedReferences.map((item) => item.knowledgeBase.vocId).whereType<String>().toList(),
+        confidence: citedReferences.isEmpty ? null : citedReferences.first.similarityScore,
       );
       _chatMessages = [..._chatMessages, assistantMessage];
       notifyListeners();
