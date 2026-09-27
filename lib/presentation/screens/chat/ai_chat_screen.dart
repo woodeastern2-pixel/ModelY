@@ -132,7 +132,7 @@ class _AiChatListScreenState extends State<_AiChatListScreen> {
     return Scaffold(
       backgroundColor: context.visualColors.canvas,
       appBar: AppBar(
-        title: const Text('AI 코파일럿'),
+        title: const Text('내부 자료 도우미'),
         actions: [
           IconButton(
             onPressed: _loadSessions,
@@ -714,7 +714,7 @@ class _AiChatConversationScreenState extends State<_AiChatConversationScreen> {
                                             ),
                                       isUser
                                           ? '질문을 복사했습니다.'
-                                          : 'AI 답변을 복사했습니다.',
+                                          : '자료 기반 답변을 복사했습니다.',
                                     ),
                                   ),
                                 ),
@@ -846,7 +846,7 @@ class _ConversationMessage extends StatelessWidget {
               ),
               const Spacer(),
               IconButton(
-                tooltip: isUser ? '질문 복사' : 'AI 답변 복사',
+                tooltip: isUser ? '질문 복사' : '자료 기반 답변 복사',
                 onPressed: onCopy,
                 icon: const Icon(Icons.content_copy_outlined, size: 16),
                 visualDensity: VisualDensity.compact,
