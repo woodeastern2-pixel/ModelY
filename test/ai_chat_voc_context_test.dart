@@ -1,6 +1,7 @@
 import 'package:ai_voc_assistant/data/services/ai_service.dart';
 import 'package:ai_voc_assistant/domain/entities/knowledge_base_entity.dart';
 import 'package:ai_voc_assistant/domain/entities/voc_entity.dart';
+import 'package:ai_voc_assistant/domain/entities/response_entity.dart';
 import 'package:ai_voc_assistant/domain/repositories/knowledge_base_repository.dart';
 import 'package:ai_voc_assistant/domain/repositories/settings_repository.dart';
 import 'package:ai_voc_assistant/domain/repositories/voc_repository.dart';
@@ -80,6 +81,9 @@ class _VocRepository implements VocRepository {
 
   @override
   Future<List<VocEntity>> getAllVocs() async => vocs;
+
+  @override
+  Future<List<ResponseEntity>> getResponsesByVocId(String vocId) async => const [];
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
