@@ -41,4 +41,11 @@ void main() {
     expect(answer, contains('설정에서 알림을 선택합니다.'));
     expect(answer, isNot(contains('회의 목록에서 참가')));
   });
+
+  test('a partial match is not presented as an overall report', () {
+    final service = LocalAnswerService();
+    final results = service.rank('미팅 접속 방법', [meeting]);
+    expect(service.answerForQuery('전체 VOC 보고서', results), contains('집계가 필요합니다'));
+    expect(service.answerForQuery('전체 VOC 보고서', results), isNot(contains('회의 목록에서 참가')));
+  });
 }
