@@ -56,6 +56,21 @@ class LocalAnswerService {
     return '${item.answer.trim()}\n\n근거: $source · ${item.question}';
   }
 
+  bool needsWholeDataset(String query) {
+    final normalized = SearchQueryExpander.normalize(query);
+    return const [
+      '전체', '몇 건', '몇개', '몇 개', '가장 많', '우선순위',
+      '반복 문의', '보고서', '현황 요약',
+    ].any(normalized.contains);
+  }
+
+  String answerForQuery(String query, List<SimilarVocResult> references) {
+    if (needsWholeDataset(query)) {
+      return '이 질문은 전체 자료의 집계가 필요합니다. 현재 자료 검색 결과만으로는 정확한 수치나 순위를 판단할 수 없습니다. VOC 목록에서 확인해 주세요.\n근거: 없음';
+    }
+    return answer(references);
+  }
+
   List<String> _terms(String query) {
     const stop = {
       '어떻게', '알려줘', '알려주세요', '해주세요', '해줘', '무엇', '뭐야',
