@@ -155,9 +155,10 @@ void main() {
 
   test('figure captions do not become numbered instructions', () {
     final answer = OfflineAnswerComposer().compose('설문 지정 방법', [
-      const OfflineAnswerFragment('Click\n①지정함Click\n을클릭하여대상자를지정합니다.\n참여자 지정을 클릭합니다.', 'manual')]);
+      const OfflineAnswerFragment('Click\n①지정함Click\n을클릭하여대상자를지정합니다.\n2. 을클릭하여조직도에서지정합니다.\n참여자 지정을 클릭합니다.', 'manual')]);
     expect(answer, isNot(contains('1. Click')));
     expect(answer, isNot(contains('①지정함Click')));
+    expect(answer, isNot(contains('을클릭하여')));
     expect(answer, contains('1. 참여자 지정을 클릭합니다.'));
   });
 

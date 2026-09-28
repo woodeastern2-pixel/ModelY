@@ -42,6 +42,7 @@ class OfflineAnswerComposer {
         for (var sentence in line.split(RegExp(r'(?<=[.!?])\s+(?=[^0-9])'))) {
           sentence = sentence.replaceFirst(RegExp(r'^\s*(?:[-•]|\d+[.)])\s+'), '').trim();
           if (sentence.isEmpty || sentence == 'N/A' || sentence.endsWith('?')) continue;
+          if (RegExp(r'^[을를]\s*클릭').hasMatch(sentence)) continue;
           final identity = sentence.replaceAll(RegExp(r'\s+'), '');
           if (!seen.add(identity)) continue;
           if (_restriction.hasMatch(sentence)) {
