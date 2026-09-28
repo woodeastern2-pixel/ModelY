@@ -68,6 +68,7 @@ class AiViewModel extends ChangeNotifier {
   VocIntelligenceResult? _intelligenceResult;
   List<SimilarVocResult> _similarVocs = [];
   AiAnswerResult? _answerResult;
+  String _answerQuery = '';
   bool _hasPartialAnswer = false;
   bool get hasPartialAnswer => _hasPartialAnswer;
   String? _urgencyReason;
@@ -93,7 +94,7 @@ class AiViewModel extends ChangeNotifier {
   VocAnalysisResult? get analysisResult => _analysisResult;
   VocIntelligenceResult? get intelligenceResult => _intelligenceResult;
   List<SimilarVocResult> get similarVocs => _similarVocs;
-  List<SimilarVocResult> get answerEvidence => _localAnswers.answerReferences(_similarVocs);
+  List<SimilarVocResult> get answerEvidence => _localAnswers.answerReferences(_similarVocs, query: _answerQuery);
   AiAnswerResult? get answerResult => _answerResult;
   bool get hasAnswer => _answerResult != null;
   String? get urgencyReason => _urgencyReason;
@@ -450,6 +451,7 @@ class AiViewModel extends ChangeNotifier {
 
     try {
       final query = '$title $content';
+      _answerQuery = query;
       await searchSimilarVocs(query, excludeVocId: excludeVocId);
       if (_error != null) return null;
       if (!_localAnswers.canAnswer(query, _similarVocs)) {
@@ -461,11 +463,11 @@ class AiViewModel extends ChangeNotifier {
         return null;
       }
       _hasPartialAnswer = _localAnswers.evidenceGap(
-          query, _localAnswers.answerReferences(_similarVocs)).isNotEmpty;
+          query, _localAnswers.answerReferences(_similarVocs, query: query)).isNotEmpty;
       _answerResult = AiAnswerResult(
         answer: _localAnswers.answerForQuery(query, _similarVocs),
         confidence: _similarVocs.first.similarityScore,
-        referencedCases: _localAnswers.answerReferences(_similarVocs)
+        referencedCases: _localAnswers.answerReferences(_similarVocs, query: query)
             .map((r) => r.knowledgeBase.question).toList(),
         notes: 'AI 연결 없이 매뉴얼과 승인된 답변에서 안내를 구성했습니다. 검색 점수는 정답 확률이 아닙니다. 출처의 제품·버전과 제한 조건을 확인해 주세요.',
       );

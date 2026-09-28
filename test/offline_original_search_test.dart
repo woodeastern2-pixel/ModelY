@@ -89,6 +89,29 @@ void main() {
         'queries': store.index.lastQueries, 'candidates': store.index.lastTotalCandidates,
         'answer': answer});
     }
+    final qualityQueries = {
+      '설문 대상자 1000명 지정 방법': '1000명 조건',
+      '메신저 8.5.5 알림 설정 방법': '버전 8.5.5',
+      '드라이브 파일 복원 방법 그리고 보관 기간': '보관',
+      '드라이브 영구 삭제 파일 복원 방법': '영구',
+    };
+    for (final item in qualityQueries.entries) {
+      final clock = Stopwatch()..start();
+      final refs = await store.search(item.key);
+      final answer = answerer.answerForQuery(item.key, refs);
+      clock.stop();
+      expect(answerer.canAnswer(item.key, refs), isTrue, reason: item.key);
+      expect(answer, contains(item.value), reason: item.key);
+      if (item.key.contains('영구')) {
+        expect(answer, matches(RegExp(r'확인되지|불가|없|않')));
+      }
+      expect(clock.elapsedMilliseconds, lessThan(5000));
+      expect(store.index.lastTotalCandidates, lessThanOrEqualTo(512));
+      timings.add({'stage': 'quality-conditions', 'query': item.key,
+        'milliseconds': clock.elapsedMicroseconds / 1000,
+        'queries': store.index.lastQueries, 'candidates': store.index.lastTotalCandidates,
+        'answer': answer});
+    }
     store=OfflineSearchStore(db);
     await store.initialize(maintenance:false);
     await check('first-after-reload');

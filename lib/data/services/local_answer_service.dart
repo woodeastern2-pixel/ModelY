@@ -9,6 +9,7 @@ import '../../domain/entities/knowledge_base_entity.dart';
 /// Offline, query-dependent retrieval over every stored manual body.
 /// Scores express evidence coverage, not a probability of correctness.
 class LocalAnswerService {
+  final _versionQueries = <String, List<String>>{};
   static const noEvidence =
       '현재 등록된 자료에서 이 질문에 직접 답할 근거를 찾지 못했습니다. 담당자에게 확인해 주세요.';
 
@@ -81,11 +82,18 @@ class LocalAnswerService {
     final plan = OfflineQueryPlan.from(query);
     final scope = _queryScope(query);
     final prefix = scope.isEmpty ? '' : '${scope.join(' ')} ';
-    final terms = _terms(plan.focus).where((t) => !{
+    final retrievalFocus = plan.focus.replaceAll(OfflineQueryPlan.versionPattern, ' ')
+        .replaceAll(OfflineQueryPlan.quantityPattern, ' ')
+        .replaceAll(OfflineQueryPlan.conditionPattern, ' ');
+    final terms = _terms(retrievalFocus).where((t) => !{
       '메뉴', '위치', '경로', '버튼', '패널', '제가', '혹시', '어디',
       '못', '찾는', '듯', '알', '수', '있을까', '있을까요',
     }.contains(t)).toList();
     final focused = '$prefix${plan.focus}'.trim();
+    if (plan.parts.length > 1) {
+      return <String>{query, for (final part in plan.parts)
+        '$prefix${_terms(part).join(' ')}'.trim()}.take(4).toList();
+    }
     final queries = <String>{query, focused};
     if (terms.isNotEmpty) {
       final core = '$prefix${terms.join(' ')}'.trim();
@@ -101,11 +109,15 @@ class LocalAnswerService {
 
   List<String> _queryScope(String query) {
     final terms = _terms(query);
-    final products = terms.where(_products.contains).toList();
+    final currentTerms = _terms(OfflineQueryPlan.from(query).request);
+    var products = currentTerms.where(_products.contains).toList();
+    if (products.isEmpty) products = terms.where(_products.contains).toList();
     if (products.isEmpty && terms.contains('presenter') && terms.contains('participant')) {
       products.add('meeting');
     }
-    return [...products, ...terms.where((t) => t == 'mobile' || t == 'desktop')];
+    var platforms = currentTerms.where((t) => t == 'mobile' || t == 'desktop').toList();
+    if (platforms.isEmpty) platforms = terms.where((t) => t == 'mobile' || t == 'desktop').toList();
+    return [...products, ...platforms];
   }
 
   List<String> _navigationTargets(String query) => _terms(
@@ -116,6 +128,7 @@ class LocalAnswerService {
 
   bool focusedEvidence(String query, KnowledgeBaseEntity entry) {
     final plan = OfflineQueryPlan.from(query);
+    if (!versionCompatible(query, entry)) return false;
     final scope = _normalize('${entry.project ?? ''} ${entry.question}');
     for (final group in [_products, {'desktop', 'mobile'}]) {
       final requested = _queryScope(query).where(group.contains).toSet();
@@ -123,7 +136,7 @@ class LocalAnswerService {
       if (requested.length == 1 && known.isNotEmpty &&
           !requested.any(known.contains)) return false;
     }
-    if (!plan.navigation) return true;
+    if (!plan.navigation || plan.parts.length > 1) return true;
     final targets = _navigationTargets(query);
     if (targets.isEmpty) return false;
     final parsed = ManualContent.parse(entry.answer);
@@ -133,25 +146,99 @@ class LocalAnswerService {
             caseSensitive: false).hasMatch(body);
   }
 
+  List<String> _requestedVersions(String query) {
+    if (_versionQueries.length > 16) _versionQueries.clear();
+    return _versionQueries.putIfAbsent(query, () {
+      final current = OfflineQueryPlan.versions(OfflineQueryPlan.from(query).request);
+      return current.isNotEmpty ? current : OfflineQueryPlan.versions(query);
+    });
+  }
+
+  bool versionCompatible(String query, KnowledgeBaseEntity entry) {
+    final requested = _requestedVersions(query);
+    if (requested.isEmpty) return true;
+    final known = OfflineQueryPlan.versions('${entry.customer ?? ''} ${entry.question}');
+    return known.isEmpty || requested.any(known.contains);
+  }
+
   bool hasNavigationLocation(String query, KnowledgeBaseEntity entry) {
-    if (!OfflineQueryPlan.from(query).navigation) return false;
+    final plan = OfflineQueryPlan.from(query);
+    if (!plan.navigation || plan.parts.length > 1) return false;
     final targets = _navigationTargets(query);
     if (targets.isEmpty) return false;
     final parsed = ManualContent.parse(entry.answer);
-    final body = '${parsed.body}\n${parsed.transcription}';
-    final sentences = body.split(RegExp(r'[.!?\n]'));
-    return sentences.any((sentence) =>
-        targets.every((t) => _matches(_normalize(sentence), t)) &&
-        RegExp(r'상단|하단|왼쪽|오른쪽|좌측|우측|도구\s*모음|메인\s*메뉴|홈\s*화면|회의\s*화면|설정\s*[>→]|[>→]|toolbar|bottom|top|left|right',
-            caseSensitive: false).hasMatch(sentence));
+    final sentences = '${parsed.body}\n${parsed.transcription}'.split(RegExp(r'[.!?\n]'));
+    for (final sentence in sentences) {
+      if (!targets.every((t) => _matches(_normalize(sentence), t))) continue;
+      if (sentence.contains('>') || sentence.contains('→')) return true;
+      for (final alias in _concepts[targets.first] ?? [targets.first]) {
+        final target = RegExp.escape(alias);
+        final location = r'(?:상단|하단|왼쪽|오른쪽|좌측|우측|메인\s*메뉴|도구\s*모음|toolbar|bottom|top|left|right)';
+        if (RegExp('$location' r'(?:\s|의|에|있는|에서|도구|모음|the|toolbar){0,30}' '$target',
+                caseSensitive: false).hasMatch(sentence) ||
+            RegExp('$target' r'\s*(?:메뉴|버튼|패널|목록|button|panel)?\s*(?:은|는|이|가|is|in|on|at)?\s*(?:the\s+)?' '$location',
+                caseSensitive: false).hasMatch(sentence)) return true;
+      }
+    }
+    return false;
+  }
+
+  bool _partCovered(String part, List<SimilarVocResult> references) =>
+      rank(part, references.map((r) => r.knowledgeBase)).any((r) => r.similarityScore >= 0.68);
+
+  bool _sourcesDisagree(KnowledgeBaseEntity a, KnowledgeBaseEntity b) {
+    if (_normalize(a.question) != _normalize(b.question) || a.project != b.project) return false;
+    final left = ManualContent.parse(a.answer).body;
+    final right = ManualContent.parse(b.answer).body;
+    if (RegExp(r'경우|때|이면|unless|\bif\b', caseSensitive: false).hasMatch('$left $right')) return false;
+    final negative = RegExp(r'불가|불가능|할 수 없|지원하지 않|cannot|not supported', caseSensitive: false);
+    final positive = RegExp(r'가능|할 수 있|지원합니다|supported|can ', caseSensitive: false);
+    if ((negative.hasMatch(left) && !negative.hasMatch(right) && positive.hasMatch(right)) ||
+        (negative.hasMatch(right) && !negative.hasMatch(left) && positive.hasMatch(left))) return true;
+    final l = OfflineQueryPlan.quantities(left);
+    final r = OfflineQueryPlan.quantities(right);
+    return l.length == 1 && r.length == 1 && l.single != r.single &&
+        l.single.replaceAll(RegExp(r'[0-9.]'), '') == r.single.replaceAll(RegExp(r'[0-9.]'), '');
   }
 
   String evidenceGap(String query, List<SimilarVocResult> references) {
-    if (!OfflineQueryPlan.from(query).navigation || references.isEmpty) return '';
-    if (references.any((r) => hasNavigationLocation(query, r.knowledgeBase))) return '';
-    return '확인되지 않은 부분: 요청하신 메뉴의 정확한 위치와 여는 경로는 '
-        '찾은 자료에 설명되어 있지 않습니다. 아래는 관련 자료에서 확인한 내용이며, '
-        '메뉴 위치에 대한 확정 안내는 아닙니다. 사용 중인 제품·버전과 현재 화면을 확인하면 범위를 좁힐 수 있습니다.';
+    if (references.isEmpty) return '';
+    final plan = OfflineQueryPlan.from(query);
+    final gaps = <String>[];
+    if (plan.navigation && plan.parts.length == 1 &&
+        !references.any((r) => hasNavigationLocation(query, r.knowledgeBase))) {
+      gaps.add('요청하신 메뉴의 정확한 위치와 여는 경로는 찾은 자료에서 확인되지 않습니다.');
+    }
+    if (plan.parts.length > 1) {
+      for (final part in plan.parts) {
+        if (!_partCovered(part, references)) gaps.add('「$part」에 답할 근거가 부족합니다.');
+      }
+    }
+    final knownVersions = references.expand((r) => OfflineQueryPlan.versions(
+        '${r.knowledgeBase.customer ?? ''} ${r.knowledgeBase.question}')).toSet();
+    for (final version in _requestedVersions(query)) {
+      if (!knownVersions.contains(version)) gaps.add('요청하신 버전 $version 에 적용되는지는 확인되지 않았습니다.');
+    }
+    final bodies = references.map((r) => ManualContent.parse(r.knowledgeBase.answer).body).join('\n');
+    final knownQuantities = OfflineQueryPlan.quantities(bodies).toSet();
+    for (final condition in OfflineQueryPlan.conditions(plan.request)) {
+      if (!_matches(_normalize(bodies), _normalize(condition))) {
+        gaps.add('「$condition」 조건에 적용할 수 있는지는 확인되지 않았습니다.');
+      }
+    }
+    for (final quantity in OfflineQueryPlan.quantities(plan.request)) {
+      if (!knownQuantities.contains(quantity)) gaps.add('요청하신 $quantity 조건은 직접 확인되지 않습니다. 아래 원문의 수치·제한 조건을 함께 확인해 주세요.');
+    }
+    for (var i = 0; i < references.length; i++) {
+      for (var j = i + 1; j < references.length; j++) {
+        if (_sourcesDisagree(references[i].knowledgeBase, references[j].knowledgeBase)) {
+          gaps.add('동일 항목에 대해 자료마다 서로 다른 안내가 있습니다. 하나의 확정 답변으로 합치지 않고 각 출처를 구분합니다.');
+        }
+      }
+    }
+    if (gaps.isEmpty) return '';
+    return '확인되지 않은 부분: ${gaps.toSet().join(' ')} '
+        '아래는 확인된 관련 설명이며, 질문의 모든 조건을 충족한 확정 안내는 아닙니다.';
   }
 
   List<List<String>> queryIndexKeys(String query) => [
@@ -181,6 +268,7 @@ class LocalAnswerService {
     final ranked = <SimilarVocResult>[];
     for (var i = 0; i < docs.length; i++) {
       final entry = docs[i];
+      if (!versionCompatible(query, entry)) continue;
       final preferred = entry.vocId != null && preferredVocIds.contains(entry.vocId);
       final scope = _normalize('${entry.project ?? ''} ${entry.question}');
       final requestedPlatform = terms.where((t) => t == 'desktop' || t == 'mobile').toSet();
@@ -267,13 +355,28 @@ class LocalAnswerService {
 
   bool canAnswer(String query, List<SimilarVocResult> references) =>
       !needsWholeDataset(query) && references.any((item) =>
-          isAnswerSource(item.knowledgeBase) && item.similarityScore >= 0.68);
+          isAnswerSource(item.knowledgeBase) && item.similarityScore >= 0.68 &&
+          versionCompatible(query, item.knowledgeBase));
 
-  List<SimilarVocResult> answerReferences(List<SimilarVocResult> references) {
+  List<SimilarVocResult> answerReferences(List<SimilarVocResult> references, {String query = ''}) {
     final usable = references.where((r) =>
-        isAnswerSource(r.knowledgeBase) && r.similarityScore >= 0.68).toList();
+        isAnswerSource(r.knowledgeBase) && r.similarityScore >= 0.68 &&
+        versionCompatible(query, r.knowledgeBase)).toList();
     if (usable.isEmpty) return [];
+    final plan = OfflineQueryPlan.from(query);
+    if (plan.parts.length > 1) {
+      final selected = <String, SimilarVocResult>{};
+      for (final part in plan.parts.take(3)) {
+        final matches = rank(part, usable.map((r) => r.knowledgeBase));
+        if (matches.isNotEmpty && matches.first.similarityScore >= 0.68) {
+          selected[matches.first.knowledgeBase.id] = matches.first;
+        }
+      }
+      if (selected.isNotEmpty) return selected.values.toList();
+    }
     final best = usable.first;
+    final conflicting = usable.where((r) => _sourcesDisagree(best.knowledgeBase, r.knowledgeBase)).toList();
+    if (conflicting.isNotEmpty) return [best, conflicting.first];
     // Keep different sources separate: never splice incompatible procedures.
     final source = best.knowledgeBase.customer;
     if (source == null || source.isEmpty) return [best];
@@ -291,7 +394,7 @@ class LocalAnswerService {
     if (needsWholeDataset(query)) {
       return '이 질문은 전체 자료의 집계가 필요합니다. 현재 자료 검색 결과만으로는 정확한 수치나 순위를 판단할 수 없습니다. VOC 목록에서 확인해 주세요.\n근거: 없음';
     }
-    final selected = answerReferences(references);
+    final selected = answerReferences(references, query: query);
     if (selected.isEmpty) return '$noEvidence\n근거: 없음';
     final fragments = selected.map((reference) {
       final item = reference.knowledgeBase;

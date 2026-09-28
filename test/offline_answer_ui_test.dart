@@ -78,6 +78,25 @@ void main() {
       expect(find.textContaining('찾지 못했습니다'), findsNothing);
       expect(tester.takeException(), isNull);
       await _capture(tester, key, 'attendee-navigation-${dark ? "dark" : "light"}');
+      await tester.pumpWidget(ChangeNotifierProvider.value(value: vm,
+        child: MaterialApp(theme: dark ? AppTheme.darkTheme : AppTheme.lightTheme,
+          home: RepaintBoundary(key: key, child: const AiAnswerScreen(
+            key: ValueKey('quantity-condition'), vocId: 'quantity-check',
+            vocTitle: '설문 대상자 지정', vocContent: '설문 대상자 1000명 지정 방법',
+            category: '기타', customer: '', project: '')))));
+      for (var attempt = 0; attempt < 100; attempt++) {
+        await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 40)));
+        await tester.pump();
+        if (!vm.isGenerating && (vm.hasAnswer || vm.error != null)) break;
+      }
+      await tester.pumpAndSettle();
+      expect(vm.hasAnswer, isTrue);
+      expect(vm.hasPartialAnswer, isTrue);
+      expect(vm.answerResult!.answer, contains('1000명 조건'));
+      expect(find.text('일부 근거 · 추가 확인 필요'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await _capture(tester, key, 'quantity-condition-${dark ? "dark" : "light"}');
+
     });
     testWidgets('schedule question composes an offline answer from the complete corpus (${dark ? "dark" : "light"})', (tester) async {
       tester.view.physicalSize = const Size(1440, 1800);
