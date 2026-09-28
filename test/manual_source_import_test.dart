@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:ai_voc_assistant/data/services/manual_media_store.dart';
 import 'package:archive/archive.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ai_voc_assistant/data/services/manual_document_import_service.dart';
@@ -7,6 +9,32 @@ import 'package:ai_voc_assistant/domain/entities/knowledge_base_entity.dart';
 import 'package:ai_voc_assistant/domain/repositories/knowledge_base_repository.dart';
 
 void main() {
+  test('Word embedded image stays linked after source file removal', () async {
+    final dir = await Directory.systemTemp.createTemp('manual-media-');
+    addTearDown(() => dir.delete(recursive: true));
+    const xml = '<w:document xmlns:w="urn:w" xmlns:a="urn:a" xmlns:r="urn:r"><w:body>'
+        '<w:p><w:r><w:t>발신 취소하기</w:t><a:blip r:embed="rId7"/></w:r></w:p>'
+        '</w:body></w:document>';
+    const rels = '<Relationships><Relationship Id="rId7" Target="media/image.png"/></Relationships>';
+    final bytes = Uint8List.fromList(base64Decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aEfoAAAAASUVORK5CYII='));
+    final zip = Archive()
+      ..addFile(ArchiveFile('word/document.xml', utf8.encode(xml).length, utf8.encode(xml)))
+      ..addFile(ArchiveFile('word/_rels/document.xml.rels', utf8.encode(rels).length, utf8.encode(rels)))
+      ..addFile(ArchiveFile('word/media/image.png', bytes.length, bytes));
+    final file = File('${dir.path}/image.docx');
+    await file.writeAsBytes(ZipEncoder().encode(zip)!);
+    final repo = _MemoryRepository();
+    final media = ManualMediaStore(directory: Directory('${dir.path}/saved'));
+    final service = ManualDocumentImportService(repo, mediaStore: media);
+    final result = await service.importDocuments([file.path]);
+    expect(result.processedFiles, 1);
+    final entry = repo.entries.values.single;
+    expect(entry.answer, '발신 취소하기');
+    final attached = await media.imagesFor(entry.id);
+    expect(attached.length, 1);
+    await file.delete();
+    expect(await media.imageBytes(attached.single['id'] as String), bytes);
+  });
   test('raw paragraphs, numbered steps and table cells survive offline import and AI failure', () async {
     final dir = await Directory.systemTemp.createTemp('manual-source-');
     addTearDown(() => dir.delete(recursive: true));

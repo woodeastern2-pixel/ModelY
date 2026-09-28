@@ -78,6 +78,7 @@ jobs:
           name: ai-voc-ui-previews
           path: |
             test/goldens/*.png
+            test/goldens/manual-image-audit.json
             test/failures/*.png
           if-no-files-found: error
 
@@ -149,4 +150,5 @@ jobs:
           name: ai-voc-assistant-windows-x64
           path: build/ai-voc-assistant-windows-x64.zip
           if-no-files-found: error
+
 

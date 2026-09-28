@@ -56,7 +56,7 @@ void main() {
       final raw = tester.widgetList<RawImage>(find.byType(RawImage));
       if (raw.isNotEmpty && raw.first.image != null) break;
     }
-    expect(tester.widget<RawImage>(find.byType(RawImage)).image, isNotNull);
+    expect(tester.widgetList<RawImage>(find.byType(RawImage)).every((raw) => raw.image != null), isTrue);
     await tester.pump();
     await tester.runAsync(() async {
       final image = await (boundary.currentContext!.findRenderObject() as RenderRepaintBoundary).toImage();
@@ -66,9 +66,10 @@ void main() {
       await file.writeAsBytes(bytes!.buffer.asUint8List());
       image.dispose();
     });
-    expect(find.byType(Image), findsOneWidget);
+    expect(find.byType(Image), findsWidgets);
     expect(find.text('1 / 1'), findsOneWidget);
     expect(find.byType(InteractiveViewer), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
+

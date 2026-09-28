@@ -90,6 +90,7 @@ class AiViewModel extends ChangeNotifier {
   VocAnalysisResult? get analysisResult => _analysisResult;
   VocIntelligenceResult? get intelligenceResult => _intelligenceResult;
   List<SimilarVocResult> get similarVocs => _similarVocs;
+  List<SimilarVocResult> get answerEvidence => _localAnswers.answerReferences(_similarVocs);
   AiAnswerResult? get answerResult => _answerResult;
   bool get hasAnswer => _answerResult != null;
   String? get urgencyReason => _urgencyReason;

@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'manual_content.dart';
 
 import '../../core/utils/search_query_expander.dart';
 import '../../domain/entities/knowledge_base_entity.dart';
@@ -166,7 +167,10 @@ class LocalAnswerService {
     if (selected.isEmpty) return '$noEvidence\n근거: 없음';
     return selected.map((reference) {
       final item = reference.knowledgeBase;
-      final text = query.trim().isEmpty ? item.answer.trim() : _extract(query, item.answer);
+      final authored = ManualContent.parse(item.answer).body;
+      final text = authored.isEmpty
+          ? '이미지에 포함된 설명은 아래 매뉴얼 원본 이미지를 확인해 주세요.'
+          : query.trim().isEmpty ? authored : _extract(query, authored);
       final source = item.customer?.trim();
       final label = source != null && source.isNotEmpty ? source :
           (item.category == '시스템매뉴얼' ? '시스템 매뉴얼' : '승인된 답변 / 지식베이스');

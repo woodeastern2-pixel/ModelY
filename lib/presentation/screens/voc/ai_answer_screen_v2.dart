@@ -10,6 +10,8 @@ import '../../viewmodels/ai_viewmodel.dart';
 import '../../viewmodels/integration_viewmodel.dart';
 import '../../viewmodels/voc_viewmodel.dart';
 import '../../widgets/workspace_ui.dart';
+import '../../widgets/manual_content_view.dart';
+import '../../widgets/manual_image_gallery.dart';
 
 class AiAnswerScreen extends StatefulWidget {
   const AiAnswerScreen({
@@ -477,6 +479,9 @@ class _AnswerWorkspace extends StatelessWidget {
                               .bodyLarge
                               ?.copyWith(height: 1.65),
                         ),
+                        if (vm.hasAnswer)
+                          for (final reference in vm.answerEvidence)
+                            ManualImageGallery(entryId: reference.knowledgeBase.id),
                         if (vm.answerResult?.notes.trim().isNotEmpty ==
                             true) ...[
                           const SizedBox(height: 12),
@@ -543,8 +548,7 @@ class _SelectedEvidence extends StatelessWidget {
           Text(kb.question,
               style: const TextStyle(fontWeight: FontWeight.w800)),
           const SizedBox(height: 10),
-          SelectableText(UserFacingText.fromAi(kb.answer),
-              style: const TextStyle(height: 1.55)),
+          ManualContentView(content: UserFacingText.fromAi(kb.answer), entryId: kb.id),
           const SizedBox(height: 10),
           Wrap(
             spacing: 12,

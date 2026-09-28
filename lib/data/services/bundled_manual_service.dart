@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'manual_media_store.dart';
 
 import 'package:archive/archive.dart';
 import 'package:flutter/services.dart';
@@ -64,7 +65,9 @@ class BundledManualService {
   }
 
   static Future<List<Map<String, dynamic>>> imagesFor(String entryId) async {
-    if (!entryId.startsWith('manual-pack-')) return const [];
+    if (!entryId.startsWith('manual-pack-')) {
+      return const ManualMediaStore().imagesFor(entryId);
+    }
     final pack = await load();
     final entries = pack['entries'] as List;
     for (final raw in entries) {
@@ -79,6 +82,7 @@ class BundledManualService {
   }
 
   static Future<Uint8List> imageBytes(String id) async {
+    if (id.startsWith('local-')) return const ManualMediaStore().imageBytes(id);
     if (!RegExp(r'^[a-f0-9]{24}$').hasMatch(id)) {
       throw const FormatException('잘못된 매뉴얼 이미지 식별자입니다.');
     }
@@ -96,3 +100,4 @@ class BundledManualService {
     return Uint8List.fromList(file.content as List<int>);
   }
 }
+

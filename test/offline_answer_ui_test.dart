@@ -16,12 +16,53 @@ import 'package:ai_voc_assistant/presentation/viewmodels/settings_viewmodel.dart
 import 'package:ai_voc_assistant/presentation/screens/voc/ai_answer_screen_v2.dart';
 import 'package:ai_voc_assistant/presentation/screens/chat/ai_chat_screen.dart';
 import 'support/ui_harness.dart';
+import 'package:ai_voc_assistant/data/services/bundled_manual_service.dart';
 import 'package:ai_voc_assistant/presentation/viewmodels/knowledge_base_viewmodel.dart';
 import 'package:ai_voc_assistant/presentation/screens/knowledge_base/knowledge_base_screen.dart';
 
 void main() {
   setUpAll(loadUiHarnessFonts);
   for (final dark in [false, true]) {
+    testWidgets('recall answer shows original images instead of raw transcription (${dark ? "dark" : "light"})', (tester) async {
+      tester.view.physicalSize = const Size(1440, 1800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final pack = await tester.runAsync(BundledManualService.load);
+      final raw = (pack!['entries'] as List).cast<Map<String, dynamic>>().firstWhere((e) =>
+          (e['question'] as String).contains('발신 취소') && (e['images'] as List).isNotEmpty);
+      final entry = KnowledgeBaseEntity(id: raw['id'] as String,
+          question: raw['question'] as String, answer: raw['answer'] as String,
+          category: '시스템매뉴얼', customer: raw['sourceName'] as String,
+          project: raw['project'] as String,
+          resolvedAt: DateTime(2026), createdAt: DateTime(2026));
+      final settings = SettingsViewModel(_Settings());
+      final vm = AiViewModel(_RecallKnowledge(entry), _Vocs(), settings);
+      addTearDown(vm.dispose);
+      addTearDown(settings.dispose);
+      final key = GlobalKey();
+      await tester.pumpWidget(ChangeNotifierProvider.value(value: vm,
+        child: MaterialApp(theme: dark ? AppTheme.darkTheme : AppTheme.lightTheme,
+          home: RepaintBoundary(key: key, child: const AiAnswerScreen(
+            vocId: 'recall-check', vocTitle: '메일 발신 취소 방법', vocContent: '',
+            category: '문의', customer: '검증', project: 'Brity Mail')))));
+      for (var attempt = 0; attempt < 100; attempt++) {
+        await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 40)));
+        await tester.pump();
+        final images = tester.widgetList<RawImage>(find.byType(RawImage));
+        if (images.isNotEmpty && images.every((i) => i.image != null)) break;
+      }
+      await tester.pumpAndSettle();
+      expect(vm.hasAnswer, isTrue);
+      expect(vm.answerResult!.answer, isNot(contains('[이미지에서 읽은 글자')));
+      expect(find.textContaining('이미지 자동 인식 글자 확인'), findsOneWidget);
+      expect(find.textContaining('원본 이미지'), findsWidgets);
+      expect(tester.widgetList<RawImage>(find.byType(RawImage))
+          .where((i) => i.image != null), isNotEmpty);
+      expect(find.textContaining('Home [ oz'), findsNothing);
+      expect(tester.takeException(), isNull);
+      await _capture(tester, key, 'recall-answer-images-${dark ? "dark" : "light"}');
+    });
     testWidgets('manual counts include legacy sources (${dark ? "dark" : "light"})', (tester) async {
       tester.view.physicalSize = const Size(1280, 1000);
       tester.view.devicePixelRatio = 1;
@@ -119,4 +160,11 @@ class _ManualKnowledge extends _Knowledge {
       project: old ? 'Brity Messenger' : 'manual-upload',
       resolvedAt: DateTime(2026), createdAt: DateTime(2026)),
   ];
+}
+
+class _RecallKnowledge extends _Knowledge {
+  final KnowledgeBaseEntity entry;
+  _RecallKnowledge(this.entry);
+  @override
+  Future<List<KnowledgeBaseEntity>> getAllEntries() async => [entry];
 }

@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../../domain/entities/knowledge_base_entity.dart';
 import '../../viewmodels/knowledge_base_viewmodel.dart';
-import '../../widgets/manual_image_gallery.dart';
+import '../../widgets/manual_content_view.dart';
 
 class KnowledgeBaseScreen extends StatelessWidget {
   const KnowledgeBaseScreen({super.key});
@@ -596,12 +596,7 @@ class _KbCard extends StatelessWidget {
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  entry.answer,
-                  style: const TextStyle(fontSize: 13, height: 1.5),
-                ),
-                if (entry.id.startsWith('manual-pack-'))
-                  ManualImageGallery(entryId: entry.id),
+                ManualContentView(content: entry.answer, entryId: entry.id),
                 const SizedBox(height: 8),
                 Row(
                   children: [

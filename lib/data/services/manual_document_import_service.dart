@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
+import 'manual_media_store.dart';
 
 import 'package:archive/archive.dart';
 import 'package:crypto/crypto.dart';
@@ -56,7 +58,11 @@ class ManualImportProgress {
 }
 
 class ManualDocumentImportService {
-  ManualDocumentImportService(this._kbRepository);
+  ManualDocumentImportService(this._kbRepository, {ManualMediaStore? mediaStore})
+      : _mediaStore = mediaStore ?? const ManualMediaStore();
+
+  final ManualMediaStore _mediaStore;
+  final _extractedImages = <String, Uint8List>{};
 
   static const String manualCategory = '시스템매뉴얼';
 
@@ -91,10 +97,11 @@ class ManualDocumentImportService {
 
         final extension = p.extension(file.path).toLowerCase().replaceAll('.', '');
         final fileName = p.basename(file.path);
+        _extractedImages.clear();
         final text = await _extractText(file.path, extension);
         final normalized = _normalizeText(text);
         if (extension == 'pdf' || extension == 'docx') {
-          warnings.add('$fileName: 이번 가져오기는 텍스트·표를 보존합니다. 이미지 속 글자는 자동 인식하지 않으므로 이미지 전용 설명은 별도 확인이 필요합니다.');
+          warnings.add('$fileName: 텍스트·표와 Word의 삽입 이미지를 보존합니다. 이미지 속 글자 자동 인식과 PDF 이미지 추출은 지원하지 않습니다.');
         }
 
         if (normalized.trim().isEmpty) {
@@ -114,6 +121,7 @@ class ManualDocumentImportService {
             fingerprint: sha256.convert(await file.readAsBytes()).toString(),
             fileName: fileName,
             sections: sections,
+            images: Map.of(_extractedImages),
           ),
         );
       } catch (e) {
@@ -141,22 +149,28 @@ class ManualDocumentImportService {
       try {
         for (int i = 0; i < doc.sections.length; i++) {
           final section = doc.sections[i];
-          final sectionLabel = _headline(section);
+          final imageIds = RegExp(r'\[manual-image:([a-z0-9-]+)\]')
+              .allMatches(section.body).map((m) => m.group(1)!).toSet();
+          final cleanBody = section.body.replaceAll(RegExp(r'\[manual-image:[a-z0-9-]+\]'), '').trim();
+          final sectionLabel = _headline(_ManualSection(heading: section.heading, body: cleanBody));
           final fallbackQuestion = _buildQuestion(doc.fileName, i + 1, section);
 
           final now = DateTime.now();
           final sourceId = 'manual-source-${sha1.convert(utf8.encode(
-              '${doc.fileName}::${doc.fingerprint}::$i')).toString()}';
+              '${doc.fileName}::${doc.fingerprint}::$i${imageIds.isEmpty ? '' : '::media-v1'}')).toString()}';
           final source = KnowledgeBaseEntity(
             id: sourceId,
             question: '[${doc.fileName}] 원문 섹션 ${i + 1}: $sectionLabel',
-            answer: section.body,
+            answer: cleanBody.isEmpty ? '이 구간의 설명은 첨부 원본 이미지를 확인해 주세요.' : cleanBody,
             category: manualCategory,
             customer: doc.fileName,
             project: 'manual-upload',
             resolvedAt: now,
             createdAt: now,
           );
+          await _mediaStore.save(sourceId, {
+            for (final id in imageIds) if (doc.images.containsKey(id)) id: doc.images[id]!,
+          });
           if (await _kbRepository.getEntryById(sourceId) == null) {
             await _kbRepository.createEntry(source);
             importedEntries++;
@@ -173,7 +187,7 @@ class ManualDocumentImportService {
                 doc.fileName,
                 i + 1,
                 sectionLabel,
-                section.body,
+                cleanBody,
               );
             } catch (e) {
               warnings.add('${doc.fileName} 섹션 ${i + 1}: AI 질문 분해 실패, 기본 형태로 저장 ($e)');
@@ -182,7 +196,7 @@ class ManualDocumentImportService {
 
           if (qaItems.isEmpty && answerRefiner != null) {
             try {
-              final refined = await answerRefiner(fallbackQuestion, section.body);
+              final refined = await answerRefiner(fallbackQuestion, cleanBody);
               if (refined.trim().isNotEmpty) {
                 qaItems = [ManualGeneratedQa(question: fallbackQuestion, answer: refined)];
               }
@@ -314,6 +328,37 @@ class ManualDocumentImportService {
   Future<String> _extractFromDocx(String filePath) async {
     final archive = await _readZipArchive(filePath);
     final parts = <String>[];
+    final relations = <String, String>{};
+    final rels = archive.findFile('word/_rels/document.xml.rels');
+    if (rels != null) {
+      final xml = XmlDocument.parse(utf8.decode(rels.content as List<int>));
+      for (final rel in xml.descendants.whereType<XmlElement>()) {
+        if (rel.name.local != 'Relationship' || rel.getAttribute('TargetMode') == 'External') continue;
+        final id = rel.getAttribute('Id');
+        final target = rel.getAttribute('Target');
+        if (id != null && target != null) {
+          relations[id] = target.startsWith('/') ? target.substring(1)
+              : p.posix.normalize(p.posix.join('word', target));
+        }
+      }
+    }
+    String imagesOf(XmlElement node) {
+      final ids = <String>[];
+      for (final element in node.descendants.whereType<XmlElement>()) {
+        if (element.name.local != 'blip' && element.name.local != 'imagedata') continue;
+        final refs = element.attributes.where((a) =>
+            a.name.local == 'embed' || a.name.local == 'id').map((a) => a.value);
+        final rid = refs.isEmpty ? null : refs.first;
+        final target = relations[rid];
+        final media = target == null ? null : archive.findFile(target);
+        if (media == null) continue;
+        final bytes = Uint8List.fromList(media.content as List<int>);
+        final id = 'local-${sha256.convert(bytes)}';
+        _extractedImages[id] = bytes;
+        ids.add('[manual-image:$id]');
+      }
+      return ids.join('\n');
+    }
 
     for (final entry in archive.files) {
       if (!entry.isFile || entry.name != 'word/document.xml') continue;
@@ -328,8 +373,10 @@ class ManualDocumentImportService {
               .where((e) => e.name.local == 'tr');
           parts.add(rows.map((row) => row.childElements
               .where((e) => e.name.local == 'tc').map(textOf).join(' | ')).join('\n'));
+          final images = imagesOf(node);
+          if (images.isNotEmpty) parts.add(images);
         } else {
-          final text = textOf(node);
+          final text = [textOf(node), imagesOf(node)].where((s) => s.isNotEmpty).join('\n');
           if (text.trim().isNotEmpty) parts.add(text);
         }
       }
@@ -485,6 +532,7 @@ class _PreparedManualDoc {
   final String filePath;
   final String fileName;
   final String fingerprint;
+  final Map<String, Uint8List> images;
   final List<_ManualSection> sections;
 
   const _PreparedManualDoc({
@@ -492,6 +540,7 @@ class _PreparedManualDoc {
     required this.fileName,
     required this.sections,
     required this.fingerprint,
+    required this.images,
   });
 }
 
