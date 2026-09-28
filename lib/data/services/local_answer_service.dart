@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'manual_content.dart';
+import 'offline_answer_composer.dart';
 
 import '../../core/utils/search_query_expander.dart';
 import '../../domain/entities/knowledge_base_entity.dart';
@@ -20,6 +21,8 @@ class LocalAnswerService {
     'copilot': ['코파일럿', 'copilot'],
     'desktop': ['데스크톱', 'desktop', 'pc'],
     'mobile': ['모바일', 'mobile'],
+    'schedule': ['일정', '캘린더', 'calendar', 'schedule'],
+    'register': ['등록', 'register', 'registration'],
     'notification': ['알림', 'notification', 'notifications'],
     'password': ['비밀번호', '암호', 'password'],
     'join': ['접속', '참가', '참여', 'join'],
@@ -55,11 +58,16 @@ class LocalAnswerService {
     'search', 'edit', 'delete', 'share', 'download', 'upload',
   };
   static const _stop = {
-    '어떻게', '알려줘', '알려주세요', '해주세요', '해줘', '무엇', '뭐야',
-    '있나요', '있어', '그럼', '해당', '내용', '관련', '대한', '다시',
-    '방법', '하나요', '하나', '하고', '싶어요', '싶습니다', '하는', '하려면',
-    '기능', '사용', '사용법', '가능한가요', '되나요', '합니다', '있는',
-    'the', 'how', 'to', 'can', 'i', 'a', 'in', 'of', 'please', 'brity', '브리티',
+    '어떻게', '알려줘', '알려주세요', '해주세요', '해줘', '무엇',
+    '뭐야', '있나요', '있어', '그럼', '해당', '내용',
+    '관련', '대한', '다시', '방법', '하나요', '하나',
+    '하고', '싶어요', '싶습니다', '하는', '하려면', '되려면',
+    '해야하나요', '해야', '되나요', '하려고', '싶은데', '싶은데요',
+    '궁금합니다', '궁금해요', '궁금', '새로운', '새로', '해요',
+    '주세요', '대해', '어떤', '되는', '하려고합니다', '기능',
+    '사용', '사용법', '가능한가요', '합니다', '있는', 'the',
+    'how', 'to', 'can', 'i', 'a', 'in',
+    'of', 'please', 'brity', '브리티',
   };
 
   List<SimilarVocResult> rank(
@@ -129,6 +137,16 @@ class LocalAnswerService {
     ranked.sort((a, b) {
       final score = b.similarityScore.compareTo(a.similarityScore);
       if (score != 0) return score;
+      // Equal coverage is common for broad sections. Prefer a question about
+      // the requested operation over menus that merely mention it in passing.
+      double focus(KnowledgeBaseEntity e) {
+        final titleTerms = _terms(e.question).toSet();
+        final hits = terms.where(titleTerms.contains).length;
+        return hits / math.max(1, terms.length) +
+            hits / math.max(1, titleTerms.length);
+      }
+      final focused = focus(b.knowledgeBase).compareTo(focus(a.knowledgeBase));
+      if (focused != 0) return focused;
       return a.knowledgeBase.id.compareTo(b.knowledgeBase.id);
     });
     return ranked.take(limit).toList();
@@ -165,7 +183,7 @@ class LocalAnswerService {
     }
     final selected = answerReferences(references);
     if (selected.isEmpty) return '$noEvidence\n근거: 없음';
-    return selected.map((reference) {
+    final fragments = selected.map((reference) {
       final item = reference.knowledgeBase;
       final authored = ManualContent.parse(item.answer).body;
       final text = authored.isEmpty
@@ -174,8 +192,9 @@ class LocalAnswerService {
       final source = item.customer?.trim();
       final label = source != null && source.isNotEmpty ? source :
           (item.category == '시스템매뉴얼' ? '시스템 매뉴얼' : '승인된 답변 / 지식베이스');
-      return '$text\n\n근거: $label · ${item.question}';
-    }).join('\n\n────────\n\n');
+      return OfflineAnswerFragment(text, '$label · ${item.question}');
+    }).toList();
+    return OfflineAnswerComposer().compose(query, fragments);
   }
 
   bool needsWholeDataset(String query) {
@@ -224,7 +243,8 @@ class LocalAnswerService {
   String _normalize(String text) => SearchQueryExpander.normalize(text);
 
   List<String> _terms(String query) {
-    var remaining = _normalize(query);
+    var remaining = _normalize(query)
+        .replaceAll(RegExp(r'해야\s*하나요|해야\s*하나|할\s*수\s*있나요|알려\s*주세요'), ' ');
     final result = <String>{};
     final aliases = <MapEntry<String, String>>[
       for (final concept in _concepts.entries)
@@ -237,6 +257,7 @@ class LocalAnswerService {
       remaining = remaining.replaceAll(pattern, ' ');
     }
     for (var term in remaining.split(' ')) {
+      if (_stop.contains(term)) continue;
       term = term.replaceFirst(RegExp(r'(에서는|으로|에서|에게|처럼|하고|은|는|을|를|이|가|에|도|만)$'), '');
       if (term.length >= 2 && !_stop.contains(term)) result.add(term);
     }

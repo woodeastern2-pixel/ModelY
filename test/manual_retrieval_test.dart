@@ -74,6 +74,22 @@ void main() {
     expect(rows.length, 1008);
     final docs = rows.map((r) => entry(r['id'] as String, r['question'] as String,
         r['answer'] as String, source: r['sourceName'] as String?)).toList();
+    // Reproduce the user's title + body, with all 1,008 competing entries.
+    for (final query in [
+      '일정등록 일정 등록 되려면 어떻게 해야하나요?',
+      '일정 등록하려면 어떻게 해야 하나요?',
+      '새로운 일정을 등록하는 방법을 알려 주세요',
+      '일정등록',
+    ]) {
+      final refs = service.rank(query, docs);
+      expect(service.canAnswer(query, refs), isTrue, reason: query);
+      final answer = service.answerForQuery(query, refs);
+      expect(answer, contains('일정'), reason: query);
+      expect(answer, contains('등록'), reason: query);
+      expect(answer, contains('다음 순서로 진행해 주세요.'), reason: query);
+      expect(answer, contains('1.'), reason: query);
+      expect(answer, isNot(contains('근거: 없음')), reason: query);
+    }
     final queries = <String, String>{
       '메신저 제거 후 대화 기록': 'All conversation data',
       '메신저 데스크톱 바로가기': 'Shortcut',

@@ -17,12 +17,45 @@ import 'package:ai_voc_assistant/presentation/screens/voc/ai_answer_screen_v2.da
 import 'package:ai_voc_assistant/presentation/screens/chat/ai_chat_screen.dart';
 import 'support/ui_harness.dart';
 import 'package:ai_voc_assistant/data/services/bundled_manual_service.dart';
+import 'package:ai_voc_assistant/data/seeds/brity_suite_manual_seed.dart';
 import 'package:ai_voc_assistant/presentation/viewmodels/knowledge_base_viewmodel.dart';
 import 'package:ai_voc_assistant/presentation/screens/knowledge_base/knowledge_base_screen.dart';
 
 void main() {
   setUpAll(loadUiHarnessFonts);
   for (final dark in [false, true]) {
+    testWidgets('schedule question composes an offline answer from the complete corpus (${dark ? "dark" : "light"})', (tester) async {
+      tester.view.physicalSize = const Size(1440, 1800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final pack = await tester.runAsync(BundledManualService.load);
+      final rows = [...BritySuiteManualSeed.entries, ...(pack!['entries'] as List)];
+      final entries = rows.map((r) => KnowledgeBaseEntity(
+        id: r['id'] as String, question: r['question'] as String, answer: r['answer'] as String,
+        category: '시스템매뉴얼', customer: r['sourceName'] as String?,
+        project: r['project'] as String?, resolvedAt: DateTime(2026), createdAt: DateTime(2026))).toList();
+      final settings = SettingsViewModel(_Settings());
+      final vm = AiViewModel(_CorpusKnowledge(entries), _Vocs(), settings);
+      addTearDown(vm.dispose);
+      addTearDown(settings.dispose);
+      final key = GlobalKey();
+      await tester.pumpWidget(ChangeNotifierProvider.value(value: vm,
+        child: MaterialApp(theme: dark ? AppTheme.darkTheme : AppTheme.lightTheme,
+          home: RepaintBoundary(key: key, child: const AiAnswerScreen(
+            vocId: 'schedule-check', vocTitle: '일정등록',
+            vocContent: '일정 등록 되려면 어떻게 해야하나요?',
+            category: '기타', customer: '', project: '')))));
+      await tester.pumpAndSettle();
+      expect(entries.length, 1008);
+      expect(vm.isAiConnected, isFalse);
+      expect(vm.hasAnswer, isTrue);
+      expect(vm.answerResult!.answer, contains('다음 순서로 진행해 주세요.'));
+      expect(vm.answerResult!.answer, contains('등록'));
+      expect(find.textContaining('답변으로 사용할 매뉴얼이나 승인된 답변을 찾지 못했습니다'), findsNothing);
+      expect(tester.takeException(), isNull);
+      await _capture(tester, key, 'schedule-offline-${dark ? "dark" : "light"}');
+    });
     testWidgets('recall answer shows original images instead of raw transcription (${dark ? "dark" : "light"})', (tester) async {
       tester.view.physicalSize = const Size(1440, 1800);
       tester.view.devicePixelRatio = 1;
@@ -167,4 +200,11 @@ class _RecallKnowledge extends _Knowledge {
   _RecallKnowledge(this.entry);
   @override
   Future<List<KnowledgeBaseEntity>> getAllEntries() async => [entry];
+}
+
+class _CorpusKnowledge extends _Knowledge {
+  final List<KnowledgeBaseEntity> entries;
+  _CorpusKnowledge(this.entries);
+  @override
+  Future<List<KnowledgeBaseEntity>> getAllEntries() async => entries;
 }

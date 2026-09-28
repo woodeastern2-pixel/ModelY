@@ -437,7 +437,7 @@ class AiViewModel extends ChangeNotifier {
     return topK == null ? fallback : fallback.take(topK).toList();
   }
 
-  /// 3단계: AI 답변 생성 (RAG)
+  /// 3단계: 저장된 자료를 검색해 오프라인 답변 구성
   Future<AiAnswerResult?> generateAnswer(String title, String content, {String? excludeVocId}) async {
     _isGenerating = true;
     _error = null;
@@ -458,7 +458,7 @@ class AiViewModel extends ChangeNotifier {
         confidence: _similarVocs.first.similarityScore,
         referencedCases: _localAnswers.answerReferences(_similarVocs)
             .map((r) => r.knowledgeBase.question).toList(),
-        notes: '매뉴얼 본문 전체에서 찾은 근거입니다. 검색 점수는 정답 확률이 아닙니다. 출처의 제품·버전과 제한 조건을 확인해 주세요.',
+        notes: 'AI 연결 없이 매뉴얼과 승인된 답변에서 안내를 구성했습니다. 검색 점수는 정답 확률이 아닙니다. 출처의 제품·버전과 제한 조건을 확인해 주세요.',
       );
       return _answerResult;
     } catch (e) {
