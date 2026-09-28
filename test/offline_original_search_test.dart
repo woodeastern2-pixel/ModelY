@@ -46,6 +46,11 @@ void main() {
         final refs=await store.search(q.key);
         expect(answerer.canAnswer(q.key,refs),isTrue,reason:'$stage ${q.key}');
         final text=answerer.answerForQuery(q.key,refs);
+        if(q.key.startsWith('일정등록')) {
+          expect(answerer.answerReferences(refs).first.knowledgeBase.question,
+              isNot(contains('단축키')));
+          expect(text,anyOf(contains('클릭'),contains('입력')));
+        }
         clock.stop();
         expect(text.toLowerCase(),contains(q.value.toLowerCase()),reason:'$stage ${q.key}: $text');
         expect(store.index.lastCandidates,lessThanOrEqualTo(128));

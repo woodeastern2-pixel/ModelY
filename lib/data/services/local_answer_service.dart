@@ -150,6 +150,20 @@ class LocalAnswerService {
     ranked.sort((a, b) {
       final score = b.similarityScore.compareTo(a.similarityScore);
       if (score != 0) return score;
+      // A matching shortcut table is supporting material, not the primary
+      // procedure when the user asks how to perform an operation.
+      int supportingOnly(KnowledgeBaseEntity e) =>
+          (!terms.contains('shortcut') && _matches(_normalize(e.question), 'shortcut')) ? 1 : 0;
+      final support = supportingOnly(a.knowledgeBase).compareTo(supportingOnly(b.knowledgeBase));
+      if (support != 0) return support;
+      if (RegExp(r'어떻게|방법|절차|등록').hasMatch(query)) {
+        bool instruction(KnowledgeBaseEntity e) => RegExp(
+            r'클릭하|선택하|입력하|누르|선택합|입력합|클릭합|클릭한|선택한|입력한')
+            .hasMatch(ManualContent.parse(e.answer).body);
+        final direct = (instruction(b.knowledgeBase) ? 1 : 0)
+            .compareTo(instruction(a.knowledgeBase) ? 1 : 0);
+        if (direct != 0) return direct;
+      }
       // Equal coverage is common for broad sections. Prefer a question about
       // the requested operation over menus that merely mention it in passing.
       double focus(KnowledgeBaseEntity e) {
@@ -276,7 +290,7 @@ class LocalAnswerService {
   String _normalize(String text) => SearchQueryExpander.normalize(text);
 
   List<String> _terms(String query) {
-    var remaining = _normalize(query)
+    var remaining = _normalize(query).replaceAll(RegExp(r'원문 구간 \d+'), ' ')
         .replaceAll(RegExp(r'해야\s*하나요|해야\s*하나|할\s*수\s*있나요|알려\s*주세요'), ' ');
     final result = <String>{};
     final aliases = <MapEntry<String, String>>[
