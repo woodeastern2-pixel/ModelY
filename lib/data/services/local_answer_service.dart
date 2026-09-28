@@ -275,7 +275,7 @@ class LocalAnswerService {
     final ranked = <SimilarVocResult>[];
     for (var i = 0; i < docs.length; i++) {
       final entry = docs[i];
-      if (!versionCompatible(query, entry)) continue;
+      if (!versionCompatible(query, entry) || _looksLikeContents(entry)) continue;
       final preferred = entry.vocId != null && preferredVocIds.contains(entry.vocId);
       final scope = _normalize('${entry.project ?? ''} ${entry.question}');
       final requestedPlatform = terms.where((t) => t == 'desktop' || t == 'mobile').toSet();
@@ -363,6 +363,20 @@ class LocalAnswerService {
     return ranked.take(limit).toList();
   }
 
+  bool _looksLikeContents(KnowledgeBaseEntity entry) {
+    if (entry.category != '시스템매뉴얼') return false;
+    final parsed = ManualContent.parse(entry.answer);
+    if (parsed.transcription.isNotEmpty) return false;
+    final lines = parsed.body.split('\n').map((s) => s.trim()).where((s) =>
+        s.isNotEmpty && !s.startsWith('[출처]') && !s.startsWith('[범위]') &&
+        !s.startsWith('http') && !RegExp(r'이 장에서는|다루는 내용|다루는내용|chapter covers',
+            caseSensitive: false).hasMatch(s)).toList();
+    if (lines.length < 3) return false;
+    return !lines.any((line) => RegExp(
+        r'습니다|합니다|입니다|됩니다|세요|십시오|불가능|불가|할 수 없|할 수 있|[|>→]|\b(?:click|select|open|cannot|must|will)\b',
+        caseSensitive: false).hasMatch(line));
+  }
+
   bool isAnswerSource(KnowledgeBaseEntity entry) =>
       !entry.id.startsWith('registered-voc-') && entry.answer.trim().isNotEmpty;
 
@@ -390,15 +404,9 @@ class LocalAnswerService {
     final best = usable.first;
     final conflicting = usable.where((r) => _sourcesDisagree(best.knowledgeBase, r.knowledgeBase)).toList();
     if (conflicting.isNotEmpty) return [best, conflicting.first];
-    // Keep different sources separate: never splice incompatible procedures.
-    final source = best.knowledgeBase.customer;
-    if (source == null || source.isEmpty) return [best];
-    final seen = <String>{};
-    return usable.where((r) =>
-        r.knowledgeBase.customer == source &&
-        r.knowledgeBase.project == best.knowledgeBase.project &&
-        r.similarityScore >= best.similarityScore * 0.94 &&
-        seen.add(r.knowledgeBase.answer.trim())).take(3).toList();
+    // A complete original section is already attached to each raw hit.
+    // Extra keyword-matching sections are references, not automatic answer text.
+    return [best];
   }
 
   String answer(List<SimilarVocResult> references) => answerForQuery('', references);

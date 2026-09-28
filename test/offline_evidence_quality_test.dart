@@ -131,6 +131,27 @@ void main() {
     expect(index.lastTotalCandidates, lessThanOrEqualTo(512));
   });
 
+  test('a table of contents cannot outrank the explicit answer', () {
+    final index = OfflineSearchIndex()
+      ..put(record('contents', '영구 삭제 파일 복원',
+        '삭제한 파일 복원하기\n복원 폴더 선택하는 경우\n영구 삭제 후 복원하기\n휴지통 화면'))
+      ..put(record('answer', '영구 삭제 파일 복원',
+        '영구 삭제한 파일은 복원이 불가능합니다.'));
+    const query = '드라이브 영구 삭제 파일 복원 방법';
+    final answer = service.answerForQuery(query, index.search(query));
+    expect(answer, contains('복원이 불가능'));
+    expect(answer, isNot(contains('선택하는 경우')));
+    expect(answer, isNot(contains('다음 순서')));
+  });
+
+  test('figure captions do not become numbered instructions', () {
+    final answer = OfflineAnswerComposer().compose('설문 지정 방법', [
+      const OfflineAnswerFragment('Click\n①지정함Click\n을클릭하여대상자를지정합니다.\n참여자 지정을 클릭합니다.', 'manual')]);
+    expect(answer, isNot(contains('1. Click')));
+    expect(answer, isNot(contains('①지정함Click')));
+    expect(answer, contains('1. 참여자 지정을 클릭합니다.'));
+  });
+
   test('required permissions are presented before action steps', () {
     final answer = OfflineAnswerComposer().compose('복원 방법', [
       const OfflineAnswerFragment('파일을 선택합니다. 복원을 클릭합니다.\n관리자만 복원할 수 있습니다.', 'manual')]);

@@ -103,7 +103,8 @@ void main() {
       expect(answerer.canAnswer(item.key, refs), isTrue, reason: item.key);
       expect(answer, contains(item.value), reason: item.key);
       if (item.key.contains('영구')) {
-        expect(answer, matches(RegExp(r'확인되지|불가|없|않')));
+        expect(answer, contains('영구 삭제한 파일/폴더는 복원이 불가능'));
+        expect(answer, isNot(contains('다음 순서')));
       }
       expect(clock.elapsedMilliseconds, lessThan(5000));
       expect(store.index.lastTotalCandidates, lessThanOrEqualTo(512));

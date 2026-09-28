@@ -13,7 +13,7 @@ class OfflineAnswerComposer {
       r'클릭|누르|누릅|선택|입력|저장|엽니|여세요|이동|실행|드래그|체크|click|select|enter|open|press',
       caseSensitive: false);
   static final _restriction = RegExp(
-      r'관리자만|주최자만|소유자만|안\s*됩|할\s*수\s*없|주의|제한|불가|않습니다|없습니다|없으며|없으므로|최대|최소|경우에만|해야만|caution|warning|cannot|must|only|not available',
+      r'관리자만|주최자만|소유자만|안\s*됩|할\s*수\s*없|주의|(?<!삭)제한|불가|않습니다|없습니다|없으며|없으므로|최대|최소|경우에만|해야만|caution|warning|cannot|must|only|not available',
       caseSensitive: false);
 
   String compose(String query, List<OfflineAnswerFragment> fragments) {
@@ -31,6 +31,9 @@ class OfflineAnswerComposer {
       for (final paragraph in sourceText.split('\n')) {
         final line = paragraph.trim();
         if (line.isEmpty) continue;
+        if (RegExp(r'^Chapter\b|^Copyright\b|^All rights reserved|^(?:[①-⑳\d.()\s]*[^.!?]{0,24})?Click$|^[a-z](?:\s+[a-z])+$',
+            caseSensitive: false).hasMatch(line)) continue;
+        if (RegExp(r'^[을를]\s*클릭').hasMatch(line)) continue;
         if (line.startsWith('[출처]') || line.startsWith('출처:')) {
           provenance.add(line);
           continue;
