@@ -44,6 +44,7 @@ class AiViewModel extends ChangeNotifier {
   bool _aiConnected = false;
   bool _checkingConnection = false;
   int _configurationRevision = 0;
+  List<Object?>? _configurationValues;
   bool _disposed = false;
   static const copilotUnavailable =
       '인공지능이 연결되지 않아 코파일럿을 사용할 수 없습니다. 설정에서 연결을 확인해 주세요.';
@@ -102,6 +103,17 @@ class AiViewModel extends ChangeNotifier {
   }
 
   void _configureServices() {
+    final values = <Object?>[
+      _settingsViewModel.aiProvider,
+      _settingsViewModel.ollamaUrl, _settingsViewModel.ollamaModel,
+      _settingsViewModel.openAiKey, _settingsViewModel.openAiModel,
+      _settingsViewModel.geminiKey, _settingsViewModel.geminiModel,
+      _settingsViewModel.claudeKey, _settingsViewModel.claudeModel,
+      _settingsViewModel.claudeBaseUrl, _settingsViewModel.faissEndpoint,
+      _settingsViewModel.aiTemperature, _settingsViewModel.aiMaxTokens,
+    ];
+    if (listEquals(values, _configurationValues)) return;
+    _configurationValues = values;
     _configurationRevision++;
     _aiConnected = false;
     final provider = _settingsViewModel.aiProvider;
@@ -906,4 +918,3 @@ class AiViewModel extends ChangeNotifier {
     return '${title.substring(0, 26).trim()}...';
   }
 }
-
