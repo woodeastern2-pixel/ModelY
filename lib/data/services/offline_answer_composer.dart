@@ -13,7 +13,7 @@ class OfflineAnswerComposer {
       r'클릭|누르|누릅|선택|입력|저장|엽니|여세요|이동|실행|드래그|체크|click|select|enter|open|press',
       caseSensitive: false);
   static final _restriction = RegExp(
-      r'관리자만|주최자만|소유자만|안\s*됩|할\s*수\s*없|주의|(?<!삭)제한|불가|않습니다|없습니다|없으며|없으므로|최대|최소|경우에만|해야만|caution|warning|cannot|must|only|not available',
+      r'권한.{0,20}경우|관리자만|주최자만|소유자만|안\s*됩|할\s*수\s*없|주의|(?<!삭)제한|불가|않습니다|없습니다|없으며|없으므로|최대|최소|경우에만|해야만|caution|warning|cannot|must|only|not available',
       caseSensitive: false);
 
   String compose(String query, List<OfflineAnswerFragment> fragments) {
@@ -23,6 +23,7 @@ class OfflineAnswerComposer {
       final statements = <String>[];
       final steps = <String>[];
       final conditions = <String>[];
+      final choices = <String>[];
       final provenance = <String>[];
       // Preserve table rows and conditional sentences as complete units.
       // Never split a sentence at 'if', '경우', or a Korean conjunctive ending.
@@ -47,6 +48,8 @@ class OfflineAnswerComposer {
           if (!seen.add(identity)) continue;
           if (_restriction.hasMatch(sentence)) {
             conditions.add(sentence);
+          } else if (RegExp(r'(?:클릭|선택|누르)(?:하|시)?면').hasMatch(sentence)) {
+            choices.add(sentence);
           } else if (_procedure.hasMatch(query) && _action.hasMatch(sentence)) {
             steps.add(sentence);
           } else {
@@ -54,7 +57,7 @@ class OfflineAnswerComposer {
           }
         }
       }
-      if (statements.isEmpty && steps.isEmpty && conditions.isEmpty) continue;
+      if (statements.isEmpty && steps.isEmpty && conditions.isEmpty && choices.isEmpty) continue;
       final parts = <String>[];
       if (conditions.isNotEmpty) {
         parts.add('확인할 조건\n${conditions.map((s) => '• $s').join('\n')}');
@@ -63,6 +66,9 @@ class OfflineAnswerComposer {
         parts.add('다음 순서로 진행해 주세요.\n${[
           for (var i = 0; i < steps.length; i++) '${i + 1}. ${steps[i]}'
         ].join('\n')}');
+      }
+      if (choices.isNotEmpty) {
+        parts.add('선택한 기능에 따른 동작\n${choices.map((s) => '• $s').join('\n')}');
       }
       if (statements.isNotEmpty) parts.add(statements.join('\n'));
       parts.add('근거: ${fragment.source}${provenance.isEmpty ? '' : '\n${provenance.join('\n')}'}');

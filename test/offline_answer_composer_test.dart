@@ -34,6 +34,13 @@ void main() {
     ]);
     expect(answer, contains('only conversations stored on the server.'));
   });
+  test('alternative meeting buttons are not consecutive required steps', () {
+    final answer = composer.compose('미팅 개설 방법', [
+      const OfflineAnswerFragment('메인 메뉴에서 미팅을 클릭하세요.\n예약하기를 클릭하면 예약 사이트로 이동합니다.\n즉시시작을 클릭하면 회의가 개설됩니다.\n참여를 클릭하면 참석합니다.\nMeeting 권한이 있는 경우 메뉴가 제공됩니다.', '매뉴얼')]);
+    expect(answer, contains('선택한 기능에 따른 동작'));
+    expect(answer, isNot(contains('2. 예약하기')));
+    expect(answer.indexOf('권한'), lessThan(answer.indexOf('1. 메인')));
+  });
   test('a factual question does not turn a limit into a procedure', () {
     final answer = composer.compose('첨부 최대 용량은?', [
       const OfflineAnswerFragment('첨부 가능한 최대 용량은 50MB 입니다.', '매뉴얼'),

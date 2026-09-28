@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
 import 'support/ui_harness.dart';
+import 'package:ai_voc_assistant/core/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -50,7 +51,7 @@ void main() {
     expect(vm.entries.length,1008);
     final boundary = GlobalKey();
     await tester.pumpWidget(ChangeNotifierProvider.value(value:vm,
-      child:MaterialApp(home:RepaintBoundary(key:boundary, child:const KnowledgeBaseScreen()))));
+      child:MaterialApp(theme:AppTheme.lightTheme, home:RepaintBoundary(key:boundary, child:const KnowledgeBaseScreen()))));
     await tester.pumpAndSettle();
     final initial = vm.searchPasses;
     final costs = <double>[];

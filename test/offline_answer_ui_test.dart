@@ -112,6 +112,14 @@ void main() {
       expect(vm.answerResult!.answer, contains('권한'));
       expect(vm.hasPartialAnswer, isTrue);
       expect(tester.takeException(), isNull);
+      for (var attempt = 0; attempt < 50; attempt++) {
+        await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 40)));
+        await tester.pump();
+        if (tester.widgetList<RawImage>(find.byType(RawImage)).any((w) => w.image != null)) break;
+      }
+      expect(tester.widgetList<RawImage>(find.byType(RawImage)).any((w) => w.image != null), isTrue);
+      expect(vm.answerResult!.answer, contains('선택한 기능에 따른 동작'));
+      expect(vm.answerResult!.answer, isNot(contains('3. 예약하기')));
       await _capture(tester, key, 'meeting-create-${dark ? "dark" : "light"}');
 
 
