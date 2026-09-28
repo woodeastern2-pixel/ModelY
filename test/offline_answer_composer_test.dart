@@ -28,6 +28,12 @@ void main() {
     expect('영구 삭제된 파일'.allMatches(answer).length, 1);
     expect(answer, isNot(contains('1. 복원 버튼')));
   });
+  test('wrapped English restrictions keep their object in the same sentence', () {
+    final answer = composer.compose('메신저 제거 대화 기록', [
+      const OfflineAnswerFragment('If you reinstall, you can view only conversations stored on the\nserver.', 'PDF'),
+    ]);
+    expect(answer, contains('only conversations stored on the server.'));
+  });
   test('a factual question does not turn a limit into a procedure', () {
     final answer = composer.compose('첨부 최대 용량은?', [
       const OfflineAnswerFragment('첨부 가능한 최대 용량은 50MB 입니다.', '매뉴얼'),

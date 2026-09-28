@@ -26,7 +26,9 @@ class OfflineAnswerComposer {
       final provenance = <String>[];
       // Preserve table rows and conditional sentences as complete units.
       // Never split a sentence at 'if', '경우', or a Korean conjunctive ending.
-      for (final paragraph in fragment.text.split('\n')) {
+      final sourceText = fragment.text.replaceAllMapped(
+          RegExp(r'([A-Za-z,])\n(?=[a-z])'), (m) => '${m.group(1)} ');
+      for (final paragraph in sourceText.split('\n')) {
         final line = paragraph.trim();
         if (line.isEmpty) continue;
         if (line.startsWith('[출처]') || line.startsWith('출처:')) {
