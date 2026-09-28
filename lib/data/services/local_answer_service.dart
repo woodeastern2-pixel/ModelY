@@ -410,7 +410,20 @@ class LocalAnswerService {
     if (conflicting.isNotEmpty) return [best, conflicting.first];
     // A complete original section is already attached to each raw hit.
     // Extra keyword-matching sections are references, not automatic answer text.
-    return [best];
+    final title = _normalize(best.knowledgeBase.question
+        .replaceFirst(RegExp(r' · 원문 구간 \d+$'), ''));
+    final supplements = usable.skip(1).where((r) {
+      final item = r.knowledgeBase;
+      final sameSource = best.knowledgeBase.customer?.isNotEmpty == true &&
+          item.customer == best.knowledgeBase.customer &&
+          item.project == best.knowledgeBase.project;
+      final heading = _normalize(item.question
+          .replaceFirst(RegExp(r' · 원문 구간 \d+$'), ''));
+      return sameSource && title.isNotEmpty && heading.contains(title) &&
+          RegExp(r'제한|주의|조건|권한|restriction|caution|permission',
+              caseSensitive: false).hasMatch(heading);
+    });
+    return [best, ...supplements.take(2)];
   }
 
   String answer(List<SimilarVocResult> references) => answerForQuery('', references);
