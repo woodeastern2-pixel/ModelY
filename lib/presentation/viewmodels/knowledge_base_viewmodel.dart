@@ -340,7 +340,8 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
 
   bool _isManualEntry(KnowledgeBaseEntity entry) {
     return entry.category == _manualCategory &&
-        (entry.project == _manualProjectMarker ||
+        (entry.id.startsWith('manual-pack-') ||
+            entry.project == _manualProjectMarker ||
             entry.question.contains('매뉴얼 섹션'));
   }
 

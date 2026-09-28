@@ -112,6 +112,28 @@ jobs:
       - name: Build Windows release
         run: flutter build windows --release
 
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          $versionSpec = ((Select-String -Path "pubspec.yaml" -Pattern '^version:\s*(.+)$').Matches.Groups[1].Value).Trim()
+          $parts = $versionSpec.Split('+')
+          iscc "/DMyAppVersion=$($parts[0])" "/DMyAppBuild=$($parts[1])" "windows\installer\AI-VOC-Assistant.iss"
+          Get-ChildItem release_artifacts/windows/*.exe | ForEach-Object {
+            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
+            "$hash  $($_.Name)" | Set-Content "$($_.FullName).sha256"
+          }
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-voc-assistant-windows-installer
+          path: release_artifacts/windows/*
+          if-no-files-found: error
+
       - name: Package Windows release
         shell: pwsh
         run: |

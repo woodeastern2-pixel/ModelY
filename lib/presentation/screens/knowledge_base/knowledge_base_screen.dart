@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../../domain/entities/knowledge_base_entity.dart';
 import '../../viewmodels/knowledge_base_viewmodel.dart';
+import '../../widgets/manual_image_gallery.dart';
 
 class KnowledgeBaseScreen extends StatelessWidget {
   const KnowledgeBaseScreen({super.key});
@@ -599,6 +600,8 @@ class _KbCard extends StatelessWidget {
                   entry.answer,
                   style: const TextStyle(fontSize: 13, height: 1.5),
                 ),
+                if (entry.id.startsWith('manual-pack-'))
+                  ManualImageGallery(entryId: entry.id),
                 const SizedBox(height: 8),
                 Row(
                   children: [

@@ -4,6 +4,7 @@ import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../../data/seeds/brity_suite_manual_seed.dart';
+import '../../data/services/bundled_manual_service.dart';
 import '../constants/app_constants.dart';
 import '../utils/search_query_expander.dart';
 import '../utils/vector_utils.dart';
@@ -35,6 +36,7 @@ class DatabaseHelper {
   Future<void> _onOpen(Database db) async {
     await _ensureVocTableColumns(db);
     await _ensureSyncEventTable(db);
+    await BundledManualService.install(db);
     await db.insert(
         AppConstants.tableSettings,
         {
