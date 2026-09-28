@@ -1,11 +1,28 @@
+import 'dart:typed_data';
+import '../../core/database/database_helper.dart';
+import '../../domain/repositories/indexed_knowledge_repository.dart';
+import '../services/offline_search_store.dart';
 import '../datasources/local/knowledge_base_local_datasource.dart';
-import '../../../domain/entities/knowledge_base_entity.dart';
-import '../../../domain/repositories/knowledge_base_repository.dart';
+import '../../domain/entities/knowledge_base_entity.dart';
+import '../../domain/repositories/knowledge_base_repository.dart';
 
-class KnowledgeBaseRepositoryImpl implements KnowledgeBaseRepository {
+class KnowledgeBaseRepositoryImpl implements KnowledgeBaseRepository, IndexedKnowledgeRepository {
   final KnowledgeBaseLocalDatasource _localDatasource;
 
   KnowledgeBaseRepositoryImpl(this._localDatasource);
+
+  @override
+  Future<List<SimilarVocResult>> searchOffline(String query, {String? excludeVocId}) async =>
+      OfflineSearchStore.forDatabase(await DatabaseHelper.instance.database)
+          .search(query, excludeVocId: excludeVocId);
+
+  @override
+  Future<void> preserveOriginal({required String fileName, required String fingerprint,
+      required Uint8List bytes, required String extractedText,
+      required Map<String, Uint8List> images}) async =>
+      OfflineSearchStore.forDatabase(await DatabaseHelper.instance.database).preserveOriginal(
+          fileName:fileName, fingerprint:fingerprint, bytes:bytes,
+          extractedText:extractedText, images:images);
 
   @override
   Future<List<KnowledgeBaseEntity>> getAllEntries() =>
@@ -41,3 +58,4 @@ class KnowledgeBaseRepositoryImpl implements KnowledgeBaseRepository {
   @override
   Future<int> getTotalCount() => _localDatasource.getTotalCount();
 }
+

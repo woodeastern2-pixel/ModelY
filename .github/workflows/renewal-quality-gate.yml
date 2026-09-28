@@ -79,6 +79,7 @@ jobs:
           path: |
             test/goldens/*.png
             test/goldens/manual-image-audit.json
+            test/goldens/offline-search-performance.json
             test/failures/*.png
           if-no-files-found: error
 

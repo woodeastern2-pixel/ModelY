@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'manual_media_store.dart';
+import 'original_media_registry.dart';
 
 import 'package:archive/archive.dart';
 import 'package:flutter/services.dart';
@@ -65,6 +66,7 @@ class BundledManualService {
   }
 
   static Future<List<Map<String, dynamic>>> imagesFor(String entryId) async {
+    if (entryId.startsWith('raw-')) return OriginalMediaRegistry.images[entryId] ?? [];
     if (!entryId.startsWith('manual-pack-')) {
       return const ManualMediaStore().imagesFor(entryId);
     }

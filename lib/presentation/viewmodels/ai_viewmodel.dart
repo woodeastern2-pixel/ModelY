@@ -9,6 +9,7 @@ import '../../core/utils/vector_utils.dart';
 import '../../domain/entities/ai_chat_message_entity.dart';
 import '../../domain/entities/knowledge_base_entity.dart';
 import '../../domain/repositories/knowledge_base_repository.dart';
+import '../../domain/repositories/indexed_knowledge_repository.dart';
 import '../../domain/repositories/voc_repository.dart';
 import '../../data/services/ai_service.dart';
 import '../../data/services/local_answer_service.dart';
@@ -447,6 +448,7 @@ class AiViewModel extends ChangeNotifier {
     try {
       final query = '$title $content';
       await searchSimilarVocs(query, excludeVocId: excludeVocId);
+      if (_error != null) return null;
       if (!_localAnswers.canAnswer(query, _similarVocs)) {
         _error = _localAnswers.needsWholeDataset(query)
             ? '이 질문은 전체 자료의 분석이 필요합니다. 인공지능 연결 후 코파일럿을 이용해 주세요.'
@@ -767,6 +769,10 @@ class AiViewModel extends ChangeNotifier {
     bool includeRegisteredQuestions = false,
     String? excludeVocId,
   }) async {
+    if (!includeRegisteredQuestions && _kbRepository is IndexedKnowledgeRepository) {
+      return (_kbRepository as IndexedKnowledgeRepository)
+          .searchOffline(query, excludeVocId: excludeVocId);
+    }
     final entries = <KnowledgeBaseEntity>[
       ...await _kbRepository.getAllEntries(),
     ];

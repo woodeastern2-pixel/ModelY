@@ -70,6 +70,19 @@ class LocalAnswerService {
     'of', 'please', 'brity', '브리티',
   };
 
+  Set<String> conceptKeys(String text) {
+    final normalized = _normalize(text);
+    return {for (final key in _concepts.keys) if (_matches(normalized, key)) 'c:$key'};
+  }
+
+  List<List<String>> queryIndexKeys(String query) => [
+    for (final term in _terms(query))
+      if (_concepts.containsKey(term)) ['c:$term'] else [
+        for (var i = 0; i + 1 < term.replaceAll(' ', '').length; i++)
+          'g:${term.replaceAll(' ', '').substring(i, i + 2)}',
+      ],
+  ];
+
   List<SimilarVocResult> rank(
     String query,
     Iterable<KnowledgeBaseEntity> entries, {
@@ -185,8 +198,28 @@ class LocalAnswerService {
     if (selected.isEmpty) return '$noEvidence\n근거: 없음';
     final fragments = selected.map((reference) {
       final item = reference.knowledgeBase;
-      final authored = ManualContent.parse(item.answer).body;
-      final text = authored.isEmpty
+      final parsed = ManualContent.parse(item.answer);
+      final authored = parsed.body;
+      var imageEvidence = '';
+      if (item.id.startsWith('raw-') && parsed.transcription.isNotEmpty) {
+        final bodyOnly = KnowledgeBaseEntity(id:item.id, question:item.question,
+          answer:authored, category:item.category, customer:item.customer,
+          project:item.project, resolvedAt:item.resolvedAt, createdAt:item.createdAt);
+        if (!canAnswer(query, rank(query, [bodyOnly]))) {
+          final terms = _terms(query);
+          final lines = parsed.transcription.split('\n');
+          final relevant = <int>{};
+          for (var i=0;i<lines.length;i++) {
+            if (terms.any((t) => _matches(_normalize(lines[i]), t))) {
+              relevant.add(i);
+              if(i+1<lines.length) relevant.add(i+1);
+            }
+          }
+          final ordered=relevant.toList()..sort();
+          if(ordered.isNotEmpty) imageEvidence = '원문 이미지에서 찾은 내용입니다. 자동 인식 결과이므로 아래 원본 이미지와 대조해 주세요.\n${ordered.take(12).map((i)=>lines[i]).join('\n')}';
+        }
+      }
+      final text = imageEvidence.isNotEmpty ? imageEvidence : authored.isEmpty
           ? '이미지에 포함된 설명은 아래 매뉴얼 원본 이미지를 확인해 주세요.'
           : query.trim().isEmpty ? authored : _extract(query, authored);
       final source = item.customer?.trim();

@@ -14,6 +14,7 @@ import '../../core/utils/search_query_expander.dart';
 import '../../core/utils/vector_utils.dart';
 import '../../domain/entities/knowledge_base_entity.dart';
 import '../../domain/repositories/knowledge_base_repository.dart';
+import '../../domain/repositories/indexed_knowledge_repository.dart';
 
 class ManualImportResult {
   final int selectedFiles;
@@ -107,6 +108,13 @@ class ManualDocumentImportService {
         if (normalized.trim().isEmpty) {
           warnings.add('$fileName: 텍스트 추출 결과가 비어 있어 건너뜀');
           continue;
+        }
+
+        if (_kbRepository is IndexedKnowledgeRepository) {
+          final bytes = await file.readAsBytes();
+          await (_kbRepository as IndexedKnowledgeRepository).preserveOriginal(
+            fileName:fileName, fingerprint:sha256.convert(bytes).toString(),
+            bytes:bytes, extractedText:normalized, images:Map.of(_extractedImages));
         }
 
         final sections = _buildSections(normalized);
