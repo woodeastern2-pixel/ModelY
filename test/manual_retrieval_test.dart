@@ -27,6 +27,12 @@ void main() {
         '첨부파일을 선택한 다음 다운로드 버튼을 누릅니다.')]);
     expect(service.canAnswer('첨부 파일 다운로드', spaced), isTrue);
   });
+  test('OCR-only labels are searched with their recognition notice preserved', () {
+    final refs = service.rank('보존기간 90일', [entry('ocr', '화면 안내',
+        '[이미지 OCR 자동 인식] 보존기간 90일\n원본 화면에서 숫자를 확인하세요.')]);
+    expect(service.canAnswer('보존기간 90일', refs), isTrue);
+    expect(service.answerForQuery('보존기간 90일', refs), contains('OCR 자동 인식'));
+  });
   test('a matching title and product never substitute for body evidence', () {
     final refs = service.rank('메신저 비밀번호 복구', [
       entry('wrong', '메신저 비밀번호 복구', '메신저 제품을 소개합니다.'),
@@ -72,6 +78,7 @@ void main() {
       '메신저 제거 conversation data': 'All conversation data',
       '메신저 바로가기 desktop': 'Shortcut',
       '드라이브 다른 사람이 편집 중인 파일 취소': '강제 취소 기능을 제공하지 않습니다',
+      '설문 500명': '500명',
     };
     final watch = Stopwatch()..start();
     for (final query in queries.entries) {

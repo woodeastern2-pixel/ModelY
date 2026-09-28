@@ -84,7 +84,9 @@ class LocalAnswerService {
       final requestedProducts = terms.where(_products.contains);
       final knownProducts = _products.where((p) => _matches(scope, p)).toSet();
       if (!preferred && requestedProducts.isNotEmpty && knownProducts.isNotEmpty &&
-          !requestedProducts.any(knownProducts.contains)) continue;
+          !requestedProducts.any(knownProducts.contains)) {
+        continue;
+      }
       final windows = _windows(entry.answer);
       var best = 0.0;
       for (final window in windows) {
@@ -113,6 +115,10 @@ class LocalAnswerService {
       }
       // Pinned VOCs remain available to AI as context, but cannot manufacture
       // evidence for the offline answer path (isAnswerSource filters them).
+      if (entry.id.startsWith('registered-voc-')) {
+        final contextHits = terms.where((t) => _matches(corpora[i], t)).length;
+        best = math.max(best, 0.65 * contextHits / terms.length);
+      }
       final score = preferred ? math.max(best, 0.95) : best;
       if (score < 0.38) continue;
       ranked.add(SimilarVocResult(knowledgeBase: entry,
@@ -201,7 +207,9 @@ class LocalAnswerService {
     for (var i = 0; i < blocks.length; i++) {
       // Retain section-wide restrictions and provenance, including OCR labels.
       if (RegExp(r'주의|제한|불가|않습니다|해야|경우|출처|자동 인식|OCR|caution|warning|must|cannot|only', caseSensitive: false)
-          .hasMatch(blocks[i])) keep.add(i);
+          .hasMatch(blocks[i])) {
+        keep.add(i);
+      }
     }
     if (keep.length == blocks.length) return text.trim();
     final indices = keep.toList()..sort();

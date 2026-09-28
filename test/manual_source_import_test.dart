@@ -10,7 +10,7 @@ void main() {
   test('raw paragraphs, numbered steps and table cells survive offline import and AI failure', () async {
     final dir = await Directory.systemTemp.createTemp('manual-source-');
     addTearDown(() => dir.delete(recursive: true));
-    final xml = '<w:document xmlns:w="urn:test"><w:body>'
+    const xml = '<w:document xmlns:w="urn:test"><w:body>'
         '<w:p><w:r><w:t>1. 복원 절차</w:t></w:r></w:p>'
         '<w:p><w:r><w:t>1. 휴지통을 엽니다.</w:t></w:r></w:p>'
         '<w:p><w:r><w:t>2. 파일을 선택하고 복원합니다.</w:t></w:r></w:p>'
