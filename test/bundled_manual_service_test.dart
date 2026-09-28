@@ -96,8 +96,8 @@ void main() {
     final db = await database();
     try {
       final entries = pack['entries'] as List;
-      final broken = {...pack, 'entries': [entries.first, {...entries[1] as Map, 'answer':null}]};
-      await expectLater(BundledManualService.installPack(db, broken), throwsA(isA<DatabaseException>()));
+      final broken = {...pack, 'entries': [entries.first, {...Map<String, dynamic>.from(entries[1] as Map), 'answer':null}]};
+      await expectLater(BundledManualService.installPack(db, broken), throwsA(isA<FormatException>()));
       expect(await db.query('knowledge_base'), isEmpty);
       expect(await db.query('settings'), isEmpty);
     } finally {

@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:flutter/services.dart';
@@ -37,7 +36,12 @@ class BundledManualService {
       final now = DateTime.now().toIso8601String();
       final batch = txn.batch();
       for (final raw in pack['entries'] as List) {
-        final e = raw as Map<String, dynamic>;
+        final e = Map<String, dynamic>.from(raw as Map);
+        for (final key in ['id', 'question', 'answer', 'sourceName', 'project']) {
+          if (e[key] is! String || (e[key] as String).trim().isEmpty) {
+            throw FormatException('매뉴얼 자료의 $key 항목이 비어 있습니다.');
+          }
+        }
         batch.insert('knowledge_base', {
           'id': e['id'],
           'question': e['question'],

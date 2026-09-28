@@ -36,8 +36,14 @@ void main() {
         ),
       ),
     )));
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
     await tester.pumpAndSettle();
     await tester.tap(find.text('매뉴얼 원본 이미지 1개'));
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
     await tester.pumpAndSettle();
     await tester.runAsync(() async {
       final image = await (boundary.currentContext!.findRenderObject() as RenderRepaintBoundary).toImage();

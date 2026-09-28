@@ -70,8 +70,10 @@ class _ManualImageState extends State<_ManualImage> {
       builder: (context, snapshot) {
         if (snapshot.hasError) return const Text('이미지를 읽지 못했습니다.');
         final bytes = snapshot.data;
-        if (bytes == null) return const SizedBox(
-          height: 32, child: Center(child: LinearProgressIndicator()));
+        if (bytes == null) {
+          return const SizedBox(
+            height: 32, child: Center(child: LinearProgressIndicator()));
+        }
         return Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: InkWell(
