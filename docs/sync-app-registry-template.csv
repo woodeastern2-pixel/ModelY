@@ -1,0 +1,5 @@
+instance_name,environment,role,seq,base_url,bearer_token_alias,enabled,owner,last_health_check,status_note
+VOC-PROD-HQ-01,prod,hq,01,http://10.0.0.11:8788,token-prod-2026q3,true,ops-team,2026-07-04T15:30:00,normal
+VOC-PROD-BRANCH-02,prod,branch,02,http://10.0.0.12:8788,token-prod-2026q3,true,ops-team,2026-07-04T15:30:00,normal
+VOC-PROD-BRANCH-03,prod,branch,03,http://10.0.0.13:8788,token-prod-2026q3,true,ops-team,2026-07-04T15:30:00,normal
+VOC-DEV-QA-01,dev,qa,01,http://10.10.0.21:8788,token-dev-2026q3,false,qa-team,2026-07-04T12:00:00,standby
