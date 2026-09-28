@@ -16,6 +16,7 @@ class OfflineSearchStore {
   final Database db;
   final OfflineSearchIndex index = OfflineSearchIndex();
   final Directory? directory;
+  final _contexts = <String, Map<String,dynamic>>{};
   Future<void>? _updating;
   Timer? _timer;
   static final _instances = Expando<OfflineSearchStore>();
@@ -57,6 +58,9 @@ class OfflineSearchStore {
         _load(jsonDecode(row['record'] as String) as Map<String, dynamic>,
             (jsonDecode(row['tokens'] as String) as List).cast<String>());
       }
+      for(final row in await db.query('original_documents',columns:['content'])) {
+        _prepareContexts(jsonDecode(row['content'] as String) as Map<String,dynamic>);
+      }
       await refresh();
     }
     if (maintenance) _timer ??= Timer.periodic(const Duration(seconds: 1), (_) {
@@ -93,6 +97,30 @@ class OfflineSearchStore {
     for (final item in encoded) _load(item['row'] as Map<String,dynamic>, (item['tokens'] as List).cast<String>());
   }
 
+  void _prepareContexts(Map<String,dynamic> document) {
+    final groups=<Object?,List<Map<String,dynamic>>>{};
+    for(final raw in document['blocks'] as List) {
+      final block=Map<String,dynamic>.from(raw as Map);
+      (groups[block['section']] ??= []).add(block);
+    }
+    for(final group in groups.values) {
+      final text=group.map((b)=>b['text'] as String).where((s)=>s.trim().isNotEmpty).join('\n\n');
+      final ocr=group.map((b)=>b['ocr'] as String? ?? '').where((s)=>s.trim().isNotEmpty).join('\n');
+      final images=<String,Map<String,dynamic>>{};
+      for(final block in group) {
+        for(final raw in block['images'] as List? ?? []) {
+          final image=Map<String,dynamic>.from(raw as Map);images[image['id'] as String]=image;
+        }
+      }
+      final context=<String,dynamic>{'title':group.first['title'],
+        'body':'$text${ocr.isEmpty ? '' : '\n\n[이미지에서 읽은 글자: 원본 대조 필요]\n$ocr'}\n\n[출처] ${document['filename']} · ${group.first['title']}',
+        'images':images.values.toList()};
+      for(final block in group) {
+        _contexts[block['id'] as String]=context;
+      }
+    }
+  }
+
   Future<void> installOriginal(Map<String,dynamic> document, {String? originalPath}) async {
     final id = document['id'] as String;
     final blocks = (document['blocks'] as List).cast<Map<String,dynamic>>();
@@ -118,6 +146,7 @@ class OfflineSearchStore {
         'documentId':id,'images':images.values.toList()});
     }
     await _putMany(rows);
+    _prepareContexts(document);
     await db.insert('original_documents', {'id':id,'name':document['filename'],
       'fingerprint':document['sha256'],'original_path':originalPath,'content':jsonEncode(document)}, conflictAlgorithm:ConflictAlgorithm.replace);
   }
@@ -131,9 +160,13 @@ class OfflineSearchStore {
     await ManualMediaStore(directory:directory == null ? null : Directory(p.join(root.path,'media'))).save('manual-source-$fingerprint',images);
     final paragraphs=extractedText.split(RegExp(r'\n\s*\n')).where((s)=>s.trim().isNotEmpty).toList();
     final blocks=<Map<String,dynamic>>[];
+    var section=0;
+    var sectionLength=0;
     for(var i=0;i<paragraphs.length;i++) {
       final ids=RegExp(r'\[manual-image:([a-z0-9-]+)\]').allMatches(paragraphs[i]).map((m)=>m.group(1)!);
-      blocks.add({'id':'raw-$fingerprint-$i','title':fileName,'ordinal':i,'section':0,
+      if(sectionLength+paragraphs[i].length>2400 || paragraphs[i].startsWith('[페이지 ')) {section++;sectionLength=0;}
+      sectionLength+=paragraphs[i].length;
+      blocks.add({'id':'raw-$fingerprint-$i','title':fileName,'ordinal':i,'section':section,
         'text':paragraphs[i].replaceAll(RegExp(r'\[manual-image:[a-z0-9-]+\]'),''),
         'ocr':'','images':[for(final id in ids) {'id':id,'kind':'imported'}]});
     }
@@ -186,6 +219,16 @@ class OfflineSearchStore {
     }
     if(_updating!=null) await _updating!.timeout(const Duration(seconds:2));
     await refresh().timeout(const Duration(seconds:2));
-    return index.search(query,excludeVocId:excludeVocId);
+    final matches=index.search(query,excludeVocId:excludeVocId);
+    return matches.map((r) {
+      final e=r.knowledgeBase;
+      final context=_contexts[e.id];
+      if(context==null) return r;
+      OriginalMediaRegistry.images[e.id]=(context['images'] as List).cast<Map<String,dynamic>>();
+      return SimilarVocResult(knowledgeBase:KnowledgeBaseEntity(
+        id:e.id,question:'원문 · ${context['title']}',answer:context['body'] as String,
+        category:e.category,customer:e.customer,project:e.project,
+        resolvedAt:e.resolvedAt,createdAt:e.createdAt),similarityScore:r.similarityScore);
+    }).toList();
   }
 }

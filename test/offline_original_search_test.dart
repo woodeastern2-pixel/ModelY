@@ -1,3 +1,10 @@
+import 'package:ai_voc_assistant/domain/repositories/indexed_knowledge_repository.dart';
+import 'package:ai_voc_assistant/domain/repositories/knowledge_base_repository.dart';
+import 'package:ai_voc_assistant/domain/repositories/voc_repository.dart';
+import 'package:ai_voc_assistant/domain/repositories/settings_repository.dart';
+import 'package:ai_voc_assistant/domain/entities/knowledge_base_entity.dart';
+import 'package:ai_voc_assistant/presentation/viewmodels/ai_viewmodel.dart';
+import 'package:ai_voc_assistant/presentation/viewmodels/settings_viewmodel.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -106,6 +113,25 @@ void main() {
     expect(LocalAnswerService().answerForQuery('휴지통 복원',refs),contains('복원 버튼'));
   });
 
+  test('answer entry point uses the index and retains distant section restrictions', () async {
+    final db=await database();addTearDown(db.close);
+    final store=OfflineSearchStore(db);await store.initialize(bundled:false,maintenance:false);
+    await store.installOriginal({'id':'full-section','filename':'원문.docx','sha256':'1234567890abcdef',
+      'blocks':[
+        for(var i=0;i<8;i++) {'id':'raw-context-$i','title':'복원 절차','ordinal':i,'section':1,
+          'text':i==0 ? '휴지통에서 복원 버튼을 선택하세요.' : i==7 ? '주의: 90일 이후에는 복원이 불가합니다.' : '화면 안내 $i',
+          'ocr':'','images':[]},
+      ]});
+    final settings=SettingsViewModel(_EmptySettings());addTearDown(settings.dispose);
+    final vm=AiViewModel(_IndexRepository(store),_NoVocScan(),settings);addTearDown(vm.dispose);
+    final clock=Stopwatch()..start();
+    final result=await vm.generateAnswer('휴지통 복원','방법');
+    expect(result,isNotNull);
+    expect(result!.answer,contains('90일 이후에는 복원이 불가'));
+    expect(vm.isAiConnected,isFalse);
+    expect(clock.elapsedMilliseconds,lessThan(5000));
+  });
+
   test('insert update delete and approved response invalidate the index', () async {
     final db=await database();addTearDown(db.close);
     final store=OfflineSearchStore(db);await store.initialize(bundled:false,maintenance:false);
@@ -123,4 +149,26 @@ void main() {
     expect(await store.search('휴지통 복원'),isNotEmpty);
     expect(await store.search('휴지통 복원',excludeVocId:'v'),isEmpty);
   });
+}
+
+class _IndexRepository implements KnowledgeBaseRepository, IndexedKnowledgeRepository {
+  final OfflineSearchStore store;
+  _IndexRepository(this.store);
+  @override
+  Future<List<SimilarVocResult>> searchOffline(String query,{String? excludeVocId}) =>
+      store.search(query,excludeVocId:excludeVocId);
+  @override
+  Future<List<KnowledgeBaseEntity>> getAllEntries() => throw StateError('Full QA scan is forbidden in the answer path');
+  @override
+  dynamic noSuchMethod(Invocation i)=>super.noSuchMethod(i);
+}
+class _NoVocScan implements VocRepository {
+  @override
+  dynamic noSuchMethod(Invocation i)=>throw StateError('Full VOC scan is forbidden in the answer path');
+}
+class _EmptySettings implements SettingsRepository {
+  @override
+  Future<Map<String,String>> getAllSettings() async => {};
+  @override
+  dynamic noSuchMethod(Invocation i)=>super.noSuchMethod(i);
 }
