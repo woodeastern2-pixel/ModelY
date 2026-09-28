@@ -77,7 +77,7 @@ class KnowledgeBaseScreen extends StatelessWidget {
                         ),
                         itemCount: vm.entries.length,
                         itemBuilder: (_, i) =>
-                            _KbCard(entry: vm.entries[i], vm: vm),
+                            _KbCard(key: ValueKey(vm.entries[i].id), entry: vm.entries[i], vm: vm),
                       ),
                     ),
             ),
@@ -302,13 +302,17 @@ class _SearchBarState extends State<_SearchBar> {
                   icon: const Icon(Icons.clear),
                   onPressed: () {
                     _controller.clear();
+                    setState(() {});
                     widget.vm.setSearch('');
                   },
                 )
               : null,
           isDense: true,
         ),
-        onChanged: widget.vm.setSearch,
+        onChanged: (value) {
+          setState(() {});
+          widget.vm.setSearch(value);
+        },
       ),
     );
   }
@@ -517,7 +521,7 @@ class _ManualUploadManagerState extends State<_ManualUploadManager> {
 class _KbCard extends StatelessWidget {
   final KnowledgeBaseEntity entry;
   final KnowledgeBaseViewModel vm;
-  const _KbCard({required this.entry, required this.vm});
+  const _KbCard({super.key, required this.entry, required this.vm});
 
   @override
   Widget build(BuildContext context) {

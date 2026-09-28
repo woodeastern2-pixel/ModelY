@@ -90,6 +90,8 @@ void main() {
         'answer': answer});
     }
     final qualityQueries = {
+      '미팅개설이 안되요 미팅개설을 하려면 어떤게 해야하나요?': '즉시시작',
+      '미팅 개설을 하려면 어떻게 해야 하나요?': '즉시시작',
       '설문 대상자 1000명 지정 방법': '1000명 조건',
       '메신저 8.5.5 알림 설정 방법': '버전 8.5.5',
       '드라이브 파일 복원 방법 그리고 보관 기간': '보관',
@@ -102,6 +104,11 @@ void main() {
       clock.stop();
       expect(answerer.canAnswer(item.key, refs), isTrue, reason: item.key);
       expect(answer, contains(item.value), reason: item.key);
+      if (item.key.contains('미팅')) {
+        expect(answer, contains('권한'));
+        expect(answer, contains('미팅'));
+        if (item.key.contains('안되요')) expect(answer, contains('원인은 자료만으로'));
+      }
       if (item.key.contains('영구')) {
         expect(answer, contains('영구 삭제한 파일/폴더는 복원이 불가능'));
         expect(answer, isNot(contains('다음 순서')));

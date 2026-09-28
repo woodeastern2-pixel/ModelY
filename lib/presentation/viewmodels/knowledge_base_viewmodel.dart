@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../core/constants/app_constants.dart';
@@ -15,6 +16,14 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
   final AiService _aiService = AiService();
 
   List<KnowledgeBaseEntity> _entries = [];
+  List<KnowledgeBaseEntity> _visible = [];
+  Map<String, String> _searchBodies = {};
+  Timer? _searchTimer;
+  bool _disposed = false;
+  int _loadGeneration = 0;
+  int searchPasses = 0;
+  final Completer<void> _ready = Completer<void>();
+  Future<void> get ready => _ready.future;
   bool _isLoading = false;
   bool _isImportingManual = false;
   int _manualImportTotalSections = 0;
@@ -38,11 +47,14 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
+    _loadGeneration++;
+    _searchTimer?.cancel();
     _settingsViewModel.removeListener(_configureAiService);
     super.dispose();
   }
 
-  List<KnowledgeBaseEntity> get entries => _filtered;
+  List<KnowledgeBaseEntity> get entries => _visible;
   bool get isLoading => _isLoading;
   bool get isImportingManual => _isImportingManual;
   int get manualImportTotalSections => _manualImportTotalSections;
@@ -63,6 +75,7 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
   String get manualFileFilter => _manualFileFilter;
 
   List<KnowledgeBaseEntity> get _filtered {
+    searchPasses++;
     var list = _entries;
     if (_filterCategory.isNotEmpty) {
       list = list.where((e) => e.category == _filterCategory).toList();
@@ -79,23 +92,28 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
           )
           .toList();
     }
-    if (_searchQuery.isNotEmpty) {
-      list = list
-          .where(
-            (e) => SearchQueryExpander.matches(
-              _searchQuery,
-              [
-                e.question,
-                e.answer,
-                e.project ?? '',
-                e.customer ?? '',
-                e.category,
-              ].join(' '),
-            ),
-          )
-          .toList();
+    if (_searchQuery.trim().isNotEmpty) {
+      final matcher = SearchQueryExpander.compile(_searchQuery);
+      list = list.where((e) => matcher.matchesNormalized(_searchBodies[e.id] ?? '')).toList();
     }
     return list;
+  }
+
+  void _refreshVisible() {
+    _searchTimer?.cancel();
+    _visible = List.unmodifiable(_filtered);
+  }
+
+  Future<void> _installEntries(List<KnowledgeBaseEntity> entries) async {
+    final generation = ++_loadGeneration;
+    final bodies = entries.length > 100
+        ? await compute(_prepareSearchBodies, entries)
+        : _prepareSearchBodies(entries);
+    if (_disposed || generation != _loadGeneration) return;
+    _entries = List.of(entries);
+    _searchBodies = bodies;
+    _sanitizeManualFileFilter();
+    _refreshVisible();
   }
 
   Future<void> loadEntries() async {
@@ -103,19 +121,21 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
-      _entries = await _repository.getAllEntries();
-      _sanitizeManualFileFilter();
+      await _installEntries(await _repository.getAllEntries());
     } catch (e) {
       _error = e.toString();
     } finally {
       _isLoading = false;
-      notifyListeners();
+      if (!_ready.isCompleted) _ready.complete();
+      if (!_disposed) notifyListeners();
     }
   }
 
   Future<void> deleteEntry(String id) async {
     await _repository.deleteEntry(id);
     _entries.removeWhere((e) => e.id == id);
+    _searchBodies.remove(id);
+    _refreshVisible();
     notifyListeners();
   }
 
@@ -149,7 +169,7 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
           notifyListeners();
         },
       );
-      _entries = await _repository.getAllEntries();
+      await _installEntries(await _repository.getAllEntries());
       return result;
     } catch (e) {
       _error = e.toString();
@@ -237,17 +257,20 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
       (entry) => toDelete.any((item) => item.id == entry.id),
     );
     _sanitizeManualFileFilter();
+    _refreshVisible();
     notifyListeners();
     return toDelete.length;
   }
 
   void setFilter(String category) {
     _filterCategory = category;
+    _refreshVisible();
     notifyListeners();
   }
 
   void setProductFilter(String product) {
     _filterProduct = product.trim();
+    _refreshVisible();
     notifyListeners();
   }
 
@@ -256,12 +279,24 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
     if (_manualFileFilter.isNotEmpty && _filterCategory != _manualCategory) {
       _filterCategory = _manualCategory;
     }
+    _refreshVisible();
     notifyListeners();
   }
 
   void setSearch(String query) {
+    if (_searchQuery == query || _disposed) return;
     _searchQuery = query;
-    notifyListeners();
+    _searchTimer?.cancel();
+    if (query.isEmpty) {
+      _refreshVisible();
+      notifyListeners();
+      return;
+    }
+    _searchTimer = Timer(const Duration(milliseconds: 180), () {
+      if (_disposed) return;
+      _refreshVisible();
+      notifyListeners();
+    });
   }
 
   List<String> get categories {
@@ -307,3 +342,8 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
   }
 }
 
+
+Map<String, String> _prepareSearchBodies(List<KnowledgeBaseEntity> entries) => {
+  for (final e in entries) e.id: SearchQueryExpander.normalize(
+      '${e.question} ${e.answer} ${e.project ?? ''} ${e.customer ?? ''} ${e.category}'),
+};

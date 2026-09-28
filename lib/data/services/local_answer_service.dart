@@ -65,6 +65,7 @@ class LocalAnswerService {
     '관련', '대한', '다시', '방법', '하나요', '하나',
     '하고', '싶어요', '싶습니다', '하는', '하려면', '되려면',
     '해야하나요', '해야', '되나요', '하려고', '싶은데', '싶은데요',
+    '안되요', '안돼요', '안됩니다', '안돼', '안되', '어떤게',
     '궁금합니다', '궁금해요', '궁금', '새로운', '새로', '해요',
     '주세요', '대해', '어떤', '되는', '하려고합니다', '기능',
     '사용', '사용법', '가능한가요', '합니다', '있는', 'the',
@@ -227,6 +228,10 @@ class LocalAnswerService {
       if (!knownVersions.contains(version)) gaps.add('요청하신 버전 $version 에 적용되는지는 확인되지 않았습니다.');
     }
     final bodies = references.map((r) => ManualContent.parse(r.knowledgeBase.answer).body).join('\n');
+    if (RegExp(r'안\s*(?:되|돼)|실패|오류').hasMatch(plan.request) &&
+        !RegExp(r'오류|실패|해결|조치|원인').hasMatch(bodies)) {
+      gaps.add('동작하지 않는 원인은 자료만으로 확인되지 않습니다. 아래는 확인된 사용 절차와 권한 조건입니다.');
+    }
     final knownQuantities = OfflineQueryPlan.quantities(bodies).toSet();
     for (final condition in OfflineQueryPlan.conditions(plan.request)) {
       if (!_matches(_normalize(bodies), _normalize(condition))) {

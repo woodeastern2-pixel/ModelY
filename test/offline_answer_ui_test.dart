@@ -96,6 +96,24 @@ void main() {
       expect(find.text('일부 근거 · 추가 확인 필요'), findsOneWidget);
       expect(tester.takeException(), isNull);
       await _capture(tester, key, 'quantity-condition-${dark ? "dark" : "light"}');
+      await tester.pumpWidget(ChangeNotifierProvider.value(value: vm,
+        child: MaterialApp(theme: dark ? AppTheme.darkTheme : AppTheme.lightTheme,
+          home: RepaintBoundary(key: key, child: const AiAnswerScreen(
+            key: ValueKey('meeting-create'), vocId: 'meeting-create-check',
+            vocTitle: '미팅개설이 안되요', vocContent: '미팅개설을 하려면 어떤게 해야하나요?',
+            category: '기타', customer: '', project: '')))));
+      for (var attempt = 0; attempt < 100; attempt++) {
+        await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 40)));
+        await tester.pump();
+        if (!vm.isGenerating && (vm.hasAnswer || vm.error != null)) break;
+      }
+      await tester.pumpAndSettle();
+      expect(vm.answerResult!.answer, contains('즉시시작'));
+      expect(vm.answerResult!.answer, contains('권한'));
+      expect(vm.hasPartialAnswer, isTrue);
+      expect(tester.takeException(), isNull);
+      await _capture(tester, key, 'meeting-create-${dark ? "dark" : "light"}');
+
 
     });
     testWidgets('schedule question composes an offline answer from the complete corpus (${dark ? "dark" : "light"})', (tester) async {
