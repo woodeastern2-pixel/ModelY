@@ -31,6 +31,17 @@ void main() {
     expect(service.answerForQuery(query, refs), contains('휴지통'));
   });
 
+  test('confirmed matching version outranks an unversioned duplicate', () {
+    final index = OfflineSearchIndex()
+      ..put(record('a-unknown', '파일 복원', '파일을 선택하고 복원합니다.'))
+      ..put(record('z-confirmed', '드라이브 v2.0 파일 복원', '파일을 선택하고 복원합니다.'));
+    const query = '드라이브 v2.0 파일 복원 방법';
+    final refs = index.search(query);
+    expect(service.canAnswer(query, refs), isTrue);
+    expect(service.answerReferences(refs, query: query).first.knowledgeBase.id, 'z-confirmed');
+    expect(service.evidenceGap(query, service.answerReferences(refs, query: query)), isEmpty);
+  });
+
   test('unknown requested version is disclosed while showing related guidance', () {
     final index = OfflineSearchIndex()..put(record('restore', '파일 복원',
         '휴지통에서 파일을 선택하고 복원 버튼을 클릭합니다.'));

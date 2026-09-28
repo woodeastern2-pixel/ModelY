@@ -154,6 +154,13 @@ class LocalAnswerService {
     });
   }
 
+  bool confirmedVersion(String query, KnowledgeBaseEntity entry) {
+    final requested = _requestedVersions(query);
+    if (requested.isEmpty) return false;
+    final known = OfflineQueryPlan.versions('${entry.customer ?? ''} ${entry.question}');
+    return requested.any(known.contains);
+  }
+
   bool versionCompatible(String query, KnowledgeBaseEntity entry) {
     final requested = _requestedVersions(query);
     if (requested.isEmpty) return true;
@@ -319,6 +326,12 @@ class LocalAnswerService {
           similarityScore: score.clamp(0.0, 1.0).toDouble()));
     }
     ranked.sort((a, b) {
+      final sufficient = (b.similarityScore >= 0.68 ? 1 : 0)
+          .compareTo(a.similarityScore >= 0.68 ? 1 : 0);
+      if (sufficient != 0) return sufficient;
+      final version = (confirmedVersion(query, b.knowledgeBase) ? 1 : 0)
+          .compareTo(confirmedVersion(query, a.knowledgeBase) ? 1 : 0);
+      if (version != 0) return version;
       final score = b.similarityScore.compareTo(a.similarityScore);
       if (score != 0) return score;
       // A matching shortcut table is supporting material, not the primary

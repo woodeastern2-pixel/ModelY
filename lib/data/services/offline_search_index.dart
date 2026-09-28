@@ -63,6 +63,12 @@ class OfflineSearchIndex {
     }
     final order = {for (var i = 0; i < found.length; i++) found.keys.elementAt(i): i};
     final ranked = found.values.toList()..sort((a, b) {
+      final sufficient = (b.similarityScore >= 0.68 ? 1 : 0)
+          .compareTo(a.similarityScore >= 0.68 ? 1 : 0);
+      if (sufficient != 0) return sufficient;
+      final version = (service.confirmedVersion(query, b.knowledgeBase) ? 1 : 0)
+          .compareTo(service.confirmedVersion(query, a.knowledgeBase) ? 1 : 0);
+      if (version != 0) return version;
       final location = (service.hasNavigationLocation(query, b.knowledgeBase) ? 1 : 0)
           .compareTo(service.hasNavigationLocation(query, a.knowledgeBase) ? 1 : 0);
       if (location != 0) return location;
