@@ -105,6 +105,9 @@ void main() {
       expect(answerer.canAnswer(item.key, refs), isTrue, reason: item.key);
       expect(answer, contains(item.value), reason: item.key);
       if (item.key.contains('미팅')) {
+        expect(refs.where((r)=>r.knowledgeBase.question.contains('6.미팅 사용하기')),hasLength(1));
+        final meeting=refs.singleWhere((r)=>r.knowledgeBase.question.contains('6.미팅 사용하기'));
+        expect(await BundledManualService.imagesFor(meeting.knowledgeBase.id),hasLength(2));
         expect(answer, contains('권한'));
         expect(answer, contains('미팅'));
         if (item.key.contains('안되요')) expect(answer, contains('원인은 자료만으로'));
@@ -120,6 +123,18 @@ void main() {
         'queries': store.index.lastQueries, 'candidates': store.index.lastTotalCandidates,
         'answer': answer});
     }
+    final meetingRow=(pack['entries'] as List).cast<Map<String,dynamic>>()
+        .singleWhere((e)=>e['id']=='manual-pack-works-2-0830');
+    final storedAnswer=meetingRow['answer'] as String;
+    await db.update('knowledge_base',{'answer':storedAnswer.replaceFirst(
+      '[출처]', '미팅 개설 추가 운영 안내: 담당자 승인 후 진행합니다.\n\n[출처]')},
+      where:'id=?',whereArgs:[meetingRow['id']]);
+    final edited=await store.search('미팅 개설을 하려면 어떻게 해야 하나요?');
+    expect(edited.any((r)=>r.knowledgeBase.id==meetingRow['id']),isTrue);
+    expect(edited.any((r)=>r.knowledgeBase.id.startsWith('raw-')),isTrue);
+    await db.update('knowledge_base',{'answer':storedAnswer},
+      where:'id=?',whereArgs:[meetingRow['id']]);
+    await store.refresh();
     store=OfflineSearchStore(db);
     await store.initialize(maintenance:false);
     await check('first-after-reload');
@@ -183,8 +198,38 @@ void main() {
     final result=await vm.generateAnswer('휴지통 복원','방법');
     expect(result,isNotNull);
     expect(result!.answer,contains('90일 이후에는 복원이 불가'));
+    expect(vm.similarVocs,hasLength(1));
     expect(vm.isAiConnected,isFalse);
     expect(clock.elapsedMilliseconds,lessThan(5000));
+  });
+
+  test('identical headings in different versions and sections stay distinct', () async {
+    final db=await database();addTearDown(db.close);
+    final store=OfflineSearchStore(db);
+    await store.initialize(bundled:false,maintenance:false);
+    for(final version in [1,2]) {
+      await store.installOriginal({'id':'version-$version','filename':'동일제목.docx',
+        'sha256':'000000000000000$version','project':'fixture','blocks':[
+          for(var i=0;i<2;i++) {'id':'raw-version-$version-$i','section':0,'ordinal':i,
+            'title':'복원 방법','text':'휴지통 복원 버튼을 선택하세요. 버전 $version 설명 $i',
+            'ocr':'','images':[{'id':'image-$version-$i','kind':'screen'}]},
+          if(version==2) {'id':'raw-repeated-heading','section':1,'ordinal':2,
+            'title':'복원 방법','text':'휴지통 복원 버튼을 선택하세요. 별도 절의 제한 사항',
+            'ocr':'','images':[]},
+        ]});
+    }
+    for(var repeat=0;repeat<2;repeat++) {
+      final refs=await store.search('휴지통 복원 버튼');
+      expect(refs,hasLength(3));
+      for(final version in [1,2]) {
+        final ref=refs.singleWhere((r)=>r.knowledgeBase.answer.contains('버전 $version'));
+        expect(ref.knowledgeBase.answer,contains('설명 0'));
+        expect(ref.knowledgeBase.answer,contains('설명 1'));
+        expect(await BundledManualService.imagesFor(ref.knowledgeBase.id),hasLength(2));
+      }
+      expect(refs.any((r)=>r.knowledgeBase.answer.contains('별도 절의 제한 사항')),isTrue);
+    }
+    expect(store.index.length,5); // Stored passages are never deleted by grouping.
   });
 
   test('insert update delete and approved response invalidate the index', () async {
@@ -227,3 +272,4 @@ class _EmptySettings implements SettingsRepository {
   @override
   dynamic noSuchMethod(Invocation i)=>super.noSuchMethod(i);
 }
+

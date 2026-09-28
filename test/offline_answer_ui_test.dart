@@ -108,6 +108,7 @@ void main() {
         if (!vm.isGenerating && (vm.hasAnswer || vm.error != null)) break;
       }
       await tester.pumpAndSettle();
+      expect(vm.similarVocs, hasLength(1));
       expect(vm.answerResult!.answer, contains('즉시시작'));
       expect(vm.answerResult!.answer, contains('권한'));
       expect(vm.hasPartialAnswer, isTrue);
@@ -321,3 +322,4 @@ class _IndexedCorpus implements KnowledgeBaseRepository, IndexedKnowledgeReposit
   @override
   dynamic noSuchMethod(Invocation i) => super.noSuchMethod(i);
 }
+

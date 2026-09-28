@@ -11,12 +11,15 @@ import '../../domain/entities/knowledge_base_entity.dart';
 import 'offline_search_index.dart';
 import 'original_media_registry.dart';
 import 'manual_media_store.dart';
+import 'manual_content.dart';
+import 'bundled_manual_service.dart';
 
 class OfflineSearchStore {
   final Database db;
   final OfflineSearchIndex index = OfflineSearchIndex();
   final Directory? directory;
   final _contexts = <String, Map<String,dynamic>>{};
+  final _sourceSections = <String, Set<String>>{};
   Future<void>? _updating;
   Timer? _timer;
   static final _instances = Expando<OfflineSearchStore>();
@@ -112,7 +115,11 @@ class OfflineSearchStore {
           final image=Map<String,dynamic>.from(raw as Map);images[image['id'] as String]=image;
         }
       }
+      final identity=jsonEncode([document['id'],document['sha256'],group.first['section']]);
+      final source='${document['filename']} · ${group.first['title']}';
+      (_sourceSections[source] ??= <String>{}).add(identity);
       final context=<String,dynamic>{'title':group.first['title'],
+        'identity':identity,'source':source,
         'body':'$text${ocr.isEmpty ? '' : '\n\n[이미지에서 읽은 글자: 원본 대조 필요]\n$ocr'}\n\n[출처] ${document['filename']} · ${group.first['title']}',
         'images':images.values.toList()};
       for(final block in group) {
@@ -220,7 +227,7 @@ class OfflineSearchStore {
     if(_updating!=null) await _updating!.timeout(const Duration(seconds:2));
     await refresh().timeout(const Duration(seconds:2));
     final matches=index.search(query,excludeVocId:excludeVocId);
-    return matches.map((r) {
+    final expanded=matches.map((r) {
       final e=r.knowledgeBase;
       final context=_contexts[e.id];
       if(context==null) return r;
@@ -230,5 +237,79 @@ class OfflineSearchStore {
         category:e.category,customer:e.customer,project:e.project,
         resolvedAt:e.resolvedAt,createdAt:e.createdAt),similarityScore:r.similarityScore);
     }).toList();
+    return _distinctReferences(expanded);
+  }
+
+  // Search every indexed passage as before. Consolidate only after expanding
+  // hits to complete sections, so distant restrictions and images survive.
+  Future<List<SimilarVocResult>> _distinctReferences(
+      List<SimilarVocResult> matches) async {
+    final rawGroups=<String,SimilarVocResult>{};
+    final sources=<String,List<String>>{};
+    for(final result in matches) {
+      final context=_contexts[result.knowledgeBase.id];
+      if(context==null) continue;
+      final key=context['identity'] as String;
+      final previous=rawGroups[key];
+      if(previous==null) {
+        rawGroups[key]=result;
+        (sources[context['source'] as String] ??= []).add(key);
+      } else if(result.similarityScore>previous.similarityScore) {
+        rawGroups[key]=result;
+      }
+    }
+    final output=<String,SimilarVocResult>{};
+    for(final result in matches) {
+      final entry=result.knowledgeBase;
+      final context=_contexts[entry.id];
+      String? group=context?['identity'] as String?;
+      if(group==null && entry.vocId==null) {
+        final source=_sourceOf(entry.answer);
+        final candidates=sources[source];
+        // A filename/title alone cannot distinguish versions or repeated headings.
+        if(candidates?.length==1 && _sourceSections[source]?.length==1) {
+          final key=candidates!.single;
+          final original=rawGroups[key]!.knowledgeBase;
+          if(entry.project==original.project && _covered(entry.answer,original.answer)) {
+            final available=(OriginalMediaRegistry.images[original.id] ?? [])
+                .map((image)=>image['id']).toSet();
+            try {
+              final images=await BundledManualService.imagesFor(entry.id);
+              if(images.every((image)=>available.contains(image['id']))) group=key;
+            } catch (_) {
+              // If attachment coverage cannot be verified, retain the entry.
+            }
+          }
+        }
+      }
+      final key=group==null ? 'entry:${entry.id}' : 'section:$group';
+      final representative=group==null ? result : rawGroups[group]!;
+      final previous=output[key];
+      final score=[result.similarityScore,representative.similarityScore,
+        if(previous!=null) previous.similarityScore].reduce((a,b)=>a>b?a:b);
+      output[key]=SimilarVocResult(knowledgeBase:representative.knowledgeBase,
+        similarityScore:score,adoptionCount:representative.adoptionCount,
+        usageCount:representative.usageCount,lastUsedAt:representative.lastUsedAt);
+    }
+    return output.values.toList();
+  }
+
+  static String? _sourceOf(String text) {
+    final position=text.lastIndexOf('[출처]');
+    return position<0 ? null : text.substring(position+4).trim();
+  }
+
+  static bool _covered(String candidate,String original) {
+    final a=ManualContent.parse(candidate), b=ManualContent.parse(original);
+    String normalize(String value)=>value.replaceAll(RegExp(r'\s+'),'');
+    bool includes(String shorter,String longer) {
+      final full=normalize(longer.split('[출처]').first);
+      final lines=shorter.split('[출처]').first.split('\n')
+          .map(normalize).where((line)=>line.isNotEmpty);
+      return lines.every(full.contains);
+    }
+    return includes(a.body,b.body) && includes(a.transcription,b.transcription);
   }
 }
+
+
