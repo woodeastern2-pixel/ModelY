@@ -76,6 +76,5 @@ void main() {
       'entries': entries.length, 'images': rows.length,
       'entriesWithTranscription': transcriptions, 'results': rows,
     }));
-    print('Manual audit: ${entries.length} entries, ${rows.length} decoded images, $transcriptions transcription sections.');
   }, timeout: const Timeout(Duration(minutes: 4)));
 }
