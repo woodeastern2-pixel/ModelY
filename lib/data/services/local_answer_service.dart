@@ -372,6 +372,10 @@ class LocalAnswerService {
         !s.startsWith('http') && !RegExp(r'이 장에서는|다루는 내용|다루는내용|chapter covers',
             caseSensitive: false).hasMatch(s)).toList();
     if (lines.length < 3) return false;
+    // A lack of sentence endings alone does not make concise facts a TOC.
+    final headings = lines.where((line) => RegExp(
+        r'(?:하기|경우|화면|내용|구성|설정|검색|사용)\s*$').hasMatch(line)).length;
+    if (headings < 3 || headings / lines.length < 0.7) return false;
     return !lines.any((line) => RegExp(
         r'습니다|합니다|입니다|됩니다|세요|십시오|불가능|불가|할 수 없|할 수 있|[|>→]|\b(?:click|select|open|cannot|must|will)\b',
         caseSensitive: false).hasMatch(line));

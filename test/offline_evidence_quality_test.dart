@@ -144,6 +144,15 @@ void main() {
     expect(answer, isNot(contains('다음 순서')));
   });
 
+  test('concise multiline facts remain searchable', () {
+    final index = OfflineSearchIndex()..put(record('facts', '파일 보관',
+        '보관 기간: 30일\n복원 대상: 삭제 파일\n지원 제품: 드라이브'));
+    const query = '드라이브 보관 기간';
+    final refs = index.search(query);
+    expect(service.canAnswer(query, refs), isTrue);
+    expect(service.answerForQuery(query, refs), contains('30일'));
+  });
+
   test('figure captions do not become numbered instructions', () {
     final answer = OfflineAnswerComposer().compose('설문 지정 방법', [
       const OfflineAnswerFragment('Click\n①지정함Click\n을클릭하여대상자를지정합니다.\n참여자 지정을 클릭합니다.', 'manual')]);
