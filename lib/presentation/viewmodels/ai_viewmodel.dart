@@ -455,8 +455,9 @@ class AiViewModel extends ChangeNotifier {
       _answerResult = AiAnswerResult(
         answer: _localAnswers.answerForQuery(query, _similarVocs),
         confidence: _similarVocs.first.similarityScore,
-        referencedCases: [_similarVocs.first.knowledgeBase.question],
-        notes: '인공지능 생성 답변이 아닌 저장된 답변 원문입니다. 적용 전에 담당자가 확인해 주세요.',
+        referencedCases: _localAnswers.answerReferences(_similarVocs)
+            .map((r) => r.knowledgeBase.question).toList(),
+        notes: '매뉴얼 본문 전체에서 찾은 근거입니다. 검색 점수는 정답 확률이 아닙니다. 출처의 제품·버전과 제한 조건을 확인해 주세요.',
       );
       return _answerResult;
     } catch (e) {
@@ -918,3 +919,4 @@ class AiViewModel extends ChangeNotifier {
     return '${title.substring(0, 26).trim()}...';
   }
 }
+

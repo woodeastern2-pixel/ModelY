@@ -44,7 +44,7 @@ class KnowledgeBaseScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      '매뉴얼을 분석하고 있습니다. ${vm.manualImportProcessedSections}/${vm.manualImportTotalSections == 0 ? '?' : vm.manualImportTotalSections}개 구간 처리 · 질문 ${vm.manualImportGeneratedEntries}개 생성',
+                      '매뉴얼을 분석하고 있습니다. ${vm.manualImportProcessedSections}/${vm.manualImportTotalSections == 0 ? '?' : vm.manualImportTotalSections}개 구간 처리 · 원문 ${vm.manualImportGeneratedEntries}개 보존',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                     if ((vm.manualImportCurrentFile ?? '').isNotEmpty)
@@ -400,7 +400,7 @@ class _ManualUploadManagerState extends State<_ManualUploadManager> {
                       ),
                     ),
                     Text(
-                      '문서 $fileCount개 · 질문 $totalSections개',
+                      '출처 $fileCount개 · 지식 항목 $totalSections개',
                       style: Theme.of(context).textTheme.labelSmall,
                     ),
                     const SizedBox(width: 4),
@@ -414,7 +414,7 @@ class _ManualUploadManagerState extends State<_ManualUploadManager> {
             ),
             const SizedBox(height: 6),
             const Text(
-              '문서를 선택하면 해당 매뉴얼에서 생성된 질문만 볼 수 있습니다.',
+              '원문과 기존 지식 항목의 본문 전체를 검색합니다. 항목 수는 답변 가능한 질문 수가 아닙니다.',
               style: TextStyle(fontSize: 12, color: Colors.grey),
             ),
             const SizedBox(height: 8),
@@ -459,7 +459,7 @@ class _ManualUploadManagerState extends State<_ManualUploadManager> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   subtitle: Text(
-                    '생성된 질문 ${entry.value}개',
+                    '지식 항목 ${entry.value}개',
                     style: const TextStyle(fontSize: 12),
                   ),
                   trailing: IconButton(
@@ -608,7 +608,7 @@ class _KbCard extends StatelessWidget {
                     if (entry.embedding != null)
                       const Chip(
                         label: Text(
-                          'AI 검색 준비 완료',
+                          '본문 검색 가능',
                           style: TextStyle(fontSize: 10),
                         ),
                         visualDensity: VisualDensity.compact,
@@ -680,3 +680,4 @@ class _EmptyState extends StatelessWidget {
     );
   }
 }
+

@@ -28,7 +28,6 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
   String _manualFileFilter = '';
   static const String _manualCategory =
       ManualDocumentImportService.manualCategory;
-  static const String _manualProjectMarker = 'manual-upload';
 
   KnowledgeBaseViewModel(this._repository, this._settingsViewModel) {
     _manualImportService = ManualDocumentImportService(_repository);
@@ -131,11 +130,6 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
       return null;
     }
 
-    if (!_ensureManualImportAiReady()) {
-      notifyListeners();
-      return null;
-    }
-
     _isImportingManual = true;
     _manualImportTotalSections = 0;
     _manualImportProcessedSections = 0;
@@ -147,38 +141,6 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
     try {
       final result = await _manualImportService.importDocuments(
         normalized,
-        qaGenerator:
-            (fileName, sectionNumber, sectionTitle, sectionBody) async {
-              final pairs = await _aiService.generateManualQaPairs(
-                fileName: fileName,
-                sectionLabel: '매뉴얼 섹션 $sectionNumber: $sectionTitle',
-                sectionText: sectionBody,
-              );
-
-              if (pairs.isEmpty) {
-                final fallbackQuestion =
-                    '[$fileName] 매뉴얼 섹션 $sectionNumber $sectionTitle은 어떻게 하나요?';
-                final fallbackAnswer = await _aiService.refineManualAnswer(
-                  question: fallbackQuestion,
-                  sourceText: sectionBody,
-                );
-                return [
-                  ManualGeneratedQa(
-                    question: fallbackQuestion,
-                    answer: fallbackAnswer,
-                  ),
-                ];
-              }
-
-              return pairs
-                  .map(
-                    (item) => ManualGeneratedQa(
-                      question: item.question,
-                      answer: item.answer,
-                    ),
-                  )
-                  .toList();
-            },
         onProgress: (progress) {
           _manualImportTotalSections = progress.totalSections;
           _manualImportProcessedSections = progress.processedSections;
@@ -186,10 +148,6 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
           _manualImportCurrentFile = progress.currentFile;
           notifyListeners();
         },
-        answerRefiner: (question, sourceText) => _aiService.refineManualAnswer(
-          question: question,
-          sourceText: sourceText,
-        ),
       );
       _entries = await _repository.getAllEntries();
       return result;
@@ -244,14 +202,6 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
       temperature: _settingsViewModel.aiTemperature,
       maxTokens: _settingsViewModel.aiMaxTokens,
     );
-  }
-
-  bool _ensureManualImportAiReady() {
-    if (_aiService.isConfigured) {
-      return true;
-    }
-    _error = 'AI 설정이 필요합니다. 설정에서 AI 제공자/API를 먼저 구성해 주세요.';
-    return false;
   }
 
   bool isSupportedManualFile(String fileName) {
@@ -339,14 +289,12 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
   }
 
   bool _isManualEntry(KnowledgeBaseEntity entry) {
-    return entry.category == _manualCategory &&
-        (entry.id.startsWith('manual-pack-') ||
-            entry.project == _manualProjectMarker ||
-            entry.question.contains('매뉴얼 섹션'));
+    return entry.category == _manualCategory;
   }
 
   String _manualFileNameOf(KnowledgeBaseEntity entry) {
-    return (entry.customer ?? '').trim();
+    final source = (entry.customer ?? '').trim();
+    return source.isNotEmpty ? source : '${entry.project ?? '기존 매뉴얼'} · 출처 미지정';
   }
 
   void _sanitizeManualFileFilter() {
@@ -358,3 +306,4 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
     }
   }
 }
+

@@ -93,6 +93,9 @@ class ManualDocumentImportService {
         final fileName = p.basename(file.path);
         final text = await _extractText(file.path, extension);
         final normalized = _normalizeText(text);
+        if (extension == 'pdf' || extension == 'docx') {
+          warnings.add('$fileName: 이번 가져오기는 텍스트·표를 보존합니다. 이미지 속 글자는 자동 인식하지 않으므로 이미지 전용 설명은 별도 확인이 필요합니다.');
+        }
 
         if (normalized.trim().isEmpty) {
           warnings.add('$fileName: 텍스트 추출 결과가 비어 있어 건너뜀');
@@ -108,6 +111,7 @@ class ManualDocumentImportService {
         preparedDocs.add(
           _PreparedManualDoc(
             filePath: file.path,
+            fingerprint: sha256.convert(await file.readAsBytes()).toString(),
             fileName: fileName,
             sections: sections,
           ),
@@ -140,6 +144,28 @@ class ManualDocumentImportService {
           final sectionLabel = _headline(section);
           final fallbackQuestion = _buildQuestion(doc.fileName, i + 1, section);
 
+          final now = DateTime.now();
+          final sourceId = 'manual-source-${sha1.convert(utf8.encode(
+              '${doc.fileName}::${doc.fingerprint}::$i')).toString()}';
+          final source = KnowledgeBaseEntity(
+            id: sourceId,
+            question: '[${doc.fileName}] 원문 섹션 ${i + 1}: $sectionLabel',
+            answer: section.body,
+            category: manualCategory,
+            customer: doc.fileName,
+            project: 'manual-upload',
+            resolvedAt: now,
+            createdAt: now,
+          );
+          if (await _kbRepository.getEntryById(sourceId) == null) {
+            await _kbRepository.createEntry(source);
+            importedEntries++;
+          } else {
+            updatedEntries++;
+          }
+          generatedEntries++;
+
+          // Raw source is durable before any optional AI operation starts.
           List<ManualGeneratedQa> qaItems = const [];
           if (qaGenerator != null) {
             try {
@@ -154,16 +180,15 @@ class ManualDocumentImportService {
             }
           }
 
-          if (qaItems.isEmpty) {
-            final fallbackAnswer = answerRefiner == null
-                ? section.body
-                : await answerRefiner(fallbackQuestion, section.body);
-            qaItems = [
-              ManualGeneratedQa(
-                question: fallbackQuestion,
-                answer: fallbackAnswer,
-              ),
-            ];
+          if (qaItems.isEmpty && answerRefiner != null) {
+            try {
+              final refined = await answerRefiner(fallbackQuestion, section.body);
+              if (refined.trim().isNotEmpty) {
+                qaItems = [ManualGeneratedQa(question: fallbackQuestion, answer: refined)];
+              }
+            } catch (e) {
+              warnings.add('${doc.fileName} 섹션 ${i + 1}: AI 정리 실패, 원문 보존 ($e)');
+            }
           }
 
           for (int qaIndex = 0; qaIndex < qaItems.length; qaIndex++) {
@@ -275,8 +300,12 @@ class ManualDocumentImportService {
     final document = PdfDocument(inputBytes: bytes);
     try {
       final extractor = PdfTextExtractor(document);
-      final text = extractor.extractText();
-      return text;
+      final pages = <String>[];
+      for (var page = 0; page < document.pages.count; page++) {
+        final text = extractor.extractText(startPageIndex: page, endPageIndex: page);
+        if (text.trim().isNotEmpty) pages.add('[페이지 ${page + 1}]\n$text');
+      }
+      return pages.join('\n\n');
     } finally {
       document.dispose();
     }
@@ -287,12 +316,23 @@ class ManualDocumentImportService {
     final parts = <String>[];
 
     for (final entry in archive.files) {
-      if (!entry.isFile) continue;
-      if (!entry.name.startsWith('word/')) continue;
-      if (!entry.name.endsWith('.xml')) continue;
-
-      final content = utf8.decode(entry.content as List<int>, allowMalformed: true);
-      parts.add(_extractTextNodesFromXml(content));
+      if (!entry.isFile || entry.name != 'word/document.xml') continue;
+      final document = XmlDocument.parse(utf8.decode(entry.content as List<int>));
+      final body = document.descendants.whereType<XmlElement>()
+          .firstWhere((e) => e.name.local == 'body');
+      String textOf(XmlElement node) => node.descendants.whereType<XmlElement>()
+          .where((e) => e.name.local == 't').map((e) => e.innerText).join();
+      for (final node in body.childElements) {
+        if (node.name.local == 'tbl') {
+          final rows = node.descendants.whereType<XmlElement>()
+              .where((e) => e.name.local == 'tr');
+          parts.add(rows.map((row) => row.childElements
+              .where((e) => e.name.local == 'tc').map(textOf).join(' | ')).join('\n'));
+        } else {
+          final text = textOf(node);
+          if (text.trim().isNotEmpty) parts.add(text);
+        }
+      }
     }
 
     return parts.join('\n\n');
@@ -365,130 +405,30 @@ class ManualDocumentImportService {
   }
 
   List<_ManualSection> _buildSections(String input) {
-    const maxChars = 650;
-    final paragraphs = input
-        .split(RegExp(r'\n\s*\n'))
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .toList();
-
-    final sections = <_ManualSection>[];
-    String? currentHeading;
-
+    const maxChars = 2400;
+    final paragraphs = input.split(RegExp(r'\n\s*\n'))
+        .map((e) => e.trim()).where((e) => e.isNotEmpty);
+    final result = <_ManualSection>[];
+    final buffer = <String>[];
+    var length = 0;
+    String? heading;
+    void flush() {
+      if (buffer.isEmpty) return;
+      result.add(_ManualSection(heading: heading, body: buffer.join('\n\n')));
+      buffer.clear();
+      length = 0;
+    }
     for (final paragraph in paragraphs) {
-      final lines = paragraph
-          .split('\n')
-          .map((e) => e.trim())
-          .where((e) => e.isNotEmpty)
-          .toList();
-
-      if (lines.isEmpty) {
-        continue;
-      }
-
-      final lineSections = <String>[];
-      for (final line in lines) {
-        if (_looksLikeHeading(line)) {
-          currentHeading = line;
-          continue;
-        }
-
-        if (_looksLikeListItem(line)) {
-          lineSections.add(_combineHeading(currentHeading, line));
-          continue;
-        }
-
-        lineSections.add(line);
-      }
-
-      if (lineSections.isEmpty) {
-        continue;
-      }
-
-      for (final lineSection in lineSections) {
-        final pieces = _splitBySize(lineSection, maxChars);
-        for (final piece in pieces) {
-          final body = piece.trim();
-          if (body.isEmpty) continue;
-          sections.add(
-            _ManualSection(
-              heading: currentHeading,
-              body: body,
-            ),
-          );
-        }
-      }
+      final isPage = paragraph.startsWith('[페이지 ');
+      if (isPage) flush();
+      if (length + paragraph.length > maxChars) flush();
+      if (buffer.isEmpty) heading = paragraph.split('\n').first;
+      // Keep a whole paragraph/table even if it exceeds the target size.
+      buffer.add(paragraph);
+      length += paragraph.length;
     }
-
-    return sections;
-  }
-
-  List<String> _splitBySize(String text, int maxChars) {
-    if (text.length <= maxChars) {
-      return [text];
-    }
-
-    final sentenceParts = text
-        .split(RegExp(r'(?<=[.!?。！？])\s+'))
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .toList();
-
-    if (sentenceParts.length > 1) {
-      final chunks = <String>[];
-      final current = StringBuffer();
-      for (final sentence in sentenceParts) {
-        final nextLength = current.isEmpty
-            ? sentence.length
-            : current.length + 1 + sentence.length;
-        if (nextLength > maxChars && current.isNotEmpty) {
-          chunks.add(current.toString().trim());
-          current.clear();
-        }
-        if (current.isNotEmpty) {
-          current.write(' ');
-        }
-        current.write(sentence);
-      }
-      if (current.isNotEmpty) {
-        chunks.add(current.toString().trim());
-      }
-      if (chunks.isNotEmpty) {
-        return chunks;
-      }
-    }
-
-    return _hardSplit(text, maxChars);
-  }
-
-  List<String> _hardSplit(String text, int maxChars) {
-    final pieces = <String>[];
-    int start = 0;
-    while (start < text.length) {
-      final end = (start + maxChars < text.length) ? start + maxChars : text.length;
-      pieces.add(text.substring(start, end));
-      start = end;
-    }
-    return pieces;
-  }
-
-  bool _looksLikeHeading(String line) {
-    final trimmed = line.trim();
-    if (trimmed.isEmpty) return false;
-    if (trimmed.length > 70) return false;
-    return RegExp(r'^(\d+[\.)]|[가-힣]\.|[A-Z]\.|제\d+장|제\d+절|\[.*\])')
-            .hasMatch(trimmed) ||
-        trimmed.endsWith(':') ||
-        trimmed.endsWith(']');
-  }
-
-  bool _looksLikeListItem(String line) {
-    return RegExp(r'^(?:[-*•]|\d+[\.)]|[가-힣]\.)\s+').hasMatch(line.trim());
-  }
-
-  String _combineHeading(String? heading, String body) {
-    if (heading == null || heading.trim().isEmpty) return body;
-    return '$heading\n$body';
+    flush();
+    return result;
   }
 
   String _buildQuestion(String fileName, int index, _ManualSection section) {
@@ -544,11 +484,14 @@ class _ManualSection {
 class _PreparedManualDoc {
   final String filePath;
   final String fileName;
+  final String fingerprint;
   final List<_ManualSection> sections;
 
   const _PreparedManualDoc({
     required this.filePath,
     required this.fileName,
     required this.sections,
+    required this.fingerprint,
   });
 }
+
