@@ -39,7 +39,19 @@ class LocalAnswerService {
     return ranked.take(limit).toList();
   }
 
+  bool isAnswerSource(KnowledgeBaseEntity entry) =>
+      !entry.id.startsWith('registered-voc-') &&
+      entry.answer.trim().isNotEmpty;
+
+  bool canAnswer(String query, List<SimilarVocResult> references) =>
+      !needsWholeDataset(query) &&
+      references.any((item) =>
+          isAnswerSource(item.knowledgeBase) && item.similarityScore >= 0.55);
+
   String answer(List<SimilarVocResult> references) {
+    references = references
+        .where((item) => isAnswerSource(item.knowledgeBase))
+        .toList();
     if (references.isEmpty) return '$noEvidence\n근거: 없음';
     final best = references.first;
     final item = best.knowledgeBase;
@@ -89,3 +101,4 @@ class LocalAnswerService {
     return SearchQueryExpander.matchRatio(term, corpus) >= 1.0;
   }
 }
+

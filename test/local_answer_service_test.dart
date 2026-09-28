@@ -29,6 +29,18 @@ void main() {
     expect(LocalAnswerService().answer(results), contains('Brity Meeting 접속 방법'));
   });
 
+  test('a raw registered question cannot be echoed as an answer', () {
+    final question = KnowledgeBaseEntity(
+      id: 'registered-voc-1', question: '진행권 부여 방법',
+      answer: '참석자 메뉴는 어디에 있나요?', category: '문의',
+      resolvedAt: now, createdAt: now);
+    final service = LocalAnswerService();
+    final refs = [SimilarVocResult(knowledgeBase: question, similarityScore: 1)];
+    expect(service.answer(refs), contains('근거: 없음'));
+    expect(service.answer(refs), isNot(contains('참석자 메뉴는 어디에 있나요')));
+    expect(service.canAnswer('진행권 부여 방법', refs), isFalse);
+  });
+
   test('unrelated question never invents an answer', () {
     final results = LocalAnswerService().rank('급여 지급일', [meeting]);
     expect(results, isEmpty);
@@ -49,3 +61,4 @@ void main() {
     expect(service.answerForQuery('전체 VOC 보고서', results), isNot(contains('회의 목록에서 참가')));
   });
 }
+

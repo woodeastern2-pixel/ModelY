@@ -41,6 +41,20 @@ class AiViewModel extends ChangeNotifier {
   late final VectorSearchService _vectorSearch;
   final LocalAnswerService _localAnswers = LocalAnswerService();
 
+  bool _aiConnected = false;
+  bool _checkingConnection = false;
+  int _configurationRevision = 0;
+  bool _disposed = false;
+  static const copilotUnavailable =
+      '인공지능이 연결되지 않아 코파일럿을 사용할 수 없습니다. 설정에서 연결을 확인해 주세요.';
+  bool get isAiConnected => _aiConnected;
+  bool get isCheckingConnection => _checkingConnection;
+  String get copilotStatusMessage => _checkingConnection
+      ? '인공지능 연결을 확인하고 있습니다. 확인 전에는 코파일럿을 사용할 수 없습니다.'
+      : _aiConnected
+          ? '인공지능 연결이 확인되었습니다. 코파일럿을 사용할 수 있습니다.'
+          : copilotUnavailable;
+
   bool _isAnalyzing = false;
   bool _isGenerating = false;
   bool _isSearching = false;
@@ -58,11 +72,12 @@ class AiViewModel extends ChangeNotifier {
   String? _activeChatSessionId;
   static const String _manualCategory = '시스템매뉴얼';
 
-  AiViewModel(this._kbRepository, this._vocRepository, this._settingsViewModel) {
-    _aiService = AiService();
+  AiViewModel(this._kbRepository, this._vocRepository, this._settingsViewModel,
+      {AiService? aiService}) {
+    _aiService = aiService ?? AiService();
     _vectorSearch = VectorSearchService(_kbRepository);
     _configureServices();
-    _settingsViewModel.addListener(_configureServices);
+    _settingsViewModel.addListener(_handleSettingsChanged);
   }
 
   bool get isAnalyzing => _isAnalyzing;
@@ -81,7 +96,14 @@ class AiViewModel extends ChangeNotifier {
   List<AiChatMessageEntity> get chatMessages => _chatMessages;
   String? get activeChatSessionId => _activeChatSessionId;
 
+  void _handleSettingsChanged() {
+    _configureServices();
+    notifyListeners();
+  }
+
   void _configureServices() {
+    _configurationRevision++;
+    _aiConnected = false;
     final provider = _settingsViewModel.aiProvider;
     _aiService.setProvider(provider);
     _vectorSearch.setProvider(provider);
@@ -227,12 +249,12 @@ class AiViewModel extends ChangeNotifier {
   }
 
   /// 2단계: 유사 VOC 검색
-  Future<List<SimilarVocResult>> searchSimilarVocs(String query) async {
+  Future<List<SimilarVocResult>> searchSimilarVocs(String query, {String? excludeVocId}) async {
     _isSearching = true;
     _error = null;
     notifyListeners();
     try {
-      _similarVocs = await _localReferences(query);
+      _similarVocs = await _localReferences(query, excludeVocId: excludeVocId);
       return _similarVocs;
     } catch (e) {
       _error = '자료 검색 실패: $e';
@@ -403,27 +425,26 @@ class AiViewModel extends ChangeNotifier {
   }
 
   /// 3단계: AI 답변 생성 (RAG)
-  Future<AiAnswerResult?> generateAnswer(String title, String content) async {
+  Future<AiAnswerResult?> generateAnswer(String title, String content, {String? excludeVocId}) async {
     _isGenerating = true;
     _error = null;
     _answerResult = null;
     notifyListeners();
 
     try {
-      await searchSimilarVocs('$title $content');
-      final answerCases = _similarVocs
-          .where((item) => !item.knowledgeBase.id.startsWith('registered-voc-'))
-          .toList();
-      final needsWholeDataset = _localAnswers.needsWholeDataset('$title $content');
+      final query = '$title $content';
+      await searchSimilarVocs(query, excludeVocId: excludeVocId);
+      if (!_localAnswers.canAnswer(query, _similarVocs)) {
+        _error = _localAnswers.needsWholeDataset(query)
+            ? '이 질문은 전체 자료의 분석이 필요합니다. 인공지능 연결 후 코파일럿을 이용해 주세요.'
+            : '답변으로 사용할 매뉴얼이나 승인된 답변을 찾지 못했습니다. 등록된 질문은 답변으로 표시하지 않습니다.';
+        return null;
+      }
       _answerResult = AiAnswerResult(
-        answer: _localAnswers.answerForQuery('$title $content', answerCases),
-        confidence: answerCases.isEmpty || needsWholeDataset
-            ? 0
-            : answerCases.first.similarityScore,
-        referencedCases: answerCases.isEmpty || needsWholeDataset
-            ? const []
-            : [answerCases.first.knowledgeBase.question],
-        notes: '저장된 자료의 원문을 표시했습니다. 적용 전에 담당자가 확인해 주세요.',
+        answer: _localAnswers.answerForQuery(query, _similarVocs),
+        confidence: _similarVocs.first.similarityScore,
+        referencedCases: [_similarVocs.first.knowledgeBase.question],
+        notes: '인공지능 생성 답변이 아닌 저장된 답변 원문입니다. 적용 전에 담당자가 확인해 주세요.',
       );
       return _answerResult;
     } catch (e) {
@@ -435,21 +456,41 @@ class AiViewModel extends ChangeNotifier {
     }
   }
 
+  Future<bool> checkCopilotConnection() async {
+    if (_checkingConnection) return false;
+    try {
+      await testConnection();
+      return _aiConnected;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<String> testConnection() async {
     _configureServices();
-    if (!_ensureAiConfigured()) {
-      throw Exception(_error ?? 'AI 제공자 설정이 완료되지 않았습니다.');
-    }
-
+    final revision = _configurationRevision;
+    _checkingConnection = true;
+    notifyListeners();
     try {
-      final result = await _aiService.testConnection();
+      if (!_aiService.isConfigured) throw StateError('인공지능 설정이 필요합니다.');
+      final result = await _aiService.testConnection()
+          .timeout(const Duration(seconds: 8));
+      if (result.trim().isEmpty) throw StateError('연결 응답이 없습니다.');
+      if (_disposed || revision != _configurationRevision) {
+        throw StateError('연결 설정이 변경되었습니다. 다시 확인해 주세요.');
+      }
+      _aiConnected = true;
       _error = null;
-      notifyListeners();
+      _chatError = null;
       return result;
     } catch (e) {
-      _error = 'AI 통신 테스트 실패: $e';
-      notifyListeners();
+      _aiConnected = false;
+      _error = copilotUnavailable;
+      _chatError = copilotUnavailable;
       rethrow;
+    } finally {
+      _checkingConnection = false;
+      if (!_disposed) notifyListeners();
     }
   }
 
@@ -560,6 +601,9 @@ class AiViewModel extends ChangeNotifier {
   }
 
   Future<AiChatMessageEntity?> sendChatMessage(String content) async {
+    if (_isChatting || _checkingConnection) return null;
+    if (!_aiConnected && !await checkCopilotConnection()) return null;
+    final revision = _configurationRevision;
     final sessionId = _activeChatSessionId;
     if (sessionId == null) {
       _chatError = '채팅 세션이 초기화되지 않았습니다.';
@@ -596,10 +640,15 @@ class AiViewModel extends ChangeNotifier {
         preferredVocIds:
             _isContextFollowUp(trimmed) ? previousReferenceIds : const [],
       );
-      final reply = _localAnswers.answerForQuery(trimmed, references);
-      final citedReferences = _localAnswers.needsWholeDataset(trimmed)
-          ? <SimilarVocResult>[]
-          : references;
+      final reply = await _aiService.generateChatReply(
+        message: trimmed,
+        history: _chatMessages.take(_chatMessages.length - 1).toList(),
+        references: references,
+      ).timeout(const Duration(seconds: 60));
+      if (reply.trim().isEmpty) throw StateError('인공지능 응답이 없습니다.');
+      if (_disposed || revision != _configurationRevision ||
+          sessionId != _activeChatSessionId) return null;
+      final citedReferences = references;
 
       final assistantMessage = await _insertChatMessage(
         sessionId: sessionId,
@@ -613,7 +662,8 @@ class AiViewModel extends ChangeNotifier {
       notifyListeners();
       return assistantMessage;
     } catch (e) {
-      _chatError = '채팅 실패: $e';
+      _aiConnected = false;
+      _chatError = '$copilotUnavailable 답변을 생성하지 않았습니다.';
       notifyListeners();
       return null;
     } finally {
@@ -694,11 +744,14 @@ class AiViewModel extends ChangeNotifier {
   Future<List<SimilarVocResult>> resolveChatReferences(
     String query, {
     List<String> preferredVocIds = const [],
-  }) => _localReferences(query, preferredVocIds: preferredVocIds);
+  }) => _localReferences(query,
+      preferredVocIds: preferredVocIds, includeRegisteredQuestions: true);
 
   Future<List<SimilarVocResult>> _localReferences(
     String query, {
     List<String> preferredVocIds = const [],
+    bool includeRegisteredQuestions = false,
+    String? excludeVocId,
   }) async {
     final entries = <KnowledgeBaseEntity>[
       ...await _kbRepository.getAllEntries(),
@@ -721,7 +774,7 @@ class AiViewModel extends ChangeNotifier {
           resolvedAt: response.updatedAt,
           createdAt: response.createdAt,
         ));
-      } else {
+      } else if (includeRegisteredQuestions) {
         entries.add(KnowledgeBaseEntity(
           id: 'registered-voc-${voc.id}',
           question: '${voc.title} ${voc.content}',
@@ -735,7 +788,10 @@ class AiViewModel extends ChangeNotifier {
         ));
       }
     }
-    return _localAnswers.rank(query, entries,
+    final candidates = entries.where((entry) =>
+        (excludeVocId == null || entry.vocId != excludeVocId) &&
+        (includeRegisteredQuestions || _localAnswers.isAnswerSource(entry)));
+    return _localAnswers.rank(query, candidates,
         preferredVocIds: preferredVocIds);
   }
 
@@ -832,7 +888,8 @@ class AiViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
-    _settingsViewModel.removeListener(_configureServices);
+    _disposed = true;
+    _settingsViewModel.removeListener(_handleSettingsChanged);
     super.dispose();
   }
 
@@ -849,3 +906,4 @@ class AiViewModel extends ChangeNotifier {
     return '${title.substring(0, 26).trim()}...';
   }
 }
+

@@ -76,7 +76,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ai-voc-ui-previews
-          path: test/goldens/*.png
+          path: |
+            test/goldens/*.png
+            test/failures/*.png
           if-no-files-found: error
 
       - name: Build Android release APK
@@ -147,3 +149,4 @@ jobs:
           name: ai-voc-assistant-windows-x64
           path: build/ai-voc-assistant-windows-x64.zip
           if-no-files-found: error
+

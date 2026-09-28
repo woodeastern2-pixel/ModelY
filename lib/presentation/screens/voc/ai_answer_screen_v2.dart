@@ -55,8 +55,9 @@ class _AiAnswerScreenState extends State<AiAnswerScreen> {
 
   Future<void> _runPipeline() async {
     final vm = context.read<AiViewModel>();
-    await vm.searchSimilarVocs('${widget.vocTitle} ${widget.vocContent}');
-    final result = await vm.generateAnswer(widget.vocTitle, widget.vocContent);
+    setState(() => _answer = '');
+    final result = await vm.generateAnswer(widget.vocTitle, widget.vocContent,
+        excludeVocId: widget.vocId);
     if (!mounted) return;
     setState(() {
       _answer = result?.answer ?? '';
@@ -75,7 +76,9 @@ class _AiAnswerScreenState extends State<AiAnswerScreen> {
 
   Future<void> _adopt() async {
     final answer = _answer.trim();
-    if (answer.isEmpty || _adopting) return;
+    if (answer.isEmpty || _adopting ||
+        !context.read<AiViewModel>().hasAnswer ||
+        context.read<AiViewModel>().isGenerating) return;
     setState(() => _adopting = true);
     final aiVm = context.read<AiViewModel>();
     final vocVm = context.read<VocViewModel>();
@@ -438,7 +441,7 @@ class _AnswerWorkspace extends StatelessWidget {
               if (vm.answerResult != null)
                 _ScoreBadge(score: vm.answerResult!.confidence),
               IconButton(
-                  onPressed: answer.trim().isEmpty ? null : onCopy,
+                  onPressed: !vm.hasAnswer || vm.isGenerating || answer.trim().isEmpty ? null : onCopy,
                   tooltip: '답변 복사',
                   icon: const Icon(Icons.copy_outlined)),
               IconButton(
@@ -485,7 +488,7 @@ class _AnswerWorkspace extends StatelessWidget {
                         Align(
                           alignment: Alignment.centerRight,
                           child: FilledButton.icon(
-                            onPressed: answer.trim().isEmpty ? null : onAdopt,
+                            onPressed: !vm.hasAnswer || vm.isGenerating || answer.trim().isEmpty ? null : onAdopt,
                             icon: adopting
                                 ? const SizedBox(
                                     width: 16,
@@ -502,7 +505,7 @@ class _AnswerWorkspace extends StatelessWidget {
         const SizedBox(height: 14),
         if (selected != null) _SelectedEvidence(item: selected),
         const SizedBox(height: 14),
-        _FeedbackPanel(
+        if (vm.hasAnswer && !vm.isGenerating) _FeedbackPanel(
           type: feedbackType,
           controller: feedbackController,
           saving: feedbackSaving,
@@ -739,3 +742,4 @@ class _NoteBox extends StatelessWidget {
     );
   }
 }
+
