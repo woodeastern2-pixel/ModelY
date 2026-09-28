@@ -47,6 +47,12 @@ flutter test test/ui_preview_golden_test.dart
 의도적으로 디자인 기준 이미지를 갱신할 때만 `--update-goldens`를 사용하고,
 모바일·태블릿·데스크톱 결과를 시각 검수한 뒤 함께 커밋합니다.
 
+## 내부 자료 기반 답변 및 설치 파일
+
+- 대화와 VOC 답변 초안은 저장된 지식과 승인된 답변을 로컬에서 검색해 출처와 함께 보여줍니다. 일치하는 근거가 없으면 답변을 생성하지 않습니다.
+- Windows 설치 파일은 GitHub Actions의 **Build Windows EXE** 실행 결과에서 `AI-VOC-Assistant-v...-Setup` 아티팩트를 내려받은 뒤 ZIP을 풀어 `.exe`를 실행합니다.
+- **AI VOC Renewal Quality Gate**의 Windows ZIP은 실행 파일 묶음이며 설치용 EXE가 아닙니다.
+
 ## 1. 주요 기능 구현 상태
 
 - VOC 등록: 고객명, 프로젝트명, 카테고리, 제목, 내용, 우선순위 저장
