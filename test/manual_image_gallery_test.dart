@@ -16,6 +16,8 @@ void main() {
     await tester.runAsync(() async {
       final loader = FontLoader('Pretendard')..addFont(rootBundle.load('assets/fonts/Pretendard-Regular.otf'));
       await loader.load();
+      final icons = FontLoader('MaterialIcons')..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'));
+      await icons.load();
     });
     final pack = await tester.runAsync(BundledManualService.load);
     final entries = (pack!['entries'] as List).cast<Map<String, dynamic>>();
@@ -46,6 +48,16 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 100));
     });
     await tester.pumpAndSettle();
+    for (var attempt = 0; attempt < 50; attempt++) {
+      await tester.runAsync(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      });
+      await tester.pump();
+      final raw = tester.widgetList<RawImage>(find.byType(RawImage));
+      if (raw.isNotEmpty && raw.first.image != null) break;
+    }
+    expect(tester.widget<RawImage>(find.byType(RawImage)).image, isNotNull);
+    await tester.pump();
     await tester.runAsync(() async {
       final image = await (boundary.currentContext!.findRenderObject() as RenderRepaintBoundary).toImage();
       final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
