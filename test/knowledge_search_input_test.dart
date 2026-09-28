@@ -1,5 +1,8 @@
 import 'dart:io';
 import 'dart:convert';
+import 'dart:ui' as ui;
+import 'package:flutter/rendering.dart';
+import 'support/ui_harness.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -14,6 +17,7 @@ import 'package:ai_voc_assistant/presentation/viewmodels/knowledge_base_viewmode
 import 'package:ai_voc_assistant/presentation/screens/knowledge_base/knowledge_base_screen.dart';
 
 void main() {
+  setUpAll(loadUiHarnessFonts);
   test('prepared matching preserves Korean English aliases and all query terms', () {
     for (final query in ['미팅 개설', 'meeting 개설', '드라이브', '메신저', 'mail', '미팅', '']) {
       for (final body in ['Brity Meeting 회의 개설', '미팅 개설은 메신저에서',
@@ -35,13 +39,18 @@ void main() {
       category:'시스템매뉴얼', customer:r['sourceName'] as String?, project:r['project'] as String?,
       createdAt:DateTime(2026), resolvedAt:DateTime(2026))).toList();
     final settings = SettingsViewModel(_Settings());
-    final vm = KnowledgeBaseViewModel(_Repository(entries), settings);
+    late KnowledgeBaseViewModel vm;
+    await tester.runAsync(() async {
+      vm = KnowledgeBaseViewModel(_Repository(entries), settings);
+      await vm.ready;
+    });
     addTearDown(vm.dispose);
     addTearDown(settings.dispose);
-    await tester.runAsync(() => vm.ready);
+
     expect(vm.entries.length,1008);
+    final boundary = GlobalKey();
     await tester.pumpWidget(ChangeNotifierProvider.value(value:vm,
-      child:const MaterialApp(home:KnowledgeBaseScreen())));
+      child:MaterialApp(home:RepaintBoundary(key:boundary, child:const KnowledgeBaseScreen()))));
     await tester.pumpAndSettle();
     final initial = vm.searchPasses;
     final costs = <double>[];
@@ -58,6 +67,15 @@ void main() {
     watch.stop();
     expect(vm.searchPasses, initial+1);
     expect(vm.entries.any((e)=>e.answer.contains('즉시시작')), isTrue);
+    await tester.pumpAndSettle();
+    await tester.runAsync(() async {
+      final image = await (boundary.currentContext!.findRenderObject() as RenderRepaintBoundary).toImage();
+      final bytes = await image.toByteData(format:ui.ImageByteFormat.png);
+      final file = File('test/goldens/knowledge-search-phone.png');
+      await file.parent.create(recursive:true);
+      await file.writeAsBytes(bytes!.buffer.asUint8List());
+      image.dispose();
+    });
     final cached = vm.entries;
     for(var i=0;i<1000;i++) { expect(identical(vm.entries,cached),isTrue); }
     expect(vm.searchPasses,initial+1);
