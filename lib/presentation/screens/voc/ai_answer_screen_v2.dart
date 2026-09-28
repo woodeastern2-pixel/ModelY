@@ -109,7 +109,7 @@ class _AiAnswerScreenState extends State<AiAnswerScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('AI 답변을 승인해 VOC 답변으로 저장하고 지식 자료에 추가했습니다.'),
+            content: Text('자료 기반 답변을 승인해 VOC 답변으로 저장하고 지식 자료에 추가했습니다.'),
           ),
         );
         Navigator.pop(context, true);
@@ -147,7 +147,7 @@ class _AiAnswerScreenState extends State<AiAnswerScreen> {
         final desktop = constraints.maxWidth >= 1050;
         return Scaffold(
           backgroundColor: context.visualColors.canvas,
-          appBar: AppBar(title: const Text('AI 답변 초안')),
+          appBar: AppBar(title: const Text('자료 기반 답변 초안')),
           body: Consumer<AiViewModel>(
             builder: (context, vm, _) {
               return SingleChildScrollView(
@@ -224,7 +224,7 @@ class _AiAnswerScreenState extends State<AiAnswerScreen> {
                                   selectedCase: _selectedCase,
                                   onRegenerate: _runPipeline,
                                   onCopy: () =>
-                                      _copy(_answer, 'AI 답변 초안을 복사했습니다.'),
+                                      _copy(_answer, '자료 기반 답변 초안을 복사했습니다.'),
                                   onAdopt: _adopting ? null : _adopt,
                                   adopting: _adopting,
                                   feedbackType: _feedbackType,
@@ -250,7 +250,7 @@ class _AiAnswerScreenState extends State<AiAnswerScreen> {
                             answer: _answer,
                             selectedCase: _selectedCase,
                             onRegenerate: _runPipeline,
-                            onCopy: () => _copy(_answer, 'AI 답변 초안을 복사했습니다.'),
+                            onCopy: () => _copy(_answer, '자료 기반 답변 초안을 복사했습니다.'),
                             onAdopt: _adopting ? null : _adopt,
                             adopting: _adopting,
                             feedbackType: _feedbackType,
@@ -429,7 +429,7 @@ class _AnswerWorkspace extends StatelessWidget {
     return Column(
       children: [
         _Panel(
-          title: 'AI 답변 초안',
+          title: '자료 기반 답변 초안',
           subtitle: '답변을 승인하기 전에 사실관계와 안내 절차를 확인해 주세요.',
           icon: Icons.auto_awesome_outlined,
           trailing: Wrap(
@@ -467,7 +467,7 @@ class _AnswerWorkspace extends StatelessWidget {
                       children: [
                         SelectableText(
                           answer.trim().isEmpty
-                              ? '생성된 답변이 없습니다.'
+                              ? '일치하는 내부 자료가 없습니다.'
                               : UserFacingText.fromAi(answer),
                           style: Theme.of(context)
                               .textTheme
@@ -582,7 +582,7 @@ class _FeedbackPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return _Panel(
       title: '답변 평가',
-      subtitle: 'AI 답변 초안이 실제 업무에 도움이 되었는지 평가해 주세요.',
+      subtitle: '자료 기반 답변 초안이 실제 업무에 도움이 되었는지 평가해 주세요.',
       icon: Icons.feedback_outlined,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
