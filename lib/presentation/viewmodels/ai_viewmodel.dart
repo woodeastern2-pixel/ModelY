@@ -68,6 +68,8 @@ class AiViewModel extends ChangeNotifier {
   VocIntelligenceResult? _intelligenceResult;
   List<SimilarVocResult> _similarVocs = [];
   AiAnswerResult? _answerResult;
+  bool _hasPartialAnswer = false;
+  bool get hasPartialAnswer => _hasPartialAnswer;
   String? _urgencyReason;
   List<AssigneeRecommendation> _topAssignees = [];
   List<AiChatMessageEntity> _chatMessages = [];
@@ -443,6 +445,7 @@ class AiViewModel extends ChangeNotifier {
     _isGenerating = true;
     _error = null;
     _answerResult = null;
+    _hasPartialAnswer = false;
     notifyListeners();
 
     try {
@@ -457,6 +460,8 @@ class AiViewModel extends ChangeNotifier {
                 : '관련 자료는 찾았지만 요청하신 내용을 답변으로 확정할 근거가 부족합니다. 왼쪽 참고 자료에서 확인 가능한 설명과 출처를 확인해 주세요.');
         return null;
       }
+      _hasPartialAnswer = _localAnswers.evidenceGap(
+          query, _localAnswers.answerReferences(_similarVocs)).isNotEmpty;
       _answerResult = AiAnswerResult(
         answer: _localAnswers.answerForQuery(query, _similarVocs),
         confidence: _similarVocs.first.similarityScore,

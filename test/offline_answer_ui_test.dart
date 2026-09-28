@@ -72,6 +72,9 @@ void main() {
       expect(vm.similarVocs, isNotEmpty);
       expect(vm.answerResult!.answer, contains('확인되지 않은 부분'));
       expect(vm.answerResult!.answer, contains('확인된 관련 설명'));
+      expect(vm.hasPartialAnswer, isTrue);
+      expect(find.text('일부 근거 · 추가 확인 필요'), findsOneWidget);
+      expect(find.text('100%'), findsNothing);
       expect(find.textContaining('찾지 못했습니다'), findsNothing);
       expect(tester.takeException(), isNull);
       await _capture(tester, key, 'attendee-navigation-${dark ? "dark" : "light"}');

@@ -440,7 +440,9 @@ class _AnswerWorkspace extends StatelessWidget {
           trailing: Wrap(
             spacing: 4,
             children: [
-              if (vm.answerResult != null)
+              if (vm.hasPartialAnswer)
+                const Chip(label: Text('일부 근거 · 추가 확인 필요'))
+              else if (vm.answerResult != null)
                 _ScoreBadge(score: vm.answerResult!.confidence),
               IconButton(
                   onPressed: !vm.hasAnswer || vm.isGenerating || answer.trim().isEmpty ? null : onCopy,
@@ -690,7 +692,7 @@ class _ScoreBadge extends StatelessWidget {
         color: bg,
         borderRadius: BorderRadius.circular(AppRadii.small),
       ),
-      child: Text('$pct%',
+      child: Text('검색 일치 $pct%',
           style:
               TextStyle(color: fg, fontSize: 12, fontWeight: FontWeight.w800)),
     );
