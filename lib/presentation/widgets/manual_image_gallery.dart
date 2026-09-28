@@ -32,19 +32,79 @@ class _ManualImageGalleryState extends State<ManualImageGallery> {
     return FutureBuilder<List<Map<String, dynamic>>>(
       future: _images,
       builder: (context, snapshot) {
-        if (snapshot.hasError) return const Text('매뉴얼 이미지를 읽지 못했습니다.');
+        if (snapshot.hasError) {
+          return const Text('매뉴얼 이미지를 읽지 못했습니다.');
+        }
         final images = snapshot.data ?? const [];
         if (images.isEmpty) return const SizedBox.shrink();
-        return ExpansionTile(
-          tilePadding: EdgeInsets.zero,
-          title: Text('매뉴얼 원본 이미지 ${images.length}개'),
-          subtitle: const Text('화면 캡처와 버튼 아이콘 · 눌러서 확대'),
-          children: images.map((image) => _ManualImage(
-            key: ValueKey(image['id']),
-            image: image,
-          )).toList(),
+        return TextButton.icon(
+          icon: const Icon(Icons.photo_library_outlined),
+          label: Text('매뉴얼 원본 이미지 ${images.length}개 보기'),
+          onPressed: () => showDialog<void>(
+            context: context,
+            builder: (_) => _ImageReader(images: images),
+          ),
         );
       },
+    );
+  }
+}
+
+class _ImageReader extends StatefulWidget {
+  final List<Map<String, dynamic>> images;
+  const _ImageReader({required this.images});
+
+  @override
+  State<_ImageReader> createState() => _ImageReaderState();
+}
+
+class _ImageReaderState extends State<_ImageReader> {
+  final _controller = PageController();
+  int _page = 0;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog.fullscreen(
+      child: Scaffold(
+        appBar: AppBar(title: const Text('매뉴얼 원본 이미지')),
+        body: Column(children: [
+          Expanded(child: PageView.builder(
+            controller: _controller,
+            itemCount: widget.images.length,
+            onPageChanged: (value) => setState(() => _page = value),
+            itemBuilder: (_, index) => _ManualImage(
+              key: ValueKey(widget.images[index]['id']),
+              image: widget.images[index],
+            ),
+          )),
+          SafeArea(top: false, child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton(
+                tooltip: '이전 이미지',
+                onPressed: _page > 0 ? () => _controller.previousPage(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOut) : null,
+                icon: const Icon(Icons.chevron_left),
+              ),
+              Text('${_page + 1} / ${widget.images.length}'),
+              IconButton(
+                tooltip: '다음 이미지',
+                onPressed: _page + 1 < widget.images.length ? () => _controller.nextPage(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOut) : null,
+                icon: const Icon(Icons.chevron_right),
+              ),
+            ],
+          )),
+        ]),
+      ),
     );
   }
 }
@@ -63,39 +123,23 @@ class _ManualImageState extends State<_ManualImage> {
 
   @override
   Widget build(BuildContext context) {
-    final isIcon = widget.image['kind'] == 'icon';
-    final label = isIcon ? '매뉴얼 버튼 아이콘' : '매뉴얼 화면 캡처';
     return FutureBuilder<Uint8List>(
       future: _bytes,
       builder: (context, snapshot) {
-        if (snapshot.hasError) return const Text('이미지를 읽지 못했습니다.');
+        if (snapshot.hasError) {
+          return const Center(child: Text('이미지를 읽지 못했습니다.'));
+        }
         final bytes = snapshot.data;
         if (bytes == null) {
-          return const SizedBox(
-            height: 32, child: Center(child: LinearProgressIndicator()));
+          return const Center(child: CircularProgressIndicator());
         }
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: InkWell(
-            onTap: () => showDialog<void>(
-              context: context,
-              builder: (context) => Dialog.fullscreen(
-                child: Scaffold(
-                  appBar: AppBar(title: Text(label)),
-                  body: InteractiveViewer(
-                    minScale: 0.5,
-                    maxScale: 6,
-                    child: Center(child: Image.memory(bytes,
-                      fit: BoxFit.contain, semanticLabel: label)),
-                  ),
-                ),
-              ),
-            ),
-            child: Image.memory(bytes,
-              height: isIcon ? 48 : 220,
-              fit: BoxFit.contain,
-              semanticLabel: label),
-          ),
+        return InteractiveViewer(
+          minScale: 0.5,
+          maxScale: 6,
+          child: Center(child: Image.memory(bytes,
+            fit: BoxFit.contain,
+            semanticLabel: widget.image['kind'] == 'icon'
+                ? '매뉴얼 버튼 아이콘' : '매뉴얼 화면 캡처')),
         );
       },
     );

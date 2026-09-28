@@ -24,9 +24,10 @@ void main() {
     final images = await tester.runAsync(() => BundledManualService.imagesFor(id));
     await tester.runAsync(() => BundledManualService.imageBytes(images!.first['id'] as String));
     final boundary = GlobalKey();
-    await tester.pumpWidget(MaterialApp(theme: ThemeData(fontFamily: 'Pretendard'), home: RepaintBoundary(
-      key: boundary,
-      child: Scaffold(appBar: AppBar(title: const Text('지식 자료')),
+    await tester.pumpWidget(MaterialApp(
+      theme: ThemeData(fontFamily: 'Pretendard'),
+      builder: (_, child) => RepaintBoundary(key: boundary, child: child!),
+      home: Scaffold(appBar: AppBar(title: const Text('지식 자료')),
         body: SingleChildScrollView(padding: const EdgeInsets.all(24),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(entry['question'] as String),
@@ -35,12 +36,12 @@ void main() {
           ]),
         ),
       ),
-    )));
+    ));
     await tester.runAsync(() async {
       await Future<void>.delayed(const Duration(milliseconds: 100));
     });
     await tester.pumpAndSettle();
-    await tester.tap(find.text('매뉴얼 원본 이미지 1개'));
+    await tester.tap(find.text('매뉴얼 원본 이미지 1개 보기'));
     await tester.runAsync(() async {
       await Future<void>.delayed(const Duration(milliseconds: 100));
     });
@@ -54,8 +55,7 @@ void main() {
       image.dispose();
     });
     expect(find.byType(Image), findsOneWidget);
-    await tester.tap(find.byType(Image));
-    await tester.pumpAndSettle();
+    expect(find.text('1 / 1'), findsOneWidget);
     expect(find.byType(InteractiveViewer), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
