@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'manual_content.dart';
 import 'offline_answer_composer.dart';
+import 'offline_query_plan.dart';
 
 import '../../core/utils/search_query_expander.dart';
 import '../../domain/entities/knowledge_base_entity.dart';
@@ -75,6 +76,84 @@ class LocalAnswerService {
     return {for (final key in _concepts.keys) if (_matches(normalized, key)) 'c:$key'};
   }
 
+  /// At most four indexed searches; no document scan or model invocation.
+  List<String> retrievalQueries(String query) {
+    final plan = OfflineQueryPlan.from(query);
+    final scope = _queryScope(query);
+    final prefix = scope.isEmpty ? '' : '${scope.join(' ')} ';
+    final terms = _terms(plan.focus).where((t) => !{
+      '메뉴', '위치', '경로', '버튼', '패널', '제가', '혹시', '어디',
+      '못', '찾는', '듯', '알', '수', '있을까', '있을까요',
+    }.contains(t)).toList();
+    final focused = '$prefix${plan.focus}'.trim();
+    final queries = <String>{query, focused};
+    if (terms.isNotEmpty) {
+      final core = '$prefix${terms.join(' ')}'.trim();
+      if (plan.navigation) {
+        queries.add('$core 메뉴');
+        queries.add('$core 목록 패널');
+      } else {
+        queries.add(core);
+      }
+    }
+    return queries.where((q) => q.isNotEmpty).take(4).toList();
+  }
+
+  List<String> _queryScope(String query) {
+    final terms = _terms(query);
+    final products = terms.where(_products.contains).toList();
+    if (products.isEmpty && terms.contains('presenter') && terms.contains('participant')) {
+      products.add('meeting');
+    }
+    return [...products, ...terms.where((t) => t == 'mobile' || t == 'desktop')];
+  }
+
+  List<String> _navigationTargets(String query) => _terms(
+      OfflineQueryPlan.from(query).focus).where((t) => !{
+        ..._products, 'desktop', 'mobile', '메뉴', '위치', '경로',
+        '버튼', '패널', '어디', '있', '있습니까', 'where',
+      }.contains(t)).toList();
+
+  bool focusedEvidence(String query, KnowledgeBaseEntity entry) {
+    final plan = OfflineQueryPlan.from(query);
+    final scope = _normalize('${entry.project ?? ''} ${entry.question}');
+    for (final group in [_products, {'desktop', 'mobile'}]) {
+      final requested = _queryScope(query).where(group.contains).toSet();
+      final known = group.where((t) => _matches(scope, t)).toSet();
+      if (requested.length == 1 && known.isNotEmpty &&
+          !requested.any(known.contains)) return false;
+    }
+    if (!plan.navigation) return true;
+    final targets = _navigationTargets(query);
+    if (targets.isEmpty) return false;
+    final parsed = ManualContent.parse(entry.answer);
+    final body = _normalize('${parsed.body} ${parsed.transcription}');
+    return targets.every((t) => _matches(body, t)) &&
+        RegExp(r'메뉴|목록|패널|버튼|화면|menu|panel|list|button',
+            caseSensitive: false).hasMatch(body);
+  }
+
+  bool hasNavigationLocation(String query, KnowledgeBaseEntity entry) {
+    if (!OfflineQueryPlan.from(query).navigation) return false;
+    final targets = _navigationTargets(query);
+    if (targets.isEmpty) return false;
+    final parsed = ManualContent.parse(entry.answer);
+    final body = '${parsed.body}\n${parsed.transcription}';
+    final sentences = body.split(RegExp(r'[.!?\n]'));
+    return sentences.any((sentence) =>
+        targets.every((t) => _matches(_normalize(sentence), t)) &&
+        RegExp(r'상단|하단|왼쪽|오른쪽|좌측|우측|도구\s*모음|메인\s*메뉴|홈\s*화면|회의\s*화면|설정\s*[>→]|[>→]|toolbar|bottom|top|left|right',
+            caseSensitive: false).hasMatch(sentence));
+  }
+
+  String evidenceGap(String query, List<SimilarVocResult> references) {
+    if (!OfflineQueryPlan.from(query).navigation || references.isEmpty) return '';
+    if (references.any((r) => hasNavigationLocation(query, r.knowledgeBase))) return '';
+    return '확인되지 않은 부분: 요청하신 메뉴의 정확한 위치와 여는 경로는 '
+        '찾은 자료에 설명되어 있지 않습니다. 아래는 관련 자료에서 확인한 내용이며, '
+        '메뉴 위치에 대한 확정 안내는 아닙니다. 사용 중인 제품·버전과 현재 화면을 확인하면 범위를 좁힐 수 있습니다.';
+  }
+
   List<List<String>> queryIndexKeys(String query) => [
     for (final term in _terms(query))
       if (_concepts.containsKey(term)) ['c:$term'] else [
@@ -104,6 +183,10 @@ class LocalAnswerService {
       final entry = docs[i];
       final preferred = entry.vocId != null && preferredVocIds.contains(entry.vocId);
       final scope = _normalize('${entry.project ?? ''} ${entry.question}');
+      final requestedPlatform = terms.where((t) => t == 'desktop' || t == 'mobile').toSet();
+      final knownPlatform = {'desktop', 'mobile'}.where((t) => _matches(scope, t)).toSet();
+      if (requestedPlatform.length == 1 && knownPlatform.length == 1 &&
+          !requestedPlatform.any(knownPlatform.contains)) continue;
       final requestedProducts = terms.where(_products.contains);
       final knownProducts = _products.where((p) => _matches(scope, p)).toSet();
       if (!preferred && requestedProducts.isNotEmpty && knownProducts.isNotEmpty &&
@@ -241,7 +324,9 @@ class LocalAnswerService {
           (item.category == '시스템매뉴얼' ? '시스템 매뉴얼' : '승인된 답변 / 지식베이스');
       return OfflineAnswerFragment(text, '$label · ${item.question}');
     }).toList();
-    return OfflineAnswerComposer().compose(query, fragments);
+    final result = OfflineAnswerComposer().compose(OfflineQueryPlan.from(query).focus, fragments);
+    final gap = evidenceGap(query, selected);
+    return gap.isEmpty ? result : '$gap\n\n확인된 관련 설명\n\n$result';
   }
 
   bool needsWholeDataset(String query) {

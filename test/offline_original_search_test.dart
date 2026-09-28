@@ -5,6 +5,7 @@ import 'package:ai_voc_assistant/domain/repositories/settings_repository.dart';
 import 'package:ai_voc_assistant/domain/entities/knowledge_base_entity.dart';
 import 'package:ai_voc_assistant/presentation/viewmodels/ai_viewmodel.dart';
 import 'package:ai_voc_assistant/presentation/viewmodels/settings_viewmodel.dart';
+import 'offline_query_recovery_test.dart' show attendeeQuestion;
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -70,6 +71,24 @@ void main() {
     await store.refresh();
     expect(store.index.length,5894+1008);
     await check('qa-and-original');
+    for (var i = 0; i < 4; i++) {
+      final clock = Stopwatch()..start();
+      final refs = await store.search(attendeeQuestion);
+      final answer = answerer.answerForQuery(attendeeQuestion, refs);
+      clock.stop();
+      expect(answerer.canAnswer(attendeeQuestion, refs), isTrue);
+      expect(answer, contains('확인되지 않은 부분'));
+      expect(answer, contains('참석자'));
+      expect(answer, isNot(contains('하단')));
+      expect(store.index.lastQueries.length, greaterThan(1));
+      expect(store.index.lastQueries.length, lessThanOrEqualTo(4));
+      expect(store.index.lastTotalCandidates, lessThanOrEqualTo(512));
+      expect(clock.elapsedMilliseconds, lessThan(5000));
+      timings.add({'stage': 'user-reported-navigation-$i', 'query': attendeeQuestion,
+        'milliseconds': clock.elapsedMicroseconds / 1000,
+        'queries': store.index.lastQueries, 'candidates': store.index.lastTotalCandidates,
+        'answer': answer});
+    }
     store=OfflineSearchStore(db);
     await store.initialize(maintenance:false);
     await check('first-after-reload');

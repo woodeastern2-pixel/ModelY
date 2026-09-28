@@ -23,7 +23,7 @@ void main() {
     expect(await vm.searchSimilarVocs('진행권 부여 방법'), isEmpty);
     expect(await vm.generateAnswer(voc.title, voc.content), isNull);
     expect(vm.hasAnswer, isFalse);
-    expect(vm.error, contains('등록된 질문은 답변으로 표시하지 않습니다'));
+    expect(vm.error, contains('자료 자체가 없다는 뜻은 아닙니다'));
     expect(await vm.resolveChatReferences('진행권 부여 방법'), hasLength(1));
   });
 

@@ -452,7 +452,9 @@ class AiViewModel extends ChangeNotifier {
       if (!_localAnswers.canAnswer(query, _similarVocs)) {
         _error = _localAnswers.needsWholeDataset(query)
             ? '이 질문은 전체 자료의 분석이 필요합니다. 인공지능 연결 후 코파일럿을 이용해 주세요.'
-            : '답변으로 사용할 매뉴얼이나 승인된 답변을 찾지 못했습니다. 등록된 질문은 답변으로 표시하지 않습니다.';
+            : (_similarVocs.isEmpty
+                ? '검색한 자료에서 질문과 연결되는 설명을 찾지 못했습니다. 자료 자체가 없다는 뜻은 아닙니다. 제품·버전과 찾으시는 기능명을 확인해 주세요.'
+                : '관련 자료는 찾았지만 요청하신 내용을 답변으로 확정할 근거가 부족합니다. 왼쪽 참고 자료에서 확인 가능한 설명과 출처를 확인해 주세요.');
         return null;
       }
       _answerResult = AiAnswerResult(

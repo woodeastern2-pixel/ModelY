@@ -9,6 +9,8 @@ class OfflineSearchIndex {
   final _keys = <String, Set<String>>{};
   final _postings = <String, Set<String>>{};
   int lastCandidates = 0;
+  int lastTotalCandidates = 0;
+  List<String> lastQueries = [];
   int get length => _rows.length;
 
   static Set<String> keysFor(String text) {
@@ -40,6 +42,39 @@ class OfflineSearchIndex {
 
   List<SimilarVocResult> search(String query, {String? excludeVocId}) {
     final service = LocalAnswerService();
+    lastCandidates = 0;
+    lastTotalCandidates = 0;
+    lastQueries = [];
+    final found = <String, SimilarVocResult>{};
+    for (final variant in service.retrievalQueries(query)) {
+      lastQueries.add(variant);
+      final matches = _searchOnce(variant, excludeVocId: excludeVocId);
+      for (final match in matches) {
+        if (!service.focusedEvidence(query, match.knowledgeBase)) continue;
+        final id = match.knowledgeBase.id;
+        if (!found.containsKey(id) || match.similarityScore > found[id]!.similarityScore) {
+          found[id] = match;
+        }
+      }
+      // A navigation request needs the actual location, not merely a related
+      // participant action. Try the focused searches before accepting partials.
+      if (service.canAnswer(query, found.values.toList()) &&
+          service.evidenceGap(query, service.answerReferences(found.values.toList())).isEmpty) break;
+    }
+    final order = {for (var i = 0; i < found.length; i++) found.keys.elementAt(i): i};
+    final ranked = found.values.toList()..sort((a, b) {
+      final location = (service.hasNavigationLocation(query, b.knowledgeBase) ? 1 : 0)
+          .compareTo(service.hasNavigationLocation(query, a.knowledgeBase) ? 1 : 0);
+      if (location != 0) return location;
+      final score = b.similarityScore.compareTo(a.similarityScore);
+      if (score != 0) return score;
+      return order[a.knowledgeBase.id]!.compareTo(order[b.knowledgeBase.id]!);
+    });
+    return ranked.take(16).toList();
+  }
+
+  List<SimilarVocResult> _searchOnce(String query, {String? excludeVocId}) {
+    final service = LocalAnswerService();
     final groups = service.queryIndexKeys(query);
     final hits = <String, double>{};
     for (final group in groups) {
@@ -58,7 +93,8 @@ class OfflineSearchIndex {
     final qa = ids.where((id) => !id.startsWith('raw-')).take(64);
     final raw = ids.where((id) => id.startsWith('raw-')).take(64);
     final candidates = [...qa, ...raw].map((id) => _rows[id]!).toList();
-    lastCandidates = candidates.length;
+    if (candidates.length > lastCandidates) lastCandidates = candidates.length;
+    lastTotalCandidates += candidates.length;
     return service.rank(query, candidates, limit: 16);
   }
 }

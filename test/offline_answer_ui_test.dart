@@ -21,9 +21,61 @@ import 'package:ai_voc_assistant/data/seeds/brity_suite_manual_seed.dart';
 import 'package:ai_voc_assistant/presentation/viewmodels/knowledge_base_viewmodel.dart';
 import 'package:ai_voc_assistant/presentation/screens/knowledge_base/knowledge_base_screen.dart';
 
+import 'package:ai_voc_assistant/domain/repositories/indexed_knowledge_repository.dart';
+import 'package:ai_voc_assistant/data/services/offline_search_store.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'offline_original_search_test.dart' show database;
+import 'offline_query_recovery_test.dart' show attendeeQuestion;
+
 void main() {
   setUpAll(loadUiHarnessFonts);
+  setUpAll(sqfliteFfiInit);
   for (final dark in [false, true]) {
+    testWidgets('reported attendee navigation uses indexed corpus and states missing location (${dark ? "dark" : "light"})', (tester) async {
+      tester.view.physicalSize = const Size(1440, 1400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final db = (await tester.runAsync(database))!;
+      addTearDown(db.close);
+      final store = OfflineSearchStore(db);
+      await tester.runAsync(() async {
+        await store.initialize(maintenance: false);
+        final pack = await BundledManualService.load();
+        final batch = db.batch();
+        for (final row in [...BritySuiteManualSeed.entries, ...pack['entries'] as List]) {
+          batch.insert('knowledge_base', {'id': row['id'], 'question': row['question'],
+            'answer': row['answer'], 'category': '시스템매뉴얼',
+            'customer': row['sourceName'], 'project': row['project']});
+        }
+        await batch.commit(noResult: true);
+        await store.refresh();
+      });
+      final settings = SettingsViewModel(_Settings());
+      final vm = AiViewModel(_IndexedCorpus(store), _Vocs(), settings);
+      addTearDown(vm.dispose);
+      addTearDown(settings.dispose);
+      final key = GlobalKey();
+      await tester.pumpWidget(ChangeNotifierProvider.value(value: vm,
+        child: MaterialApp(theme: dark ? AppTheme.darkTheme : AppTheme.lightTheme,
+          home: RepaintBoundary(key: key, child: const AiAnswerScreen(
+            vocId: 'attendee-location-check', vocTitle: '진행권 부여 방법',
+            vocContent: attendeeQuestion, category: '기타', customer: '', project: '')))));
+      for (var attempt = 0; attempt < 100; attempt++) {
+        await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 40)));
+        await tester.pump();
+        if (vm.hasAnswer || vm.error != null) break;
+      }
+      await tester.pumpAndSettle();
+      expect(vm.isAiConnected, isFalse);
+      expect(vm.hasAnswer, isTrue);
+      expect(vm.similarVocs, isNotEmpty);
+      expect(vm.answerResult!.answer, contains('확인되지 않은 부분'));
+      expect(vm.answerResult!.answer, contains('확인된 관련 설명'));
+      expect(find.textContaining('찾지 못했습니다'), findsNothing);
+      expect(tester.takeException(), isNull);
+      await _capture(tester, key, 'attendee-navigation-${dark ? "dark" : "light"}');
+    });
     testWidgets('schedule question composes an offline answer from the complete corpus (${dark ? "dark" : "light"})', (tester) async {
       tester.view.physicalSize = const Size(1440, 1800);
       tester.view.devicePixelRatio = 1;
@@ -134,7 +186,7 @@ void main() {
             customer: '테스트 고객', project: '미팅')))));
       await tester.pumpAndSettle();
       expect(vm.hasAnswer, isFalse);
-      expect(find.textContaining('등록된 질문은 답변으로 표시하지 않습니다'), findsOneWidget);
+      expect(find.textContaining('자료 자체가 없다는 뜻은 아닙니다'), findsOneWidget);
       expect(find.text('답변 승인 및 저장'), findsNothing);
       expect(find.text('평가 저장'), findsNothing);
       expect(find.text('100%'), findsNothing);
@@ -207,4 +259,17 @@ class _CorpusKnowledge extends _Knowledge {
   _CorpusKnowledge(this.entries);
   @override
   Future<List<KnowledgeBaseEntity>> getAllEntries() async => entries;
+}
+
+class _IndexedCorpus implements KnowledgeBaseRepository, IndexedKnowledgeRepository {
+  final OfflineSearchStore store;
+  _IndexedCorpus(this.store);
+  @override
+  Future<List<SimilarVocResult>> searchOffline(String query, {String? excludeVocId}) =>
+      store.search(query, excludeVocId: excludeVocId);
+  @override
+  Future<List<KnowledgeBaseEntity>> getAllEntries() =>
+      throw StateError('The answer screen must use the index, not scan all entries');
+  @override
+  dynamic noSuchMethod(Invocation i) => super.noSuchMethod(i);
 }
