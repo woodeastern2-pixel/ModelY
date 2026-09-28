@@ -43,6 +43,7 @@ class LocalAnswerService {
     'edit': ['편집', '수정', 'edit', 'editing'],
     'cancel': ['취소', 'cancel'],
     'limit': ['제한', '최대', 'limit', 'maximum'],
+    'conversation': ['대화기록', '대화 기록', '대화내역', '대화 내역', 'conversation data', 'chat history'],
     'contact': ['연락처', 'contact', 'contacts'],
     'shortcut': ['바로가기', '바로 가기', 'shortcut'],
     'uninstall': ['제거', 'uninstall'],

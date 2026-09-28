@@ -75,8 +75,8 @@ void main() {
     final docs = rows.map((r) => entry(r['id'] as String, r['question'] as String,
         r['answer'] as String, source: r['sourceName'] as String?)).toList();
     final queries = <String, String>{
-      '메신저 제거 conversation data': 'All conversation data',
-      '메신저 바로가기 desktop': 'Shortcut',
+      '메신저 제거 후 대화 기록': 'All conversation data',
+      '메신저 데스크톱 바로가기': 'Shortcut',
       '드라이브 다른 사람이 편집 중인 파일 취소': '강제 취소 기능을 제공하지 않습니다',
       '설문 500명': '500명',
     };
