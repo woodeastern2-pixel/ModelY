@@ -1,3 +1,4 @@
+import '../../services/voc_keyword_extractor.dart';
 import '../../services/voc_identity_store.dart';
 import 'dart:convert';
 import '../../../core/constants/app_constants.dart';
@@ -8,36 +9,6 @@ import '../../../domain/entities/response_entity.dart';
 
 class VocLocalDatasource {
   final DatabaseHelper _dbHelper;
-  static final RegExp _tokenPattern = RegExp(r'[A-Za-z0-9가-힣]{2,}');
-  static const Set<String> _keywordStopwords = {
-    'the',
-    'and',
-    'for',
-    'with',
-    'this',
-    'that',
-    'from',
-    'are',
-    'was',
-    'were',
-    '있습니다',
-    '문의',
-    '요청',
-    '확인',
-    '처리',
-    '관련',
-    '대한',
-    '합니다',
-    '입니다',
-    '해주세요',
-    '기능',
-    '오류',
-    '이슈',
-    '사용',
-    '고객',
-    '서비스',
-  };
-
   VocLocalDatasource(this._dbHelper);
 
   Future<List<VocEntity>> getAllVocs() async {
@@ -252,15 +223,16 @@ class VocLocalDatasource {
           ? null
           : DateTime.tryParse(createdAtRaw)?.toLocal();
       final mergedText = '$title $content';
-      final tokens = _extractKeywords(mergedText);
+      final tokens = VocKeywordExtractor.extract(mergedText);
 
       if (createdAt != null) {
-        if (createdAt.isAfter(recentStart)) {
+        if (createdAt.isAfter(now)) continue;
+        if (!createdAt.isBefore(recentStart)) {
           recent30DayVocs += 1;
           for (final token in tokens) {
             recentCounts[token] = (recentCounts[token] ?? 0) + 1;
           }
-        } else if (createdAt.isAfter(previousStart)) {
+        } else if (!createdAt.isBefore(previousStart)) {
           for (final token in tokens) {
             previousCounts[token] = (previousCounts[token] ?? 0) + 1;
           }
@@ -277,14 +249,16 @@ class VocLocalDatasource {
 
     String risingKeyword = '-';
     var risingDelta = 0;
-    recentCounts.forEach((keyword, recent) {
+    final keywords = recentCounts.keys.toList()..sort();
+    for (final keyword in keywords) {
+      final recent = recentCounts[keyword]!;
       final previous = previousCounts[keyword] ?? 0;
       final delta = recent - previous;
       if (recent >= 2 && delta > risingDelta) {
         risingDelta = delta;
         risingKeyword = keyword;
       }
-    });
+    }
 
     return {
       'recent30DayVocs': recent30DayVocs,
@@ -292,18 +266,6 @@ class VocLocalDatasource {
       'risingKeyword': risingKeyword,
       'risingKeywordDelta': risingDelta,
     };
-  }
-
-  Set<String> _extractKeywords(String text) {
-    final matches = _tokenPattern.allMatches(text);
-    final tokens = <String>{};
-    for (final m in matches) {
-      final token = m.group(0)?.trim().toLowerCase() ?? '';
-      if (token.length < 2) continue;
-      if (_keywordStopwords.contains(token)) continue;
-      tokens.add(token);
-    }
-    return tokens;
   }
 
   // Responses

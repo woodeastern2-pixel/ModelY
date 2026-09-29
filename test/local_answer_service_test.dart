@@ -3,6 +3,7 @@ import 'package:ai_voc_assistant/domain/entities/knowledge_base_entity.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  final service = LocalAnswerService();
   final now = DateTime(2026, 9, 28);
   final meeting = KnowledgeBaseEntity(
     id: 'meeting',
@@ -60,5 +61,28 @@ void main() {
     expect(service.answerForQuery('전체 VOC 보고서', results), contains('집계가 필요합니다'));
     expect(service.answerForQuery('전체 VOC 보고서', results), isNot(contains('회의 목록에서 참가')));
   });
+  test('long context does not echo each sentence as missing evidence', () {
+    const query = '메신저 알림 설정\n상황을 확인하고 있습니다\n직원들이 도움을 요청했습니다\n이 부분도 살펴봐 주세요';
+    final refs = [SimilarVocResult(knowledgeBase: messenger, similarityScore: 1)];
+    final answer = service.answerForQuery(query, refs);
+    expect(answer, isNot(contains('에 답할 근거가 부족')));
+    expect(answer, contains('설정에서 알림'));
+  });
+
+  test('conversation layout change is not answered with member expulsion steps', () {
+    const query = '대화창의 표시\n상대방과 내가 모두 왼쪽에 표시되니 불편합니다. '
+        '나는 오른쪽에 표시되도록 변경해주시길 요청드립니다.';
+    final entry = KnowledgeBaseEntity(id: 'layout', question: '대화창',
+      answer: '대화방 목록에서 대화방을 선택하면 오른쪽에 대화창이 보입니다.\n'
+          '리더가 선택되었을 경우 멤버 내보내기는 할 수 없습니다.',
+      category: '시스템매뉴얼', resolvedAt: now, createdAt: now);
+    final answer = service.answerForQuery(query,
+        [SimilarVocResult(knowledgeBase: entry, similarityScore: 1)]);
+    expect(answer, contains('개선 요청'));
+    expect(answer, contains('변경 가능 여부'));
+    expect(answer, isNot(contains('멤버 내보내기')));
+    expect(answer, isNot(contains('설정에서 변경할 수')));
+  });
+
 }
 

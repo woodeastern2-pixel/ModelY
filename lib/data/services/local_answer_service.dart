@@ -218,8 +218,12 @@ class LocalAnswerService {
       gaps.add('요청하신 메뉴의 정확한 위치와 여는 경로는 찾은 자료에서 확인되지 않습니다.');
     }
     if (plan.parts.length > 1) {
-      for (final part in plan.parts) {
-        if (!_partCovered(part, references)) gaps.add('「$part」에 답할 근거가 부족합니다.');
+      final missing = plan.parts.where((part) => !_partCovered(part, references)).toList();
+      if (missing.isNotEmpty) {
+        final topics = missing.where((part) => part.length <= 20).take(3).toList();
+        gaps.add(topics.isEmpty
+            ? '요청하신 사항 중 일부는 자료에서 확인되지 않았습니다.'
+            : '추가 확인이 필요한 항목: ${topics.join(', ')}.');
       }
     }
     final knownVersions = references.expand((r) => OfflineQueryPlan.versions(
@@ -439,6 +443,18 @@ class LocalAnswerService {
     }
     final selected = answerReferences(references, query: query);
     if (selected.isEmpty) return '$noEvidence\n근거: 없음';
+    // A proposed interface change is not an instruction request. Avoid
+    // presenting unrelated member-management steps as an answer to it.
+    if (RegExp(r'대화|메시지').hasMatch(query) &&
+        RegExp(r'왼쪽|오른쪽|좌측|우측').hasMatch(query) &&
+        RegExp(r'변경|개선').hasMatch(query)) {
+      final alignment = selected.expand((r) =>
+          ManualContent.parse(r.knowledgeBase.answer).body.split(RegExp(r'(?<=[.!?])\s+|\n')))
+          .where((line) => RegExp(r'정렬|말풍선|(?:보낸|받은|발신|수신)\s*메시지.{0,30}(?:왼쪽|오른쪽|좌측|우측)')
+              .hasMatch(line)).toSet().take(4).toList();
+      return '보낸 메시지와 받은 메시지의 표시 위치를 구분해 달라는 개선 요청으로 이해했습니다. '
+          '${alignment.isEmpty ? '등록된 매뉴얼에서는 이 배치를 변경하는 설정을 확인하지 못했습니다. 제품 담당자에게 변경 가능 여부를 확인해 주세요.' : '매뉴얼에서 확인한 표시 방식은 다음과 같습니다. 변경 요청의 지원 여부는 제품 담당자 확인이 필요합니다.\n\n${alignment.join('\n')}'}';
+    }
     final fragments = selected.map((reference) {
       final item = reference.knowledgeBase;
       final parsed = ManualContent.parse(item.answer);

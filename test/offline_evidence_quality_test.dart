@@ -94,7 +94,7 @@ void main() {
     const query = '드라이브 파일 복원 방법 그리고 보관 기간';
     final refs = index.search(query);
     expect(service.canAnswer(query, refs), isTrue);
-    expect(service.answerForQuery(query, refs), contains('「보관 기간」에 답할 근거가 부족'));
+    expect(service.answerForQuery(query, refs), contains('추가 확인이 필요한 항목: 보관 기간'));
   });
 
   test('inconsistent limits from different sources are disclosed', () {

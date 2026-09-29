@@ -1,3 +1,4 @@
+import 'package:ai_voc_assistant/presentation/widgets/voc_duplicate_review_dialog.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
@@ -67,13 +68,15 @@ void main() {
         expect(find.text('연결된 앱의 VOC 가져오기'), findsOneWidget);
         expect(find.text('초기 데이터 동기화'), findsOneWidget);
         expect(find.text('기존 중복 VOC 정리'), findsOneWidget);
-        await tester.ensureVisible(find.text('기존 중복 VOC 정리'));
+        expect(find.text('지식자료 내보내기'), findsOneWidget);
+        expect(find.text('지식자료 다시 가져오기'), findsOneWidget);
+        await tester.ensureVisible(find.text('지식자료 다시 가져오기'));
         await tester.pumpAndSettle();
         await tester.runAsync(() async {
           final image = await (boundary.currentContext!.findRenderObject()
               as RenderRepaintBoundary).toImage();
           final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-          final file = File('test/goldens/dedup-sync-${profile.size.width.toInt()}.png');
+          final file = File('test/goldens/knowledge-archive-${profile.size.width.toInt()}.png');
           await file.parent.create(recursive: true);
           await file.writeAsBytes(bytes!.buffer.asUint8List());
           image.dispose();
@@ -88,6 +91,30 @@ void main() {
         await tester.pump();
       },
     );
+  }
+
+  for (final profile in profiles) {
+    testWidgets('duplicate review requires selection at ${profile.size.width}', (tester) async {
+      await _setViewport(tester, profile.size);
+      final boundary = GlobalKey();
+      await tester.pumpWidget(MaterialApp(theme: AppTheme.lightTheme,
+        darkTheme: AppTheme.darkTheme, themeMode: profile.theme,
+        home: RepaintBoundary(key: boundary, child: const Scaffold())));
+      final context = tester.element(find.byType(Scaffold));
+      final result = showDialog<List<List<String>>>(context: context, builder: (_) =>
+        VocDuplicateReviewDialog(groups: [[
+          for (final id in ['one', 'two']) {'id': id, 'title': '메일 첨부파일 오류',
+            'content': '첨부파일이 열리지 않습니다.', 'customer': '고객', 'project': '메일',
+            'created_at': '2026-09-29', 'source': 'peer-pull', 'status': 'OPEN'},
+        ]]));
+      await tester.pumpAndSettle();
+      expect(tester.widget<FilledButton>(find.byType(FilledButton)).onPressed, isNull);
+      await tester.tap(find.byType(Checkbox)); await tester.pumpAndSettle();
+      await tester.tap(find.text('내용과 등록 정보 비교')); await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.text('선택한 1묶음 병합')); await tester.pumpAndSettle();
+      expect(await result, [['one', 'two']]);
+    });
   }
 
   testWidgets('sync settings add a peer URL and persist auto forwarding', (

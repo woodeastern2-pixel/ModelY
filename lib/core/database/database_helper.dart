@@ -1,3 +1,4 @@
+import '../../data/services/portable_manual_media.dart';
 import 'dart:convert';
 
 import 'package:path/path.dart';
@@ -42,6 +43,7 @@ class DatabaseHelper {
   }
 
   Future<void> _onOpen(Database db) async {
+    await PortableManualMedia.initialize(db);
     await _ensureVocTableColumns(db);
     await _ensureSyncEventTable(db);
     await VocIdentityStore.reconcile(db);

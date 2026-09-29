@@ -57,7 +57,8 @@ class IntegrationViewModel extends ChangeNotifier {
     try {
       final db = await DatabaseHelper.instance.database;
       final count = await VocIdentityStore.reconcile(db);
-      _success = '중복 자료 점검 완료: $count건을 정리했습니다.';
+      final candidates = await VocIdentityStore.duplicateCandidates(db);
+      _success = '자동 중복 정리 $count건 · 확인할 중복 후보 ${candidates.length}묶음';
       if (count > 0 && !_disposed) {
         _onInboundSyncEvent?.call('중복 VOC $count건을 정리했습니다.');
       }

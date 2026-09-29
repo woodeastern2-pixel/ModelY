@@ -66,9 +66,22 @@ class OfflineSearchStore {
       }
       await refresh();
     }
+    await restorePendingOriginals();
     if (maintenance) _timer ??= Timer.periodic(const Duration(seconds: 1), (_) {
       if (db.isOpen) { unawaited(refresh().catchError((Object _) {})); } else { _timer?.cancel(); }
     });
+  }
+
+  Future<void> restorePendingOriginals() async {
+    final pending = await db.query('offline_meta', where: 'key = ?',
+        whereArgs: ['original_restore_pending']);
+    if (pending.isEmpty) return;
+    for (final row in await db.query('original_documents')) {
+      await installOriginal(jsonDecode(row['content'] as String) as Map<String, dynamic>,
+          originalPath: row['original_path'] as String?);
+    }
+    await db.delete('offline_meta', where: 'key = ?',
+        whereArgs: ['original_restore_pending']);
   }
 
   void dispose() { _timer?.cancel(); }

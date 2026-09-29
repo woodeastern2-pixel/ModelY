@@ -1,3 +1,4 @@
+import 'portable_manual_media.dart';
 import 'dart:convert';
 import 'manual_media_store.dart';
 import 'original_media_registry.dart';
@@ -66,6 +67,8 @@ class BundledManualService {
   }
 
   static Future<List<Map<String, dynamic>>> imagesFor(String entryId) async {
+    final restored = await PortableManualMedia.imagesFor(entryId);
+    if (restored != null) return restored;
     if (entryId.startsWith('raw-')) return OriginalMediaRegistry.images[entryId] ?? [];
     if (!entryId.startsWith('manual-pack-')) {
       return const ManualMediaStore().imagesFor(entryId);
@@ -84,6 +87,8 @@ class BundledManualService {
   }
 
   static Future<Uint8List> imageBytes(String id) async {
+    final restored = await PortableManualMedia.bytes(id);
+    if (restored != null) return restored;
     if (id.startsWith('local-')) return const ManualMediaStore().imageBytes(id);
     if (!RegExp(r'^[a-f0-9]{24}$').hasMatch(id)) {
       throw const FormatException('잘못된 매뉴얼 이미지 식별자입니다.');

@@ -16,7 +16,8 @@ class VocSaveResult {
 /// All identity decisions and writes run inside the caller's transaction.
 class VocIdentityStore {
   static String normalize(Object? value) =>
-      (value?.toString() ?? '').trim().replaceAll(RegExp(r'\s+'), ' ');
+      (value?.toString() ?? '').replaceAll(RegExp(r'[\u200B-\u200D\uFEFF]'), '')
+          .trim().replaceAll(RegExp(r'[\s\u00A0]+'), ' ');
 
   static String fingerprint(Map<String, dynamic> row) => sha256
       .convert(utf8.encode(jsonEncode([
@@ -312,6 +313,55 @@ class VocIdentityStore {
       if (indexed[row['id']] != fingerprint(row) ||
           keys(row).any((key) => storedAliases[key] != row['id'])) {
         await index(txn, row);
+      }
+    }
+    return count;
+  });
+
+  /// Content-equivalent records with changed timestamps are review candidates,
+  /// not automatically proven to be the same incident.
+  static String candidateFingerprint(Map<String, dynamic> row) => fingerprint({
+    ...row,
+    'title': normalize(row['title']).replaceAll(' ', ''),
+    'content': normalize(row['content']).replaceAll(' ', ''),
+  });
+
+  static Future<List<List<Map<String, dynamic>>>> duplicateCandidates(Database db) async {
+    final groups = <String, List<Map<String, dynamic>>>{};
+    for (final row in await db.query(AppConstants.tableVocs,
+        orderBy: 'created_at ASC, id ASC')) {
+      if (normalize(row['title']).isEmpty || normalize(row['content']).isEmpty) continue;
+      (groups[candidateFingerprint(row)] ??= []).add(row);
+    }
+    return groups.values.where((rows) => rows.length > 1).toList();
+  }
+
+  /// Selection is explicit; re-read every row inside one transaction to reject
+  /// a stale review if records have since been edited.
+  static Future<int> mergeReviewed(Database db, List<List<String>> groups) =>
+      db.transaction((txn) async {
+    var count = 0;
+    for (final ids in groups) {
+      if (ids.toSet().length < 2) continue;
+      final rows = <Map<String, dynamic>>[];
+      for (final id in ids.toSet()) {
+        final current = await resolve(txn, id);
+        if (rows.any((r) => r['id'] == current)) continue;
+        final found = await txn.query(AppConstants.tableVocs,
+            where: 'id = ?', whereArgs: [current]);
+        if (found.isEmpty) throw StateError('VOC가 변경되었습니다. 다시 점검해 주세요.');
+        rows.add(found.single);
+      }
+      if (rows.length < 2) continue;
+      if (rows.map(candidateFingerprint).toSet().length != 1) {
+        throw StateError('VOC 내용이 변경되었습니다. 다시 점검해 주세요.');
+      }
+      var keeper = rows.first;
+      for (final duplicate in rows.skip(1)) {
+        await _merge(txn, keeper, duplicate);
+        keeper = (await txn.query(AppConstants.tableVocs,
+            where: 'id = ?', whereArgs: [keeper['id']])).single;
+        count++;
       }
     }
     return count;

@@ -29,6 +29,37 @@ void main() {
   Future<VocSaveResult> save(Map<String, dynamic> row, {String? app}) =>
       db.transaction((txn) => VocIdentityStore.save(txn, row, peerApp: app));
 
+  test('changed timestamps are found for review without deleting recurring incidents', () async {
+    await db.insert('vocs', voc('old'));
+    await db.insert('vocs', voc('later')..['created_at'] = '2026-09-30T09:00:00Z');
+    await db.insert('vocs', voc('other')..['customer'] = '다른 고객');
+    expect(await VocIdentityStore.reconcile(db), 0);
+    final groups = await VocIdentityStore.duplicateCandidates(db);
+    expect(groups, hasLength(1));
+    expect(groups.single.map((r) => r['id']).toSet(), {'old', 'later'});
+    await db.insert('responses', {'id': 'answer', 'voc_id': 'later', 'content': '보존'});
+    expect(await VocIdentityStore.mergeReviewed(db, [['old', 'later']]), 1);
+    expect(await db.query('vocs'), hasLength(2));
+    expect((await db.query('responses')).single['voc_id'], 'old');
+    expect(await VocIdentityStore.mergeReviewed(db, [['old', 'later']]), 0);
+  });
+
+  test('review finds invisible spaces and line-wrap differences', () async {
+    await db.insert('vocs', voc('one')..['content'] = '메일 알림 설정');
+    await db.insert('vocs', voc('two')..['content'] = '메일\u200b알림\n설정'
+      ..['created_at'] = '2026-09-30T09:00:00Z');
+    expect(await VocIdentityStore.duplicateCandidates(db), hasLength(1));
+  });
+
+  test('stale reviewed group is rejected with all records preserved', () async {
+    await db.insert('vocs', voc('one'));
+    await db.insert('vocs', voc('two'));
+    await db.update('vocs', {'content': '새로 수정한 별도 문의'}, where: 'id=?', whereArgs: ['two']);
+    await expectLater(VocIdentityStore.mergeReviewed(db, [['one', 'two']]), throwsStateError);
+    expect(await db.query('vocs'), hasLength(2));
+    expect(await db.query('voc_merge_archive'), isEmpty);
+  });
+
   test('concurrent manual retries from multiple callers create one durable row', () async {
     final results = await Future.wait(List.generate(16, (i) => save(voc('manual-$i'))));
     expect(results.where((r) => r.created), hasLength(1));
