@@ -97,7 +97,7 @@ class SampleVocGenerator {
           title: '[시연] ${field.name} · ${topic.name} ${suffixes[variant]}',
           content: '${persona.department}에서 ${persona.role} 역할로 '
               '${field.project}를 이용하고 있습니다. ${persona.context}\n\n'
-              '${prompts[variant]}\n\n[시연용 가상 문의 — 실제 고객 접수나 확인된 제품 장애가 아닙니다.]',
+              '${prompts[variant]}\n\n[시연용 가상 문의 — 실제 고객 접수가 아닙니다.]',
           category: categories[variant],
           tags: '시연,${field.name},${topic.name},${persona.role}',
           customer: '시연 ${persona.department} ${persona.role}',
