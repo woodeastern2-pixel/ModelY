@@ -110,7 +110,9 @@ class VocIdentityStore {
     for (final table in tables) {
       final name = table['name'] as String;
       if (name.startsWith('voc_identity_') ||
-          !RegExp(r'^[a-zA-Z_][a-zA-Z0-9_]*$').hasMatch(name)) continue;
+          !RegExp(r'^[a-zA-Z_][a-zA-Z0-9_]*$').hasMatch(name)) {
+        continue;
+      }
       final columns = (await db.rawQuery('PRAGMA table_info("$name")'))
           .map((c) => c['name']).toSet();
       for (final column in ['voc_id', 'imported_voc_id', 'duplicate_of_voc_id']) {
@@ -341,7 +343,9 @@ class VocIdentityStore {
     }
     // Preserve terminal handling state when legacy timestamps are identical.
     if (_time(duplicate['updated_at']) == _time(keeper['updated_at']) &&
-        duplicate['status'] == 'RESOLVED') merged['status'] = 'RESOLVED';
+        duplicate['status'] == 'RESOLVED') {
+      merged['status'] = 'RESOLVED';
+    }
     await db.update(AppConstants.tableVocs, merged,
         where: 'id = ?', whereArgs: [target]);
     final tables = await db.rawQuery("SELECT name FROM sqlite_master WHERE type='table'");
