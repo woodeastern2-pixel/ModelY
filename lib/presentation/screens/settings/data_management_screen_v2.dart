@@ -71,7 +71,7 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
       _show(
         '연결된 앱에서 VOC를 가져왔습니다. 전체 ${result.remoteTotal}개 · '
         '새 VOC ${result.created}개 · 업데이트 ${result.updated}개 · '
-        '반영 ${result.applied}개 · 성공 ${result.successApps}곳'
+        '중복 제외 ${result.skipped}개 · 기존 중복 정리 ${result.merged}개 · 성공 ${result.successApps}곳'
         '${result.failedApps > 0 ? ' · 실패 ${result.failedApps}곳' : ''}',
         error: result.failedApps > 0,
       );
@@ -92,7 +92,7 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
       await _refresh();
       _show(
         '초기 데이터 동기화를 완료했습니다.\n'
-        'VOC: 전체 ${result.vocRemoteTotal}개 · 새 VOC ${result.vocCreated}개 · 업데이트 ${result.vocUpdated}개\n'
+        'VOC: 전체 ${result.vocRemoteTotal}개 · 새 VOC ${result.vocCreated}개 · 업데이트 ${result.vocUpdated}개 · 중복 제외 ${result.vocSkipped}개 · 기존 중복 정리 ${result.merged}개\n'
         '지식 자료: 전체 ${result.manualRemoteTotal}개 · 새 자료 ${result.manualCreated}개 · 제외 ${result.manualSkipped}개\n'
         '앱: 성공 ${result.successApps}곳${result.failedApps > 0 ? ' · 실패 ${result.failedApps}곳' : ''}',
         error: result.failedApps > 0,
@@ -249,6 +249,13 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
                           '연결된 앱의 VOC 가져오기',
                           Icons.cloud_download_outlined,
                           busy ? null : _pullPeerVocs,
+                        ),
+                        _Cmd(
+                          '기존 중복 VOC 정리',
+                          Icons.playlist_remove_outlined,
+                          busy ? null : () => _run((v) async {
+                            await v.reconcileDuplicateVocs();
+                          }, refresh: true),
                         ),
                         _Cmd(
                           '초기 데이터 동기화',

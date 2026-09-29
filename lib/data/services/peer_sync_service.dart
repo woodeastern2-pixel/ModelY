@@ -6,19 +6,17 @@ import 'package:uuid/uuid.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/database/database_helper.dart';
 import '../../core/utils/vector_utils.dart';
-import '../../core/utils/voc_category_catalog.dart';
-import '../../domain/entities/voc_entity.dart';
-import '../../domain/repositories/voc_repository.dart';
 import '../../presentation/viewmodels/settings_viewmodel.dart';
-import '../datasources/local/voc_local_datasource.dart';
-import '../repositories/voc_repository_impl.dart';
 import 'webhook_service.dart';
+import 'voc_identity_store.dart';
 
 class PeerVocPullResult {
   const PeerVocPullResult({
     required this.remoteTotal,
     required this.created,
     required this.updated,
+    this.skipped = 0,
+    this.merged = 0,
     required this.failedApps,
     required this.successApps,
   });
@@ -26,6 +24,8 @@ class PeerVocPullResult {
   final int remoteTotal;
   final int created;
   final int updated;
+  final int skipped;
+  final int merged;
   final int failedApps;
   final int successApps;
   int get applied => created + updated;
@@ -36,6 +36,8 @@ class PeerBootstrapResult {
     required this.vocRemoteTotal,
     required this.vocCreated,
     required this.vocUpdated,
+    this.vocSkipped = 0,
+    this.merged = 0,
     required this.manualRemoteTotal,
     required this.manualCreated,
     required this.manualSkipped,
@@ -46,6 +48,8 @@ class PeerBootstrapResult {
   final int vocRemoteTotal;
   final int vocCreated;
   final int vocUpdated;
+  final int vocSkipped;
+  final int merged;
   final int manualRemoteTotal;
   final int manualCreated;
   final int manualSkipped;
@@ -54,11 +58,9 @@ class PeerBootstrapResult {
 }
 
 class PeerSyncService {
-  PeerSyncService(this.settings)
-      : _vocRepository = VocRepositoryImpl(VocLocalDatasource(DatabaseHelper.instance));
+  PeerSyncService(this.settings);
 
   final SettingsViewModel settings;
-  final VocRepository _vocRepository;
   final WebhookService _webhook = WebhookService();
   final Uuid _uuid = const Uuid();
 
@@ -66,6 +68,9 @@ class PeerSyncService {
     final targets = settings.vocForwardWebhookTargets;
     if (targets.isEmpty) throw StateError('가져올 대상 앱 URL이 없습니다.');
 
+    final db = await DatabaseHelper.instance.database;
+    final merged = await VocIdentityStore.reconcile(db);
+    var skipped = 0;
     var remoteTotal = 0;
     var created = 0;
     var updated = 0;
@@ -88,15 +93,17 @@ class PeerSyncService {
 
         for (final item in vocs) {
           if (item is! Map) continue;
-          final wasCreated = await _upsertRemoteVoc(
+          final result = await _upsertRemoteVoc(
             sourceApp,
             Map<String, dynamic>.from(item),
             source: 'peer-pull',
           );
-          if (wasCreated) {
-            created += 1;
+          if (result.created) {
+            created++;
+          } else if (result.updated) {
+            updated++;
           } else {
-            updated += 1;
+            skipped++;
           }
         }
       } catch (_) {
@@ -108,6 +115,8 @@ class PeerSyncService {
       remoteTotal: remoteTotal,
       created: created,
       updated: updated,
+      skipped: skipped,
+      merged: merged,
       failedApps: failedApps,
       successApps: successApps,
     );
@@ -118,6 +127,8 @@ class PeerSyncService {
     if (targets.isEmpty) throw StateError('초기 동기화 대상 앱이 없습니다.');
 
     final db = await DatabaseHelper.instance.database;
+    final merged = await VocIdentityStore.reconcile(db);
+    var vocSkipped = 0;
     final existingManualRows = await db.query(
       AppConstants.tableKnowledgeBase,
       columns: ['question', 'answer'],
@@ -156,15 +167,17 @@ class PeerSyncService {
 
         for (final item in vocs) {
           if (item is! Map) continue;
-          final wasCreated = await _upsertRemoteVoc(
+          final result = await _upsertRemoteVoc(
             sourceApp,
             Map<String, dynamic>.from(item),
             source: 'peer-bootstrap',
           );
-          if (wasCreated) {
-            vocCreated += 1;
+          if (result.created) {
+            vocCreated++;
+          } else if (result.updated) {
+            vocUpdated++;
           } else {
-            vocUpdated += 1;
+            vocSkipped++;
           }
         }
 
@@ -192,7 +205,8 @@ class PeerSyncService {
               'category': row['category']?.toString() ?? '시스템매뉴얼',
               'customer': row['customer']?.toString(),
               'project': row['project']?.toString() ?? 'manual-upload',
-              'voc_id': row['voc_id']?.toString(),
+              'voc_id': row['voc_id'] == null ? null
+                  : await VocIdentityStore.resolve(db, row['voc_id'].toString()),
               'embedding': row['embedding']?.toString() ??
                   jsonEncode(VectorUtils.simpleTextEmbedding('$question $answer')),
               'resolved_at': row['resolved_at']?.toString() ?? now.toIso8601String(),
@@ -212,6 +226,8 @@ class PeerSyncService {
       vocRemoteTotal: vocRemoteTotal,
       vocCreated: vocCreated,
       vocUpdated: vocUpdated,
+      vocSkipped: vocSkipped,
+      merged: merged,
       manualRemoteTotal: manualRemoteTotal,
       manualCreated: manualCreated,
       manualSkipped: manualSkipped,
@@ -220,112 +236,15 @@ class PeerSyncService {
     );
   }
 
-  Future<bool> _upsertRemoteVoc(
+  Future<VocSaveResult> _upsertRemoteVoc(
     String sourceApp,
     Map<String, dynamic> row, {
     required String source,
   }) async {
-    final remoteId = row['id']?.toString().trim() ?? '';
-    final title = row['title']?.toString().trim().isNotEmpty == true
-        ? row['title'].toString().trim()
-        : '제목없음';
-    final content = row['content']?.toString().trim().isNotEmpty == true
-        ? row['content'].toString().trim()
-        : '내용 없음';
-    final stableRef = '$sourceApp:${remoteId.isEmpty ? _fallbackRemoteKey(title, content) : remoteId}';
     final db = await DatabaseHelper.instance.database;
-    final existingRows = await db.query(
-      AppConstants.tableVocs,
-      columns: ['id'],
-      where: 'source_ref = ?',
-      whereArgs: [stableRef],
-      limit: 1,
-    );
-
-    final existing = existingRows.isEmpty
-        ? null
-        : await _vocRepository.getVocById(existingRows.first['id'].toString());
-    final now = DateTime.now();
-    final createdAt = DateTime.tryParse(row['created_at']?.toString() ?? '') ?? existing?.createdAt ?? now;
-    final updatedAt = DateTime.tryParse(row['updated_at']?.toString() ?? '') ?? now;
-    final normalizedCategory = VocCategoryCatalog.normalize(
-      row['category']?.toString(),
-      title: title,
-      content: content,
-      aiCategory: row['ai_category']?.toString(),
-      tags: row['tags']?.toString(),
-    );
-
-    if (existing != null) {
-      final updated = existing.copyWith(
-        title: title,
-        content: content,
-        category: normalizedCategory,
-        tags: _optional(row['tags']) ?? existing.tags,
-        customer: _required(row['customer'], existing.customer),
-        project: _required(row['project'], existing.project),
-        priority: _normalizePriority(row['priority']?.toString()),
-        status: _normalizeStatus(row['status']?.toString()),
-        aiCategory: _optional(row['ai_category']) ?? existing.aiCategory,
-        isBusinessRelated: _boolValue(row['is_business_related']) ?? existing.isBusinessRelated,
-        businessScore: _doubleValue(row['business_score']) ?? existing.businessScore,
-        categoryScore: _doubleValue(row['category_score']) ?? existing.categoryScore,
-        urgency: _optional(row['urgency']) ?? existing.urgency,
-        urgencyScore: _doubleValue(row['urgency_score']) ?? existing.urgencyScore,
-        businessType: _optional(row['business_type']) ?? existing.businessType,
-        department: _optional(row['department']) ?? existing.department,
-        departmentScore: _doubleValue(row['department_score']) ?? existing.departmentScore,
-        assignee: _optional(row['assignee']) ?? existing.assignee,
-        assigneeScore: _doubleValue(row['assignee_score']) ?? existing.assigneeScore,
-        duplicateOfVocId: _optional(row['duplicate_of_voc_id']) ?? existing.duplicateOfVocId,
-        duplicateScore: _doubleValue(row['duplicate_score']) ?? existing.duplicateScore,
-        jiraRequired: _boolValue(row['jira_required']) ?? existing.jiraRequired,
-        jiraScore: _doubleValue(row['jira_score']) ?? existing.jiraScore,
-        analysisReason: _optional(row['analysis_reason']) ?? existing.analysisReason,
-        source: source,
-        sourceRef: stableRef,
-        processingMinutes: _intValue(row['processing_minutes']) ?? existing.processingMinutes,
-        updatedAt: updatedAt,
-      );
-      await _vocRepository.updateVoc(updated);
-      return false;
-    }
-
-    await _vocRepository.createVoc(
-      VocEntity(
-        id: _uuid.v4(),
-        title: title,
-        content: content,
-        category: normalizedCategory,
-        tags: _optional(row['tags']),
-        customer: _required(row['customer'], '미입력'),
-        project: _required(row['project'], '미입력'),
-        priority: _normalizePriority(row['priority']?.toString()),
-        status: _normalizeStatus(row['status']?.toString()),
-        aiCategory: _optional(row['ai_category']),
-        isBusinessRelated: _boolValue(row['is_business_related']) ?? true,
-        businessScore: _doubleValue(row['business_score']),
-        categoryScore: _doubleValue(row['category_score']),
-        urgency: _optional(row['urgency']),
-        urgencyScore: _doubleValue(row['urgency_score']),
-        businessType: _optional(row['business_type']),
-        department: _optional(row['department']),
-        departmentScore: _doubleValue(row['department_score']),
-        assignee: _optional(row['assignee']),
-        assigneeScore: _doubleValue(row['assignee_score']),
-        duplicateOfVocId: _optional(row['duplicate_of_voc_id']),
-        duplicateScore: _doubleValue(row['duplicate_score']),
-        jiraRequired: _boolValue(row['jira_required']) ?? false,
-        jiraScore: _doubleValue(row['jira_score']),
-        analysisReason: _optional(row['analysis_reason']),
-        source: source,
-        sourceRef: stableRef,
-        processingMinutes: _intValue(row['processing_minutes']),
-        createdAt: createdAt,
-        updatedAt: updatedAt,
-      ),
-    );
-    return true;
+    return db.transaction((txn) => VocIdentityStore.save(txn,
+      VocIdentityStore.remoteRow(row, sourceApp, source: source),
+      peerApp: sourceApp));
   }
 
   String _sourceApp(Map<String, dynamic> payload) {
@@ -339,60 +258,28 @@ class PeerSyncService {
   }
 
   String _toExportEndpoint(String target) {
-    var base = target.trim();
-    if (base.endsWith('/webhook/voc')) {
-      base = base.substring(0, base.length - '/webhook/voc'.length);
-    } else if (base.endsWith('/voc')) {
-      base = base.substring(0, base.length - '/voc'.length);
-    } else if (base.endsWith('/webhook/sync/full')) {
-      base = base.substring(0, base.length - '/webhook/sync/full'.length);
+    final trimmed = target.trim();
+    if (trimmed.endsWith('/health')) {
+      return '${trimmed.substring(0, trimmed.length - '/health'.length)}/webhook/sync/export';
     }
-    base = base.replaceAll(RegExp(r'/+$'), '');
-    return '$base/webhook/sync/export';
+    if (trimmed.endsWith('/webhook/sync/export') ||
+        trimmed.endsWith('/webhook/voc/export')) {
+      return trimmed;
+    }
+    if (trimmed.endsWith('/webhook/voc')) {
+      return '${trimmed.substring(0, trimmed.length - '/webhook/voc'.length)}/webhook/sync/export';
+    }
+    if (trimmed.endsWith('/webhook/sync/full')) {
+      return '${trimmed.substring(0, trimmed.length - '/webhook/sync/full'.length)}/webhook/sync/export';
+    }
+    if (trimmed.endsWith('/webhook/sync')) {
+      return '$trimmed/export';
+    }
+    if (trimmed.endsWith('/')) {
+      return '${trimmed}webhook/sync/export';
+    }
+    return '$trimmed/webhook/sync/export';
   }
-
-  String _normalizeStatus(String? raw) {
-    final value = raw?.trim().toUpperCase() ?? '';
-    return switch (value) {
-      'IN_PROGRESS' => AppConstants.vocStatusInProgress,
-      'RESOLVED' => AppConstants.vocStatusResolved,
-      'REJECTED' => AppConstants.vocStatusRejected,
-      _ => AppConstants.vocStatusOpen,
-    };
-  }
-
-  String _normalizePriority(String? raw) {
-    final value = raw?.trim().toUpperCase() ?? '';
-    return switch (value) {
-      'HIGH' => AppConstants.priorityHigh,
-      'LOW' => AppConstants.priorityLow,
-      _ => AppConstants.priorityMedium,
-    };
-  }
-
-  String? _optional(dynamic value) {
-    final text = value?.toString().trim() ?? '';
-    return text.isEmpty ? null : text;
-  }
-
-  String _required(dynamic value, String fallback) {
-    final text = value?.toString().trim() ?? '';
-    return text.isEmpty ? fallback : text;
-  }
-
-  double? _doubleValue(dynamic value) => value is num ? value.toDouble() : double.tryParse(value?.toString() ?? '');
-  int? _intValue(dynamic value) => value is int ? value : int.tryParse(value?.toString() ?? '');
-  bool? _boolValue(dynamic value) {
-    if (value is bool) return value;
-    if (value is num) return value != 0;
-    final text = value?.toString().trim().toLowerCase();
-    if (text == 'true' || text == '1') return true;
-    if (text == 'false' || text == '0') return false;
-    return null;
-  }
-
-  String _fallbackRemoteKey(String title, String content) =>
-      '${title.trim().toLowerCase()}|${content.trim().toLowerCase()}';
 
   String _manualKey(String question, String answer) =>
       '${question.trim().toLowerCase()}|${answer.trim().toLowerCase()}';

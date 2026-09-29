@@ -2,8 +2,8 @@ class AppConstants {
   AppConstants._();
 
   static const String appName = 'AI VOC Assistant';
-  static const String appVersion = '1.1.4';
-  static const int appBuildNumber = 6;
+  static const String appVersion = '1.1.17';
+  static const int appBuildNumber = 19;
 
   // 사내 시연 빌드에서는 외부 업무 협업 도구의 화면 진입점만 숨긴다.
   // 저장된 설정과 연동 데이터는 삭제하지 않아 추후 다시 노출할 수 있다.

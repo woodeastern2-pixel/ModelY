@@ -1,3 +1,4 @@
+import '../../services/voc_identity_store.dart';
 import 'dart:convert';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/database/database_helper.dart';
@@ -50,6 +51,7 @@ class VocLocalDatasource {
 
   Future<VocEntity?> getVocById(String id) async {
     final db = await _dbHelper.database;
+    id = await VocIdentityStore.resolve(db, id);
     final maps = await db.query(
       AppConstants.tableVocs,
       where: 'id = ?',
@@ -91,19 +93,21 @@ class VocLocalDatasource {
 
   Future<VocEntity> insertVoc(VocEntity voc) async {
     final db = await _dbHelper.database;
-    await db.insert(AppConstants.tableVocs, _vocToMap(voc));
-    return voc;
+    final result = await db.transaction((txn) =>
+        VocIdentityStore.save(txn, _vocToMap(voc)));
+    return _mapToVoc(result.row);
   }
 
   Future<VocEntity> updateVoc(VocEntity voc) async {
     final db = await _dbHelper.database;
-    await db.update(
-      AppConstants.tableVocs,
-      _vocToMap(voc),
-      where: 'id = ?',
-      whereArgs: [voc.id],
-    );
-    return voc;
+    return db.transaction((txn) async {
+      final id = await VocIdentityStore.resolve(txn, voc.id);
+      final row = _vocToMap(voc)..['id'] = id;
+      await txn.update(AppConstants.tableVocs, row,
+          where: 'id = ?', whereArgs: [id]);
+      await VocIdentityStore.index(txn, row);
+      return _mapToVoc(row);
+    });
   }
 
   Future<int> reassignAllVocCategories() async {
@@ -305,6 +309,7 @@ class VocLocalDatasource {
   // Responses
   Future<List<ResponseEntity>> getResponsesByVocId(String vocId) async {
     final db = await _dbHelper.database;
+    vocId = await VocIdentityStore.resolve(db, vocId);
     final maps = await db.query(
       AppConstants.tableResponses,
       where: 'voc_id = ?',
@@ -316,8 +321,12 @@ class VocLocalDatasource {
 
   Future<ResponseEntity> insertResponse(ResponseEntity response) async {
     final db = await _dbHelper.database;
-    await db.insert(AppConstants.tableResponses, _responseToMap(response));
-    return response;
+    return db.transaction((txn) async {
+      final row = _responseToMap(response);
+      row['voc_id'] = await VocIdentityStore.resolve(txn, response.vocId);
+      await txn.insert(AppConstants.tableResponses, row);
+      return _mapToResponse(row);
+    });
   }
 
   Future<ResponseEntity> updateResponse(ResponseEntity response) async {
@@ -440,7 +449,7 @@ class VocLocalDatasource {
       content: map['content'] as String,
       status: map['status'] as String,
       aiGenerated: (map['ai_generated'] as int) == 1,
-      confidenceScore: map['confidence_score'] as double?,
+      confidenceScore: (map['confidence_score'] as num?)?.toDouble(),
       referencedVocIds: refs,
       approvedBy: map['approved_by'] as String?,
       approvedAt: map['approved_at'] != null

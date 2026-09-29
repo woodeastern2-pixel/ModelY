@@ -100,7 +100,11 @@ class VocAssistantApp extends StatelessWidget {
           create: (ctx) => IntegrationViewModel(
             vocRepo,
             ctx.read<SettingsViewModel>(),
-            onInboundSyncEvent: _showInboundSyncSnackBar,
+            onInboundSyncEvent: (message) {
+              _showInboundSyncSnackBar(message);
+              ctx.read<VocViewModel>().loadVocs();
+              ctx.read<DashboardViewModel>().loadDashboard();
+            },
           ),
         ),
       ],

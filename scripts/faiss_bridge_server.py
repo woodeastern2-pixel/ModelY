@@ -1,8 +1,10 @@
 from typing import Dict, List, Any
+import threading
+from functools import wraps
 
 import numpy as np
 from fastapi import FastAPI
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 try:
     import faiss
@@ -20,7 +22,7 @@ class UpsertRequest(BaseModel):
 
 class SearchRequest(BaseModel):
     vector: List[float]
-    top_k: int = 5
+    top_k: int = Field(default=5, ge=1, le=100)
 
 
 app = FastAPI(title="AI VOC FAISS Bridge")
@@ -29,6 +31,16 @@ _DIM = None
 _INDEX = None
 _IDS: List[str] = []
 _PAYLOADS: Dict[str, Dict[str, Any]] = {}
+_VECTORS: Dict[str, np.ndarray] = {}
+_LOCK = threading.RLock()
+
+
+def _locked(function):
+    @wraps(function)
+    def wrapped(*args, **kwargs):
+        with _LOCK:
+            return function(*args, **kwargs)
+    return wrapped
 
 
 def _ensure_index(dim: int):
@@ -48,29 +60,36 @@ def _normalize(v: np.ndarray) -> np.ndarray:
 
 
 @app.get("/health")
+@_locked
 def health():
     return {"status": "ok", "count": len(_IDS), "dim": _DIM}
 
 
 @app.post("/upsert")
+@_locked
 def upsert(req: UpsertRequest):
     vec = np.array([req.vector], dtype=np.float32)
     _ensure_index(vec.shape[1])
     vec = _normalize(vec)
 
-    # 단순 구현: 중복 ID면 payload만 덮고 벡터는 append
-    # 실제 운영에서는 IDMap 또는 재색인 전략 권장
-    _INDEX.add(vec)
-    _IDS.append(req.id)
+    replacing = req.id in _VECTORS
+    _VECTORS[req.id] = vec
+    if replacing:
+        _INDEX.reset()
+        _INDEX.add(np.concatenate([_VECTORS[item_id] for item_id in _IDS], axis=0))
+    else:
+        _INDEX.add(vec)
+        _IDS.append(req.id)
     _PAYLOADS[req.id] = req.payload
 
     return {"ok": True, "count": len(_IDS)}
 
 
 @app.post("/search")
+@_locked
 def search(req: SearchRequest):
     if _INDEX is None or len(_IDS) == 0:
-    return {"results": []}
+        return {"results": []}
 
     q = np.array([req.vector], dtype=np.float32)
     if q.shape[1] != _DIM:

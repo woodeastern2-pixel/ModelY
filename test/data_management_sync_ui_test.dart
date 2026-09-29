@@ -1,3 +1,6 @@
+import 'dart:io';
+import 'dart:ui' as ui;
+import 'package:flutter/rendering.dart';
 import 'package:ai_voc_assistant/core/constants/app_constants.dart';
 import 'package:ai_voc_assistant/core/theme/app_theme.dart';
 import 'package:ai_voc_assistant/domain/repositories/knowledge_base_repository.dart';
@@ -38,6 +41,7 @@ void main() {
           const _EmptyVocRepository(),
           settings,
         );
+        final boundary = GlobalKey();
         await tester.pumpWidget(
           MultiProvider(
             providers: [
@@ -50,7 +54,7 @@ void main() {
               theme: AppTheme.lightTheme,
               darkTheme: AppTheme.darkTheme,
               themeMode: profile.theme,
-              home: const DataManagementScreen(),
+              home: RepaintBoundary(key: boundary, child: const DataManagementScreen()),
             ),
           ),
         );
@@ -62,6 +66,19 @@ void main() {
         expect(find.text('전체 VOC와 매뉴얼 보내기'), findsOneWidget);
         expect(find.text('연결된 앱의 VOC 가져오기'), findsOneWidget);
         expect(find.text('초기 데이터 동기화'), findsOneWidget);
+        expect(find.text('기존 중복 VOC 정리'), findsOneWidget);
+        await tester.ensureVisible(find.text('기존 중복 VOC 정리'));
+        await tester.pumpAndSettle();
+        await tester.runAsync(() async {
+          final image = await (boundary.currentContext!.findRenderObject()
+              as RenderRepaintBoundary).toImage();
+          final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+          final file = File('test/goldens/dedup-sync-${profile.size.width.toInt()}.png');
+          await file.parent.create(recursive: true);
+          await file.writeAsBytes(bytes!.buffer.asUint8List());
+          image.dispose();
+        });
+
         expect(find.text('Outlook 메일에서 VOC 수집'), findsNothing);
         expect(tester.takeException(), isNull);
 
@@ -167,6 +184,8 @@ void main() {
     // warning while it is the initially selected tab. This routing assertion
     // concerns exceptions produced after opening Data Management.
     tester.takeException();
+    expect(find.textContaining('끄더라도'), findsNothing);
+    expect(find.textContaining('자동 답변 생성을 사용하지 않아도'), findsOneWidget);
     await tester.tap(find.text('데이터 관리').first);
     await tester.pumpAndSettle();
 
@@ -228,3 +247,4 @@ class _EmptyKnowledgeRepository implements KnowledgeBaseRepository {
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
+

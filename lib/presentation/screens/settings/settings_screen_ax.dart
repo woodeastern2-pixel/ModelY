@@ -1887,7 +1887,7 @@ class _GeneralViewState extends State<_GeneralView> {
                   ),
                   children: [
                     Text(
-                      '끄더라도 VOC 등록은 정상 동작하며 상세 화면에서 AI 분석과 답변 생성을 직접 실행할 수 있습니다.',
+                      '자동 답변 생성을 사용하지 않아도 VOC를 등록할 수 있습니다. 상세 화면에서 분석과 답변 생성을 직접 실행할 수 있습니다.',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ],
