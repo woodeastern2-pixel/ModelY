@@ -1,3 +1,4 @@
+import 'package:ai_voc_assistant/data/services/ai_service.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -31,6 +32,34 @@ void main() {
   setUpAll(loadUiHarnessFonts);
   setUpAll(sqfliteFfiInit);
   for (final dark in [false, true]) {
+    testWidgets('connected note request displays a review draft (${dark ? "dark" : "light"})', (tester) async {
+      tester.view.physicalSize = const Size(1440, 1200);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final settings = SettingsViewModel(_Settings());
+      final service = _ConnectedDraft();
+      final vm = AiViewModel(_Knowledge(), _Vocs(), settings, aiService: service);
+      addTearDown(vm.dispose);
+      addTearDown(settings.dispose);
+      await vm.checkCopilotConnection();
+      final key = GlobalKey();
+      await tester.pumpWidget(ChangeNotifierProvider.value(value: vm,
+        child: MaterialApp(theme: dark ? AppTheme.darkTheme : AppTheme.lightTheme,
+          home: RepaintBoundary(key: key, child: const AiAnswerScreen(
+            vocId: 'note-review', vocTitle: '쪽지 복사 시 서식 초기화',
+            vocContent: '쪽지 내용을 복사하면 글자색과 진하게 서식이 초기화됩니다. 서식도 함께 복사되도록 개선해 주세요. 보낸 쪽지와 받은 쪽지의 보관 기간도 궁금합니다.',
+            category: '기능 개선', customer: '시연 고객', project: 'Brity Messenger')))));
+      await tester.pumpAndSettle();
+      expect(service.calls, 1);
+      expect(vm.hasAnswer, isTrue);
+      expect(vm.error, isNull);
+      expect(find.textContaining('쪽지 복사 시 글자색'), findsWidgets);
+      expect(find.textContaining('연결된 AI로 작성한'), findsOneWidget);
+      expect(find.text('일부 근거 · 추가 확인 필요'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await _capture(tester, key, 'connected-note-draft-${dark ? "dark" : "light"}');
+    });
     testWidgets('reported attendee navigation uses indexed corpus and states missing location (${dark ? "dark" : "light"})', (tester) async {
       tester.view.physicalSize = const Size(1440, 1400);
       tester.view.devicePixelRatio = 1;
@@ -333,3 +362,23 @@ class _IndexedCorpus implements KnowledgeBaseRepository, IndexedKnowledgeReposit
 }
 
 
+
+
+// Model output is a deterministic fixture; this verifies routing and rendering,
+// not the quality or availability of a user's actual model server.
+class _ConnectedDraft extends AiService {
+  int calls = 0;
+  @override
+  bool get isConfigured => true;
+  @override
+  Future<String> testConnection() async => 'connected';
+  @override
+  Future<AiAnswerResult> generateReviewDraft(String title, String content,
+      List<SimilarVocResult> references) async {
+    calls++;
+    return const AiAnswerResult(
+      answer: '안녕하세요. 쪽지 복사 시 글자색과 진하게 서식이 유지되지 않는다는 말씀을 확인했습니다. 서식 보존 기능의 지원 여부와 개선 가능 여부는 제품 담당자 확인이 필요합니다. 사용 중인 메신저 버전과 복사한 내용을 붙여넣는 프로그램을 알려주시면 확인에 도움이 됩니다.\n\n보낸 쪽지와 받은 쪽지의 보관 기간은 현재 확인된 자료만으로 확정하기 어렵습니다. 담당 관리자에게 적용된 보관 정책을 확인해 주세요.',
+      confidence: 0, referencedCases: [],
+      notes: '연결된 AI로 작성한 검토용 초안입니다. 확인되지 않은 정책과 기능은 담당자 확인이 필요합니다.');
+  }
+}

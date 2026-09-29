@@ -27,6 +27,50 @@ void main() {
     expect(await vm.resolveChatReferences('진행권 부여 방법'), hasLength(1));
   });
 
+  test('connected answer screen invokes AI even without answer evidence', () async {
+    final settings = SettingsViewModel(_EmptySettingsRepository());
+    final service = _DraftService();
+    final vm = AiViewModel(_EmptyKnowledgeBaseRepository(), _VocRepository([]), settings,
+        aiService: service);
+    addTearDown(vm.dispose);
+    addTearDown(settings.dispose);
+    expect(await vm.checkCopilotConnection(), isTrue);
+    final result = await vm.generateAnswer('쪽지 서식 복사', '쪽지 보관 기간도 궁금합니다.');
+    expect(service.calls, 1);
+    expect(result, isNotNull);
+    expect(vm.hasAnswer, isTrue);
+    expect(vm.error, isNull);
+    expect(vm.hasPartialAnswer, isTrue);
+    expect(vm.answerEvidence, isEmpty);
+    expect(result!.answer, contains('보관 기간'));
+  });
+
+  test('failed answer request is distinguished from insufficient sources', () async {
+    final settings = SettingsViewModel(_EmptySettingsRepository());
+    final service = _DraftService()..failDraft = true;
+    final vm = AiViewModel(_EmptyKnowledgeBaseRepository(), _VocRepository([]), settings,
+        aiService: service);
+    addTearDown(vm.dispose);
+    addTearDown(settings.dispose);
+    await vm.checkCopilotConnection();
+    expect(await vm.generateAnswer('쪽지 서식', '보관 기간'), isNull);
+    expect(service.calls, 1);
+    expect(vm.error, contains('AI 답변 요청에 실패'));
+    expect(vm.isAiConnected, isFalse);
+    expect(vm.isGenerating, isFalse);
+  });
+
+  test('offline answer does not invoke a configured model without verified connection', () async {
+    final settings = SettingsViewModel(_EmptySettingsRepository());
+    final service = _DraftService();
+    final vm = AiViewModel(_EmptyKnowledgeBaseRepository(), _VocRepository([]), settings,
+        aiService: service);
+    addTearDown(vm.dispose);
+    addTearDown(settings.dispose);
+    expect(await vm.generateAnswer('쪽지 서식', '보관 기간'), isNull);
+    expect(service.calls, 0);
+  });
+
   test('configured but unreachable AI cannot create a copilot answer', () async {
     final settings = SettingsViewModel(_EmptySettingsRepository());
     final vm = AiViewModel(_EmptyKnowledgeBaseRepository(), _VocRepository([]), settings,
@@ -154,5 +198,19 @@ class _ConnectionService extends AiService {
   Future<String> testConnection() async {
     if (fail) throw StateError('offline');
     return empty ? '' : 'connected';
+  }
+}
+
+
+class _DraftService extends _ConnectionService {
+  int calls = 0;
+  bool failDraft = false;
+  @override
+  Future<AiAnswerResult> generateReviewDraft(String title, String content,
+      List<SimilarVocResult> references) async {
+    calls++;
+    if (failDraft) throw StateError('generation unavailable');
+    return const AiAnswerResult(answer: '쪽지 서식 보존과 보관 기간은 담당자 확인이 필요합니다.',
+        confidence: 0, referencedCases: [], notes: '연결된 AI 검토용 초안');
   }
 }

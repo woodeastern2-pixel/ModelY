@@ -16,6 +16,24 @@ KnowledgeBaseEntity source(String id, String title, String answer,
 
 void main() {
   final service = LocalAnswerService();
+  test('note formatting and retention do not retrieve unrelated Drive controls', () {
+    final index = OfflineSearchIndex();
+    index.put(source('drive', 'Brity Drive 전용 기능',
+        '공유, 링크 복사, 버전 이력, 웹 뷰, 실행 상태 초기화 기능을 제공합니다.',
+        project: 'Brity Drive'));
+    index.put(source('note', 'Brity Messenger 쪽지 보관 기간',
+        '쪽지 보관 기간은 관리자 정책을 확인합니다.', project: 'Brity Messenger'));
+    const query = '쪽지 복사 시 서식 초기화 안녕하세요 쪽지 전송 후 쪽지 내용을 복사하면 '
+        '색깔이 들어있는 글자가 초기화가 되어 불편합니다. 복사 시 글자색, 진하게 등 서식이 '
+        '같이 복사될 수 있도록 해주시면 감사하겠습니다. 추가로 질문이 있습니다. '
+        '보낸 쪽지함과 받은 쪽지함은 보관 일수가 어떻게 되는지 궁금합니다.';
+    final refs = index.search(query);
+    expect(refs.map((r) => r.knowledgeBase.id), isNot(contains('drive')));
+    expect(refs.map((r) => r.knowledgeBase.id), contains('note'));
+    expect(index.lastQueries.length, lessThanOrEqualTo(4));
+    expect(index.lastTotalCandidates, lessThanOrEqualTo(512));
+  });
+
   test('current question is separated from the quoted previous instructions', () {
     final plan = OfflineQueryPlan.from(attendeeQuestion);
     expect(plan.focus, '참석자 메뉴 위치');
@@ -80,3 +98,4 @@ void main() {
     expect(service.canAnswer(query, index.search(query)), isFalse);
   });
 }
+

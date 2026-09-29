@@ -91,6 +91,19 @@ class LocalAnswerService {
       '못', '찾는', '듯', '알', '수', '있을까', '있을까요',
     }.contains(t)).toList();
     final focused = '$prefix${plan.focus}'.trim();
+    // A note report often combines a formatting request and a retention
+    // question in long polite prose. Search each named feature independently.
+    if (query.contains('쪽지')) {
+      final noteQueries = <String>{query};
+      if (RegExp(r'서식|글자|글씨|색깔|색상|진하게').hasMatch(query)) {
+        noteQueries.add('${prefix}쪽지 서식 복사');
+      }
+      if (RegExp(r'보관|보존|저장 기간').hasMatch(query)) {
+        noteQueries.add('${prefix}쪽지 보관 기간');
+      }
+      noteQueries.add(focused);
+      return noteQueries.take(4).toList();
+    }
     if (plan.parts.length > 1) {
       return <String>{query, for (final part in plan.parts)
         '$prefix${_terms(part).join(' ')}'.trim()}.take(4).toList();
@@ -113,6 +126,7 @@ class LocalAnswerService {
     final currentTerms = _terms(OfflineQueryPlan.from(query).request);
     var products = currentTerms.where(_products.contains).toList();
     if (products.isEmpty) products = terms.where(_products.contains).toList();
+    if (products.isEmpty && query.contains('쪽지')) products.add('messenger');
     if (products.isEmpty && terms.contains('presenter') && terms.contains('participant')) {
       products.add('meeting');
     }
@@ -293,7 +307,7 @@ class LocalAnswerService {
       final knownPlatform = {'desktop', 'mobile'}.where((t) => _matches(scope, t)).toSet();
       if (requestedPlatform.length == 1 && knownPlatform.length == 1 &&
           !requestedPlatform.any(knownPlatform.contains)) continue;
-      final requestedProducts = terms.where(_products.contains);
+      final requestedProducts = _queryScope(query).where(_products.contains);
       final knownProducts = _products.where((p) => _matches(scope, p)).toSet();
       if (!preferred && requestedProducts.isNotEmpty && knownProducts.isNotEmpty &&
           !requestedProducts.any(knownProducts.contains)) {
