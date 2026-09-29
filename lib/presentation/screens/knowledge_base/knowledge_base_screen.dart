@@ -194,12 +194,6 @@ class _ProductFilter extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
       child: Row(
         children: [
-          FilterChip(
-            label: const Text('모든 제품', style: TextStyle(fontSize: 12)),
-            selected: vm.filterProduct.isEmpty,
-            onSelected: (_) => vm.setProductFilter(''),
-            visualDensity: VisualDensity.compact,
-          ),
           ...vm.products.map(
             (product) => Padding(
               padding: const EdgeInsets.only(left: 6),
@@ -283,6 +277,23 @@ class _SearchBarState extends State<_SearchBar> {
   final _controller = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    _controller.text = widget.vm.searchQuery;
+  }
+
+  @override
+  void didUpdateWidget(covariant _SearchBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_controller.text != widget.vm.searchQuery) {
+      _controller.value = TextEditingValue(
+        text: widget.vm.searchQuery,
+        selection: TextSelection.collapsed(offset: widget.vm.searchQuery.length),
+      );
+    }
+  }
+
+  @override
   void dispose() {
     _controller.dispose();
     super.dispose();
@@ -331,7 +342,7 @@ class _CategoryFilter extends StatelessWidget {
         children: [
           FilterChip(
             label: const Text('전체', style: TextStyle(fontSize: 12)),
-            selected: vm.filterCategory.isEmpty,
+            selected: vm.isAllSelected,
             onSelected: (_) => vm.setFilter(''),
             visualDensity: VisualDensity.compact,
           ),
@@ -426,12 +437,6 @@ class _ManualUploadManagerState extends State<_ManualUploadManager> {
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  FilterChip(
-                    label: const Text('전체 문서', style: TextStyle(fontSize: 12)),
-                    selected: selectedFile.isEmpty,
-                    onSelected: (_) => widget.vm.setManualFileFilter(''),
-                    visualDensity: VisualDensity.compact,
-                  ),
                   ...grouped.entries.map(
                     (entry) => Padding(
                       padding: const EdgeInsets.only(left: 6),
@@ -679,4 +684,5 @@ class _EmptyState extends StatelessWidget {
     );
   }
 }
+
 

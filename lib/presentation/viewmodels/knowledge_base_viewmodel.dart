@@ -73,6 +73,9 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
   String get filterProduct => _filterProduct;
   String get searchQuery => _searchQuery;
   String get manualFileFilter => _manualFileFilter;
+  bool get isAllSelected => _filterCategory.isEmpty &&
+      _filterProduct.isEmpty && _manualFileFilter.isEmpty &&
+      _searchQuery.trim().isEmpty;
 
   List<KnowledgeBaseEntity> get _filtered {
     searchPasses++;
@@ -81,7 +84,7 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
       list = list.where((e) => e.category == _filterCategory).toList();
     }
     if (_filterProduct.isNotEmpty) {
-      list = list.where((e) => e.project == _filterProduct).toList();
+      list = list.where((e) => (e.project ?? '').trim() == _filterProduct).toList();
     }
     if (_manualFileFilter.isNotEmpty) {
       list = list
@@ -262,23 +265,41 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
     return toDelete.length;
   }
 
+  // Category, product and source are alternative browsing scopes. A new
+  // selection replaces the previous scope instead of silently intersecting it.
   void setFilter(String category) {
-    _filterCategory = category;
+    _filterCategory = category.trim();
+    _filterProduct = '';
+    _manualFileFilter = '';
+    if (_filterCategory.isEmpty) {
+      _searchQuery = '';
+    }
     _refreshVisible();
     notifyListeners();
   }
 
   void setProductFilter(String product) {
-    _filterProduct = product.trim();
+    final value = product.trim();
+    if (value.isEmpty) {
+      setFilter('');
+      return;
+    }
+    _filterCategory = '';
+    _filterProduct = value;
+    _manualFileFilter = '';
     _refreshVisible();
     notifyListeners();
   }
 
   void setManualFileFilter(String fileName) {
-    _manualFileFilter = fileName.trim();
-    if (_manualFileFilter.isNotEmpty && _filterCategory != _manualCategory) {
-      _filterCategory = _manualCategory;
+    final value = fileName.trim();
+    if (value.isEmpty) {
+      setFilter('');
+      return;
     }
+    _filterCategory = '';
+    _filterProduct = '';
+    _manualFileFilter = value;
     _refreshVisible();
     notifyListeners();
   }
@@ -347,3 +368,4 @@ Map<String, String> _prepareSearchBodies(List<KnowledgeBaseEntity> entries) => {
   for (final e in entries) e.id: SearchQueryExpander.normalize(
       '${e.question} ${e.answer} ${e.project ?? ''} ${e.customer ?? ''} ${e.category}'),
 };
+
