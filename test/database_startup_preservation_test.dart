@@ -71,7 +71,7 @@ void main() {
 
 Future<Map<String, dynamic>> post(InAppSyncReceiverService receiver,
     String path, Map<String, dynamic> body) async {
-  final client = HttpClient();
+  final client = _LoopbackHttpOverrides().createHttpClient(null);
   try {
     final request = await client.postUrl(Uri.parse(
         'http://127.0.0.1:${receiver.boundPort}$path'));
@@ -96,3 +96,6 @@ class _Settings implements SettingsRepository {
   @override
   Future<void> setMultiple(Map<String, String> settings) async {}
 }
+
+// Use the real loopback transport instead of the widget test HTTP stub.
+class _LoopbackHttpOverrides extends HttpOverrides {}
