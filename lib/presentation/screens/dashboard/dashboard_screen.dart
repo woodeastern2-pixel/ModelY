@@ -92,8 +92,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               _DashboardErrorBanner(onRetry: vm.loadDashboard),
                               const SizedBox(height: AppSpacing.sm),
                             ],
-                            Consumer<VocViewModel>(builder: (context, vocVm, _) {
-                              final count = vocVm.allVocs.where(SampleVocGenerator.isSample).length;
+                            Consumer<VocViewModel?>(builder: (context, vocVm, _) {
+                              final count = vocVm?.allVocs.where(SampleVocGenerator.isSample).length ?? 0;
                               if (count == 0) return const SizedBox.shrink();
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: 12),

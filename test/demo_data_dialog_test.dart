@@ -42,7 +42,7 @@ void main() {
         theme: ThemeData(brightness:width == 390 ? Brightness.light : Brightness.dark,
             fontFamily:'Pretendard'),
         builder: (context,child) => MediaQuery(
-            data:MediaQuery.of(context).copyWith(textScaler:TextScaler.linear(1.3)),child:child!),
+            data:MediaQuery.of(context).copyWith(textScaler:const TextScaler.linear(1.3)),child:child!),
         home: RepaintBoundary(key:boundary,child:Scaffold(body:DemoDataDialog(
           onImport:() async => const DemoImportResult(1000,0),onClear:() async => 0))),
       ));
