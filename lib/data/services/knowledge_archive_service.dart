@@ -36,18 +36,16 @@ class KnowledgeArchiveService {
     final documents = (snapshot['documents'] as List).cast<Map<String, dynamic>>();
     final links = <String, List<Map<String, dynamic>>>{};
     final media = <String, String>{};
+    final mediaIds = <String>{};
     final originalFiles = <String, String>{};
-    Future<void> addMedia(List<Map<String, dynamic>> images) async {
-      for (final image in images) {
-        final id = image['id'] as String;
-        if (!media.containsKey(id)) media[id] = base64Encode(await imageBytes(id));
-      }
+    void addMedia(List<Map<String, dynamic>> images) {
+      mediaIds.addAll(images.map((image) => image['id'] as String));
     }
     for (final entry in entries) {
       final id = entry['id'] as String;
       final images = await imagesFor(id);
       links[id] = images;
-      await addMedia(images);
+      addMedia(images);
     }
     final fileTable = await db.rawQuery(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='knowledge_original_files'");
@@ -61,13 +59,19 @@ class KnowledgeArchiveService {
       final doc = jsonDecode(row['content'] as String) as Map<String, dynamic>;
       originals.add(doc);
       for (final block in doc['blocks'] as List) {
-        await addMedia((block['images'] as List? ?? [])
+        addMedia((block['images'] as List? ?? [])
             .map((i) => Map<String, dynamic>.from(i as Map)).toList());
       }
       final path = row['original_path'] as String?;
       if (path != null && await File(path).exists()) {
         originalFiles[doc['id'] as String] = base64Encode(await File(path).readAsBytes());
       }
+    }
+    // Bundled image archives are grouped by id prefix. Read in that order to
+    // decompress each archive once instead of cycling the bounded cache.
+    final orderedMedia = mediaIds.toList()..sort();
+    for (final id in orderedMedia) {
+      media[id] = base64Encode(await imageBytes(id));
     }
     final payload = <String, dynamic>{
       'format': format, 'version': 1, 'exportedAt': DateTime.now().toUtc().toIso8601String(),

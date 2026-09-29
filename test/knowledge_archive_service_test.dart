@@ -10,7 +10,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-final png = base64Decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aD1sAAAAASUVORK5CYII=');
+final png = base64Decode('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGPUiFrAwMDAxMDAwMDAAAANSgEmo0LrwgAAAABJRU5ErkJggg==');
 Map<String, dynamic> entry(String id, {String answer = '휴지통에서 복원 버튼을 선택합니다.'}) => {
   'id': id, 'question': '파일 복원 방법', 'answer': answer, 'category': '시스템매뉴얼',
   'customer': '매뉴얼.pdf', 'project': 'Brity Drive', 'voc_id': null, 'embedding': null,
@@ -101,7 +101,8 @@ void main() {
     await PortableManualMedia.initialize(target);
     await target.execute("CREATE TRIGGER reject_archive BEFORE INSERT ON original_documents "
         "BEGIN SELECT RAISE(ABORT, 'test failure'); END");
-    await expectLater(KnowledgeArchiveService(target).importData(data), throwsA(anything));
+    await expectLater(KnowledgeArchiveService(target).importData(data),
+        throwsA(isA<DatabaseException>()));
     expect(await target.query('knowledge_base'), isEmpty);
     expect(await target.query('knowledge_media'), isEmpty);
     expect(await target.query('original_documents'), isEmpty);
