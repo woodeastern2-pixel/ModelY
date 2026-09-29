@@ -100,7 +100,7 @@ void main() {
         child: MaterialApp(theme: dark ? AppTheme.darkTheme : AppTheme.lightTheme,
           home: RepaintBoundary(key: key, child: const AiAnswerScreen(
             key: ValueKey('meeting-create'), vocId: 'meeting-create-check',
-            vocTitle: '미팅개설이 안되요', vocContent: '미팅개설을 하려면 어떤게 해야하나요?',
+            vocTitle: '미팅개설', vocContent: '미팅개설에 어려움이 있습니다. 도와주세요',
             category: '기타', customer: '', project: '')))));
       for (var attempt = 0; attempt < 100; attempt++) {
         await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 40)));
@@ -121,7 +121,13 @@ void main() {
       expect(tester.widgetList<RawImage>(find.byType(RawImage)).any((w) => w.image != null), isTrue);
       expect(vm.answerResult!.answer, contains('선택한 기능에 따른 동작'));
       expect(vm.answerResult!.answer, isNot(contains('3. 예약하기')));
-      await _capture(tester, key, 'meeting-create-${dark ? "dark" : "light"}');
+      await _capture(tester, key, 'meeting-help-${dark ? "dark" : "light"}');
+      tester.view.physicalSize = const Size(412, 915);
+      await tester.pumpAndSettle();
+      expect(vm.similarVocs, hasLength(1));
+      expect(find.text('참고할 유사 사례가 없습니다.'), findsNothing);
+      expect(tester.takeException(), isNull);
+      await _capture(tester, key, 'meeting-help-phone-${dark ? "dark" : "light"}');
 
 
     });
@@ -322,4 +328,5 @@ class _IndexedCorpus implements KnowledgeBaseRepository, IndexedKnowledgeReposit
   @override
   dynamic noSuchMethod(Invocation i) => super.noSuchMethod(i);
 }
+
 

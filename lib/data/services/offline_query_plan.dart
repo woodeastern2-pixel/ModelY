@@ -21,6 +21,26 @@ class OfflineQueryPlan {
   static List<String> quantities(String text) => quantityPattern.allMatches(text)
       .map((m) => m.group(0)!.replaceAll(RegExp(r'[\s,]'), '').toLowerCase()).toSet().toList();
 
+  // Request framing is not a technical search requirement. Remove only
+  // recognizable phrases; never drop an unknown term merely because it has
+  // no posting. Keep the original request for conditions and evidence gaps.
+  static final _requestFraming = RegExp(
+      r'어려움(?:이|을)?\s*(?:있(?:습니다|어요|는데요?)|겪고\s*있(?:습니다|어요|는데요?))'
+      r'|어려(?:워요|운데요?|워서요|웠습니다)'
+      r'|도와\s*(?:주세요|주십시오|주실\s*수\s*있(?:나요|을까요)|줘요?)'
+      r'|도움(?:이|을)?\s*(?:필요(?:합니다|해요)|부탁(?:드립니다|드려요|합니다)|주세요)'
+      r'|(?:안내|설명|확인)(?:를|을)?\s*(?:부탁(?:드립니다|드려요|합니다)|해\s*주세요)'
+      r'|문의\s*(?:드립니다|드려요|합니다)'
+      r'|잘\s*모르(?:겠습니다|겠어요)'
+      r'|\b(?:please\s+)?(?:help|assist)\s+me(?:\s+with)?\b',
+      caseSensitive: false);
+
+  static String searchText(String query) => query.replaceAll(_requestFraming, ' ');
+
+  static bool reportsDifficulty(String query) => RegExp(
+      r'안\s*(?:되|돼)|실패|오류|어려움|어려워|어려운데|문제.{0,8}(?:있|발생|겪)',
+      caseSensitive: false).hasMatch(query);
+
   factory OfflineQueryPlan.from(String query) {
     var focus = query.trim();
     // Word boundaries keep "button" / "attribute" from becoming "but".
@@ -48,3 +68,4 @@ class OfflineQueryPlan {
         parts.length > 1 ? parts : [focus], request);
   }
 }
+

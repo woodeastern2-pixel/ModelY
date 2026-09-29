@@ -90,6 +90,13 @@ void main() {
         'answer': answer});
     }
     final qualityQueries = {
+      '미팅개설 미팅개설에 어려움이 있습니다. 도와주세요': '즉시시작',
+      '미팅 개설에 어려움을 겪고 있습니다. 도움을 부탁드립니다.': '즉시시작',
+      '미팅 개설이 어려워요. 안내 부탁드립니다.': '즉시시작',
+      '미팅 개설 방법을 잘 모르겠어요. 설명해 주세요.': '즉시시작',
+      '휴지통 복원에 어려움이 있습니다. 도와주세요': '복원',
+      '설문 대상자 1000명 지정에 어려움이 있습니다. 도와주세요': '1000명 조건',
+      '메신저 v8.5.5 알림 설정에 어려움이 있습니다. 도와주세요': '버전 8.5.5',
       '미팅개설이 안되요 미팅개설을 하려면 어떤게 해야하나요?': '즉시시작',
       '미팅 개설을 하려면 어떻게 해야 하나요?': '즉시시작',
       '설문 대상자 1000명 지정 방법': '1000명 조건',
@@ -110,7 +117,9 @@ void main() {
         expect(await BundledManualService.imagesFor(meeting.knowledgeBase.id),hasLength(2));
         expect(answer, contains('권한'));
         expect(answer, contains('미팅'));
-        if (item.key.contains('안되요')) expect(answer, contains('원인은 자료만으로'));
+        if (item.key.contains('안되요') || item.key.contains('어려')) {
+          expect(answer, contains('원인은 자료만으로'));
+        }
       }
       if (item.key.contains('영구')) {
         expect(answer, contains('영구 삭제한 파일/폴더는 복원이 불가능'));
@@ -272,4 +281,5 @@ class _EmptySettings implements SettingsRepository {
   @override
   dynamic noSuchMethod(Invocation i)=>super.noSuchMethod(i);
 }
+
 

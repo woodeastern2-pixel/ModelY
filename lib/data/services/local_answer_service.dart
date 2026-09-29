@@ -228,7 +228,7 @@ class LocalAnswerService {
       if (!knownVersions.contains(version)) gaps.add('요청하신 버전 $version 에 적용되는지는 확인되지 않았습니다.');
     }
     final bodies = references.map((r) => ManualContent.parse(r.knowledgeBase.answer).body).join('\n');
-    if (RegExp(r'안\s*(?:되|돼)|실패|오류').hasMatch(plan.request) &&
+    if (OfflineQueryPlan.reportsDifficulty(plan.request) &&
         !RegExp(r'오류|실패|해결|조치|원인').hasMatch(bodies)) {
       gaps.add('동작하지 않는 원인은 자료만으로 확인되지 않습니다. 아래는 확인된 사용 절차와 권한 조건입니다.');
     }
@@ -521,7 +521,7 @@ class LocalAnswerService {
   String _normalize(String text) => SearchQueryExpander.normalize(text);
 
   List<String> _terms(String query) {
-    var remaining = _normalize(query).replaceAll(RegExp(r'원문 구간 \d+'), ' ')
+    var remaining = _normalize(OfflineQueryPlan.searchText(query)).replaceAll(RegExp(r'원문 구간 \d+'), ' ')
         .replaceAll(RegExp(r'해야\s*하나요|해야\s*하나|할\s*수\s*있나요|알려\s*주세요'), ' ');
     final result = <String>{};
     final aliases = <MapEntry<String, String>>[
@@ -556,3 +556,4 @@ class LocalAnswerService {
     return corpus.contains(term) || corpus.replaceAll(' ', '').contains(term);
   }
 }
+
