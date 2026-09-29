@@ -347,14 +347,10 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
                         ),
                       ]),
                       _Group('가져오기·내보내기', Icons.folder_copy_outlined, [
-                        const Padding(padding: EdgeInsets.symmetric(vertical: 8),
-                          child: Text('지식자료 백업에는 질문·답변, 검색 원문, 출처와 연결 이미지가 포함됩니다. '
-                              'JSON 백업을 다시 가져올 수 있으며 기존 자료는 보존됩니다.')),
                         _Cmd('지식자료 내보내기', Icons.download_outlined,
                             busy ? null : () => _knowledgeArchive(false)),
                         _Cmd('지식자료 다시 가져오기', Icons.upload_outlined,
                             busy ? null : () => _knowledgeArchive(true)),
-                        if (_peerSyncRunning) const LinearProgressIndicator(),
                         if (AppConstants.showCollaborationTools)
                           _Cmd(
                             'Outlook 메일에서 VOC 수집',
@@ -381,7 +377,9 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
                           Icons.description_outlined,
                           busy ? null : () => _export(true),
                         ),
-                      ]),
+                      ], description: '지식자료 백업에는 질문·답변, 검색 원문, 출처와 연결 이미지가 포함됩니다. '
+                          'JSON 백업을 다시 가져올 수 있으며 기존 자료는 보존됩니다.',
+                          running: _peerSyncRunning),
                       _Group('AI 검색 데이터', Icons.auto_awesome_motion_outlined, [
                         _Cmd(
                           'AI 검색 데이터 다시 만들기',
@@ -921,7 +919,9 @@ class _Grid extends StatelessWidget {
 }
 
 class _Group extends StatelessWidget {
-  const _Group(this.title, this.icon, this.commands, {this.danger = false});
+  const _Group(this.title, this.icon, this.commands, {this.danger = false, this.description, this.running = false});
+  final String? description;
+  final bool running;
   final String title;
   final IconData icon;
   final List<_Cmd> commands;
@@ -955,6 +955,10 @@ class _Group extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 14),
+              if (description != null) Padding(padding: const EdgeInsets.only(bottom: 12),
+                  child: Text(description!)),
+              if (running) const Padding(padding: EdgeInsets.only(bottom: 12),
+                  child: LinearProgressIndicator()),
               ...commands.map(
                 (c) => Padding(
                   padding: const EdgeInsets.only(bottom: 8),

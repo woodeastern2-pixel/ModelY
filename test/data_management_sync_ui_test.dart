@@ -99,7 +99,8 @@ void main() {
       final boundary = GlobalKey();
       await tester.pumpWidget(MaterialApp(theme: AppTheme.lightTheme,
         darkTheme: AppTheme.darkTheme, themeMode: profile.theme,
-        home: RepaintBoundary(key: boundary, child: const Scaffold())));
+        builder: (context, child) => RepaintBoundary(key: boundary, child: child!),
+        home: const Scaffold()));
       final context = tester.element(find.byType(Scaffold));
       final result = showDialog<List<List<String>>>(context: context, builder: (_) =>
         VocDuplicateReviewDialog(groups: [[
@@ -112,6 +113,15 @@ void main() {
       await tester.tap(find.byType(Checkbox)); await tester.pumpAndSettle();
       await tester.tap(find.text('내용과 등록 정보 비교')); await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
+      await tester.runAsync(() async {
+        final image = await (boundary.currentContext!.findRenderObject()
+            as RenderRepaintBoundary).toImage();
+        final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+        final file = File('test/goldens/duplicate-review-${profile.size.width.toInt()}.png');
+        await file.parent.create(recursive: true);
+        await file.writeAsBytes(bytes!.buffer.asUint8List());
+        image.dispose();
+      });
       await tester.tap(find.text('선택한 1묶음 병합')); await tester.pumpAndSettle();
       expect(await result, [['one', 'two']]);
     });

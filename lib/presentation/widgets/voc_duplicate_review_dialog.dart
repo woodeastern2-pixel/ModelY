@@ -34,9 +34,8 @@ class _VocDuplicateReviewDialogState extends State<VocDuplicateReviewDialog> {
                   children: [for (final row in rows) Padding(
                     padding: const EdgeInsets.all(8),
                     child: Align(alignment: Alignment.centerLeft, child: SelectableText(
-                      '등록: ${row['created_at']}\\n경로: ${row['source'] ?? '직접 등록'}\\n'
-                      '상태: ${row['status']} · ID: ${row['id']}\\n${row['content']}'
-                          .replaceAll(r'\n', '\n'))))]),
+                      '등록: ${row['created_at']}\n경로: ${row['source'] ?? '직접 등록'}\n'
+                      '상태: ${row['status']} · ID: ${row['id']}\n${row['content']}')))]),
               ])));
           })),
       ])),
