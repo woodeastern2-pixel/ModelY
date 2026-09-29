@@ -9,6 +9,7 @@ import 'package:ai_voc_assistant/presentation/widgets/demo_data_dialog.dart';
 import 'support/ui_harness.dart';
 
 void main() {
+  setUpAll(loadUiHarnessFonts);
   testWidgets('double tap is blocked and actual import result is shown', (tester) async {
     final pending = Completer<DemoImportResult>();
     var calls = 0;
@@ -36,7 +37,6 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
-      await loadUiHarnessFonts();
       final boundary = GlobalKey();
       await tester.pumpWidget(MaterialApp(
         theme: ThemeData(brightness:width == 390 ? Brightness.light : Brightness.dark,
@@ -49,15 +49,15 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.takeException(),isNull);
       expect(find.byKey(const Key('demo-import')),findsOneWidget);
-      final render = boundary.currentContext!.findRenderObject()! as RenderRepaintBoundary;
-      final screenshot = await render.toImage(pixelRatio:1);
-      final bytes = await screenshot.toByteData(format:ui.ImageByteFormat.png);
       await tester.runAsync(() async {
+        final render = boundary.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+        final screenshot = await render.toImage(pixelRatio:1);
+        final bytes = await screenshot.toByteData(format:ui.ImageByteFormat.png);
         final file = File('test/goldens/demo-data-${width.toInt()}.png');
         await file.parent.create(recursive:true);
         await file.writeAsBytes(bytes!.buffer.asUint8List());
+        screenshot.dispose();
       });
-      screenshot.dispose();
       await tester.tap(find.byKey(const Key('demo-import')));
       await tester.pumpAndSettle();
       expect(find.text('1000건 추가 · 이미 등록된 0건 제외'),findsOneWidget);
