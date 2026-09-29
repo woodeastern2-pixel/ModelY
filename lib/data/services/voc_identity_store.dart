@@ -103,6 +103,39 @@ class VocIdentityStore {
     await db.execute('CREATE TABLE IF NOT EXISTS voc_merge_archive '
         '(original_id TEXT PRIMARY KEY, canonical_id TEXT NOT NULL, '
         'original_json TEXT NOT NULL, merged_at TEXT NOT NULL)');
+
+    // An in-flight task may still hold an old id after background repair.
+    // Redirect late child writes at the database boundary as well.
+    final tables = await db.rawQuery("SELECT name FROM sqlite_master WHERE type='table'");
+    for (final table in tables) {
+      final name = table['name'] as String;
+      if (name.startsWith('voc_identity_') ||
+          !RegExp(r'^[a-zA-Z_][a-zA-Z0-9_]*$').hasMatch(name)) continue;
+      final columns = (await db.rawQuery('PRAGMA table_info("$name")'))
+          .map((c) => c['name']).toSet();
+      for (final column in ['voc_id', 'imported_voc_id', 'duplicate_of_voc_id']) {
+        if (!columns.contains(column)) continue;
+        for (final event in ['INSERT', 'UPDATE OF $column']) {
+          final suffix = event == 'INSERT' ? 'insert' : 'update';
+          await db.execute('''
+            CREATE TRIGGER IF NOT EXISTS "voc_redirect_${name}_${column}_$suffix"
+            AFTER $event ON "$name"
+            WHEN EXISTS (
+              SELECT 1 FROM voc_identity_aliases a
+              JOIN vocs v ON v.id = a.voc_id
+              WHERE a.identity_key = 'id:' || NEW."$column"
+                AND a.voc_id != NEW."$column"
+            )
+            BEGIN
+              UPDATE "$name" SET "$column" = (
+                SELECT voc_id FROM voc_identity_aliases
+                WHERE identity_key = 'id:' || NEW."$column"
+              ) WHERE rowid = NEW.rowid;
+            END
+          ''');
+        }
+      }
+    }
   }
 
   static Future<String> resolve(DatabaseExecutor db, String id) async {

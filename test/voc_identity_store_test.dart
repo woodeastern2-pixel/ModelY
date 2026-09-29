@@ -107,6 +107,10 @@ void main() {
     expect((await db.query('emails')).single['imported_voc_id'], id);
     expect(jsonDecode((await db.query('ai_chat_messages')).single['referenced_voc_ids'] as String), [id]);
     expect(await db.query('voc_merge_archive'), hasLength(2));
+    await db.insert('agent_logs', {'id': 'late-log', 'voc_id': 'duplicate',
+      'content': '정리 중 시작했던 작업의 뒤늦은 기록'});
+    expect((await db.query('agent_logs', where: 'id = ?',
+      whereArgs: ['late-log'])).single['voc_id'], id);
     expect((await save(voc('duplicate')..['source'] = 'peer-sync-full', app: 'peer')).created, isFalse);
     expect(await db.query('vocs'), hasLength(1));
     expect(await db.rawQuery('PRAGMA foreign_key_check'), isEmpty);

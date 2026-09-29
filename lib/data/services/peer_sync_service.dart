@@ -83,7 +83,6 @@ class PeerSyncService {
           url: _toExportEndpoint(target),
           headers: _authHeaders(),
         );
-        successApps += 1;
         final sourceApp = _sourceApp(payload);
         final snapshot = payload['snapshot'] is Map
             ? Map<String, dynamic>.from(payload['snapshot'] as Map)
@@ -106,6 +105,7 @@ class PeerSyncService {
             skipped++;
           }
         }
+        successApps += 1;
       } catch (_) {
         failedApps += 1;
       }
@@ -155,7 +155,6 @@ class PeerSyncService {
           url: _toExportEndpoint(target),
           headers: _authHeaders(),
         );
-        successApps += 1;
         final sourceApp = _sourceApp(payload);
         final snapshot = payload['snapshot'] is Map
             ? Map<String, dynamic>.from(payload['snapshot'] as Map)
@@ -217,6 +216,7 @@ class PeerSyncService {
           manualKeys.add(key);
           manualCreated += 1;
         }
+        successApps += 1;
       } catch (_) {
         failedApps += 1;
       }
