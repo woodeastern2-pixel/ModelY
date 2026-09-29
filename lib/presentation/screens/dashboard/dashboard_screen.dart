@@ -4,7 +4,9 @@ import 'package:fl_chart/fl_chart.dart';
 
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/utils/voc_category_catalog.dart';
-import '../../../data/services/demo_mode_service.dart';
+import '../../../core/database/database_helper.dart';
+import '../../../data/services/demo_voc_store.dart';
+import '../../widgets/demo_data_dialog.dart';
 import '../../../data/services/sample_voc_generator.dart';
 import '../../viewmodels/dashboard_viewmodel.dart';
 import '../../viewmodels/voc_viewmodel.dart';
@@ -90,6 +92,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               _DashboardErrorBanner(onRetry: vm.loadDashboard),
                               const SizedBox(height: AppSpacing.sm),
                             ],
+                            Consumer<VocViewModel>(builder: (context, vocVm, _) {
+                              final count = vocVm.allVocs.where(SampleVocGenerator.isSample).length;
+                              if (count == 0) return const SizedBox.shrink();
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(12),
+                                  color: Theme.of(context).colorScheme.secondaryContainer,
+                                  child: Text('시연 데이터 $count건 포함 · 아래 수치에는 가상 문의가 포함되어 있습니다.'),
+                                ),
+                              );
+                            }),
                             _DashboardHero(
                               vm: vm,
                               onRegister: _openRegister,
@@ -185,99 +200,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _showDemoModeDialog(BuildContext context) async {
-    final service = DefaultDemoModeService();
-    final logs = <String>[];
-
+    final vocVm = context.read<VocViewModel>();
+    final dashboardVm = context.read<DashboardViewModel>();
     await showDialog<void>(
       context: context,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (ctx, setState) {
-            return AlertDialog(
-              title: const Text('시연 모드'),
-              content: SizedBox(
-                width: 520,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.secondaryContainer,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Text(
-                        '고객지원 시연용 VOC가 현재 데이터에 추가됩니다. 기존 VOC와 설정은 변경되지 않습니다.',
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    LinearProgressIndicator(
-                      value:
-                          (service.getCurrentStatus()?.progressPercent ?? 0) /
-                              100,
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      service.getCurrentStatus()?.message ??
-                          '기능 둘러보기를 준비하고 있습니다.',
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      height: 220,
-                      child: ListView.builder(
-                        itemCount: logs.length,
-                        itemBuilder: (_, i) => Text(
-                          logs[i],
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () async {
-                    await service.stopDemo();
-                    if (ctx.mounted) Navigator.of(ctx).pop();
-                  },
-                  child: const Text('닫기'),
-                ),
-                FilledButton.icon(
-                  onPressed: service.isRunning()
-                      ? null
-                      : () async {
-                          // 샘플 데이터 임포트
-                          final samples =
-                              SampleVocGenerator.generateSampleVocs();
-                          final count = await context
-                              .read<VocViewModel>()
-                              .importSampleVocs(samples);
-                          logs.add('시연용 VOC $count건을 추가했습니다.');
-
-                          await service.startDemo((status) {
-                            logs
-                              ..clear()
-                              ..addAll(status.logs);
-                            if (ctx.mounted) setState(() {});
-                          });
-                          if (ctx.mounted) {
-                            context.read<DashboardViewModel>().loadDashboard();
-                            context.read<VocViewModel>().loadVocs();
-                          }
-                        },
-                  icon: const Icon(Icons.play_arrow),
-                  label: const Text('시연 데이터 준비'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+      barrierDismissible: false,
+      builder: (_) => DemoDataDialog(
+        existingCount: vocVm.allVocs.where(SampleVocGenerator.isSample).length,
+        onImport: () async {
+          final db = await DatabaseHelper.instance.database;
+          final result = await DemoVocStore(db).insert(
+              SampleVocGenerator.generateSampleVocs());
+          await Future.wait([vocVm.loadVocs(), dashboardVm.loadDashboard()]);
+          return result;
+        },
+        onClear: () async {
+          final db = await DatabaseHelper.instance.database;
+          final count = await DemoVocStore(db).clear();
+          await Future.wait([vocVm.loadVocs(), dashboardVm.loadDashboard()]);
+          return count;
+        },
+      ),
     );
   }
+
 }
 
 class _DashboardHero extends StatelessWidget {
@@ -1358,3 +1304,4 @@ class _AssigneeChart extends StatelessWidget {
     );
   }
 }
+
