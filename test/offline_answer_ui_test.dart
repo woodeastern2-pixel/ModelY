@@ -127,6 +127,9 @@ void main() {
       expect(vm.similarVocs, hasLength(1));
       expect(find.text('참고할 유사 사례가 없습니다.'), findsNothing);
       expect(tester.takeException(), isNull);
+      expect(tester.getSize(find.text('자료 기반 답변 초안').last).height, lessThan(40));
+      expect(tester.getSize(find.text('답변을 승인하기 전에 사실관계와 안내 절차를 확인해 주세요.')).height,
+          lessThan(80));
       await _capture(tester, key, 'meeting-help-phone-${dark ? "dark" : "light"}');
 
 

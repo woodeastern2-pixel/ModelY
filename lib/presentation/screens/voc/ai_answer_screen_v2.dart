@@ -657,14 +657,26 @@ class _Panel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return WorkspacePanel(
-      title: title,
-      description: subtitle,
-      icon: icon,
-      trailing: trailing,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      child: child,
-    );
+    return LayoutBuilder(builder: (context, constraints) {
+      final stackedActions = trailing != null && constraints.maxWidth < 600;
+      return WorkspacePanel(
+        title: title,
+        description: subtitle,
+        icon: icon,
+        trailing: stackedActions ? null : trailing,
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: stackedActions
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Align(alignment: Alignment.centerRight, child: trailing!),
+                  const SizedBox(height: AppSpacing.sm),
+                  child,
+                ],
+              )
+            : child,
+      );
+    });
   }
 }
 
@@ -748,4 +760,5 @@ class _NoteBox extends StatelessWidget {
     );
   }
 }
+
 
