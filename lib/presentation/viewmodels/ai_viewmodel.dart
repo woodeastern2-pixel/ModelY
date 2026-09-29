@@ -71,6 +71,7 @@ class AiViewModel extends ChangeNotifier {
   String _answerQuery = '';
   bool _hasPartialAnswer = false;
   List<SimilarVocResult>? _generatedEvidence;
+  bool get isAiAnswer => _generatedEvidence != null;
   bool get hasPartialAnswer => _hasPartialAnswer;
   String? _urgencyReason;
   List<AssigneeRecommendation> _topAssignees = [];
@@ -742,6 +743,8 @@ class AiViewModel extends ChangeNotifier {
   }
 
   void clearResults() {
+    _generatedEvidence = null;
+    _hasPartialAnswer = false;
     _analysisResult = null;
     _intelligenceResult = null;
     _similarVocs = [];
@@ -972,4 +975,3 @@ class AiViewModel extends ChangeNotifier {
     return '${title.substring(0, 26).trim()}...';
   }
 }
-

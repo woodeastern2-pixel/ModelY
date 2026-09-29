@@ -56,7 +56,7 @@ void main() {
       expect(vm.error, isNull);
       expect(find.textContaining('쪽지 복사 시 글자색'), findsWidgets);
       expect(find.textContaining('연결된 AI로 작성한'), findsOneWidget);
-      expect(find.text('일부 근거 · 추가 확인 필요'), findsOneWidget);
+      expect(find.text('AI 초안 · 담당자 확인 필요'), findsOneWidget);
       expect(tester.takeException(), isNull);
       await _capture(tester, key, 'connected-note-draft-${dark ? "dark" : "light"}');
     });

@@ -440,7 +440,9 @@ class _AnswerWorkspace extends StatelessWidget {
           trailing: Wrap(
             spacing: 4,
             children: [
-              if (vm.hasPartialAnswer)
+              if (vm.isAiAnswer)
+                const Chip(label: Text('AI 초안 · 담당자 확인 필요'))
+              else if (vm.hasPartialAnswer)
                 const Chip(label: Text('일부 근거 · 추가 확인 필요'))
               else if (vm.answerResult != null)
                 _ScoreBadge(score: vm.answerResult!.confidence),
