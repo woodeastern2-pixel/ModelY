@@ -35,7 +35,22 @@ class OfflineQueryPlan {
       r'|\b(?:please\s+)?(?:help|assist)\s+me(?:\s+with)?\b',
       caseSensitive: false);
 
-  static String searchText(String query) => query.replaceAll(_requestFraming, ' ');
+  static String searchText(String query) => query
+      .replaceAll(RegExp(r'\[시연\]\s*'), '')
+      .replaceAll('[시연용 가상 문의 — 실제 고객 접수가 아닙니다.]', '')
+      .replaceAll(_requestFraming, ' ');
+
+  /// Structured titles retain the product and feature, without the long
+  /// persona introduction or request-style suffix. The full query remains
+  /// authoritative for versions, restrictions and missing evidence.
+  static String? titleQuery(String query) {
+    final lines = query.split('\n');
+    if (lines.length < 2) return null;
+    final title = searchText(lines.first).trim();
+    if (!title.contains('·') || title.length > 120) return null;
+    return title.replaceFirst(RegExp(
+        r'\s+(처음 이용하는 절차|지원 조건 확인|진행되지 않는 문제|응답 지연|사용자별 권한 차이|정보 공개 범위|작업 결과 확인|휴대폰 이용 차이|진행 안내 개선|부서 운영 기준)$'), '').trim();
+  }
 
   static bool reportsDifficulty(String query) => RegExp(
       r'안\s*(?:되|돼)|실패|오류|어려움|어려워|어려운데|문제.{0,8}(?:있|발생|겪)',

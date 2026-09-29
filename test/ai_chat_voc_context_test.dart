@@ -21,9 +21,13 @@ void main() {
     addTearDown(vm.dispose);
     addTearDown(settings.dispose);
     expect(await vm.searchSimilarVocs('진행권 부여 방법'), isEmpty);
-    expect(await vm.generateAnswer(voc.title, voc.content), isNull);
-    expect(vm.hasAnswer, isFalse);
-    expect(vm.error, contains('자료 자체가 없다는 뜻은 아닙니다'));
+    final draft = await vm.generateAnswer(voc.title, voc.content);
+    expect(draft, isNotNull);
+    expect(vm.isClarificationAnswer, isTrue);
+    expect(draft!.referencedCases, isEmpty);
+    expect(draft.confidence, 0);
+    expect(draft.answer, isNot(contains('등록된 VOC 상태')));
+    expect(vm.error, isNull);
     expect(await vm.resolveChatReferences('진행권 부여 방법'), hasLength(1));
   });
 
@@ -67,7 +71,8 @@ void main() {
         aiService: service);
     addTearDown(vm.dispose);
     addTearDown(settings.dispose);
-    expect(await vm.generateAnswer('쪽지 서식', '보관 기간'), isNull);
+    expect(await vm.generateAnswer('쪽지 서식', '보관 기간'), isNotNull);
+    expect(vm.isClarificationAnswer, isTrue);
     expect(service.calls, 0);
   });
 

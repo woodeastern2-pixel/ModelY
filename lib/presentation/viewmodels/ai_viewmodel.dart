@@ -72,6 +72,8 @@ class AiViewModel extends ChangeNotifier {
   bool _hasPartialAnswer = false;
   List<SimilarVocResult>? _generatedEvidence;
   bool get isAiAnswer => _generatedEvidence != null;
+  bool _isClarificationAnswer = false;
+  bool get isClarificationAnswer => _isClarificationAnswer;
   bool get hasPartialAnswer => _hasPartialAnswer;
   String? _urgencyReason;
   List<AssigneeRecommendation> _topAssignees = [];
@@ -451,10 +453,11 @@ class AiViewModel extends ChangeNotifier {
     _answerResult = null;
     _hasPartialAnswer = false;
     _generatedEvidence = null;
+    _isClarificationAnswer = false;
     notifyListeners();
 
     try {
-      final query = '$title $content';
+      final query = title.contains('·') ? '$title\n$content' : '$title $content';
       _answerQuery = query;
       await searchSimilarVocs(query, excludeVocId: excludeVocId);
       if (_error != null) return null;
@@ -493,6 +496,18 @@ class AiViewModel extends ChangeNotifier {
         }
       }
       if (!_localAnswers.canAnswer(query, _similarVocs)) {
+        if (!_localAnswers.needsWholeDataset(query)) {
+          _isClarificationAnswer = true;
+          _hasPartialAnswer = true;
+          _answerResult = AiAnswerResult(
+            answer: _localAnswers.clarificationDraft(title, content),
+            confidence: 0,
+            referencedCases: const [],
+            notes: '내부 자료만으로 해결 절차를 확정할 수 없어 추가 확인용 초안을 작성했습니다. '
+                '인공지능을 호출하지 않았으며, 검증된 해결 답변이 아닙니다.',
+          );
+          return _answerResult;
+        }
         _error = _localAnswers.needsWholeDataset(query)
             ? '이 질문은 전체 자료의 분석이 필요합니다. 인공지능 연결 후 코파일럿을 이용해 주세요.'
             : (_similarVocs.isEmpty
@@ -743,6 +758,7 @@ class AiViewModel extends ChangeNotifier {
   }
 
   void clearResults() {
+    _isClarificationAnswer = false;
     _generatedEvidence = null;
     _hasPartialAnswer = false;
     _analysisResult = null;
@@ -860,8 +876,26 @@ class AiViewModel extends ChangeNotifier {
     final candidates = entries.where((entry) =>
         (excludeVocId == null || entry.vocId != excludeVocId) &&
         (includeRegisteredQuestions || _localAnswers.isAnswerSource(entry)));
-    return _localAnswers.rank(query, candidates,
-        preferredVocIds: preferredVocIds);
+    if (includeRegisteredQuestions || !query.split('\n').first.contains('·')) {
+      return _localAnswers.rank(query, candidates,
+          preferredVocIds: preferredVocIds);
+    }
+    final matches = <String, SimilarVocResult>{};
+    final entriesForRanking = candidates.toList();
+    for (final variant in _localAnswers.retrievalQueries(query)) {
+      for (final result in _localAnswers.rank(variant, entriesForRanking,
+          preferredVocIds: preferredVocIds)) {
+        if (!_localAnswers.focusedEvidence(query, result.knowledgeBase)) continue;
+        final id = result.knowledgeBase.id;
+        if (!matches.containsKey(id) ||
+            result.similarityScore > matches[id]!.similarityScore) matches[id] = result;
+      }
+      if (_localAnswers.canAnswer(query, matches.values.toList()) &&
+          _localAnswers.evidenceGap(query,
+              _localAnswers.answerReferences(matches.values.toList(), query: query)).isEmpty) break;
+    }
+    return (matches.values.toList()
+      ..sort((a, b) => b.similarityScore.compareTo(a.similarityScore))).take(16).toList();
   }
 
   Future<List<SimilarVocResult>> _searchRegisteredVocReferences(

@@ -21,6 +21,37 @@ void main() {
   });
   tearDown(() async => db.close());
 
+  test('upgrade removes old markers without changing IDs, dates or user edits', () async {
+    final store = DemoVocStore(db);
+    await store.insert(samples);
+    final first = samples.first;
+    await db.update('vocs', {
+      'title': '[시연] ${first.title}',
+      'content': '${first.content}\n\n[시연용 가상 문의 — 실제 고객 접수가 아닙니다.]',
+      'customer': '시연 ${first.customer}',
+      'tags': '시연,${first.tags}',
+      'assignee': '시연 담당자 1',
+    }, where: 'id = ?', whereArgs: [first.id]);
+    await db.update('vocs', {'title': '사용자가 바꾼 제목', 'content': '추가한 내용'},
+        where: 'id = ?', whereArgs: [samples[1].id]);
+    await db.update('vocs', {'title': '[시연] 실제 사용자의 제목'},
+        where: 'id = ?', whereArgs: ['real-1']);
+    expect(await store.removeVisibleMarkers(), 1);
+    expect(await store.removeVisibleMarkers(), 0);
+    final row = (await db.query('vocs', where: 'id = ?', whereArgs: [first.id])).single;
+    expect(row['title'], first.title);
+    expect(row['content'], first.content);
+    expect(row['customer'], first.customer);
+    expect(row['source'], 'demo');
+    expect(row['created_at'], first.createdAt.toIso8601String());
+    expect(row['updated_at'], first.updatedAt.toIso8601String());
+    expect((await db.query('vocs', where: 'id = ?', whereArgs: [samples[1].id])).single['content'], '추가한 내용');
+    expect((await db.query('vocs', where: 'id = ?', whereArgs: ['real-1'])).single['title'], '[시연] 실제 사용자의 제목');
+    expect((await store.insert(samples)).added, 0);
+    expect(await store.clear(), 1000);
+    expect(await db.query('vocs'), hasLength(1));
+  });
+
   test('full insertion and repeated import preserve real and edited rows', () async {
     final store = DemoVocStore(db);
     final first = await store.insert(samples);

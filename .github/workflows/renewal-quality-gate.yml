@@ -86,6 +86,7 @@ jobs:
             test/goldens/manual-image-audit.json
             test/goldens/offline-search-performance.json
             test/goldens/knowledge-input-performance.json
+            test/goldens/demo-offline-coverage.json
             test/failures/*.png
           if-no-files-found: error
 

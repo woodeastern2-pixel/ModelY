@@ -91,15 +91,19 @@ class LocalAnswerService {
       '못', '찾는', '듯', '알', '수', '있을까', '있을까요',
     }.contains(t)).toList();
     final focused = '$prefix${plan.focus}'.trim();
+    final titleQuery = OfflineQueryPlan.titleQuery(query);
+    if (titleQuery != null) {
+      return <String>{query, '$prefix$titleQuery'.trim()}.toList();
+    }
     // A note report often combines a formatting request and a retention
     // question in long polite prose. Search each named feature independently.
     if (query.contains('쪽지')) {
       final noteQueries = <String>{query};
       if (RegExp(r'서식|글자|글씨|색깔|색상|진하게').hasMatch(query)) {
-        noteQueries.add('${prefix}쪽지 서식 복사');
+        noteQueries.add('$prefix쪽지 서식 복사');
       }
       if (RegExp(r'보관|보존|저장 기간').hasMatch(query)) {
-        noteQueries.add('${prefix}쪽지 보관 기간');
+        noteQueries.add('$prefix쪽지 보관 기간');
       }
       noteQueries.add(focused);
       return noteQueries.take(4).toList();
@@ -453,6 +457,30 @@ class LocalAnswerService {
 
   String answer(List<SimilarVocResult> references) => answerForQuery('', references);
 
+  /// A clarification is a draft for the customer, not product knowledge.
+  /// Never invent a menu, retention period, workaround or completed action.
+  String clarificationDraft(String title, String content) {
+    final subject = OfflineQueryPlan.searchText(title).trim();
+    final query = '$title $content';
+    final checks = <String>['사용 중인 제품과 버전, 문제가 발생한 화면을 알려주세요.'];
+    if (RegExp(r'개선|추가해|바꾸|변경 요청').hasMatch(query)) {
+      checks.add('현재 업무 흐름과 기대하시는 동작을 구체적으로 알려주세요.');
+    } else if (RegExp(r'권한|역할|접근 거부').hasMatch(query)) {
+      checks.add('영향을 받는 사용자 범위와 다른 계정에서도 동일한지 확인해 주세요.');
+    } else if (RegExp(r'모바일|휴대폰|장치').hasMatch(query)) {
+      checks.add('컴퓨터와 휴대폰 중 어느 환경에서 발생하는지, 두 환경의 차이를 알려주세요.');
+    } else {
+      checks.add('진행하신 순서와 어느 단계에서 예상한 결과와 달라지는지 알려주세요.');
+    }
+    if (RegExp(r'오류|실패|멈|지연|되지 않|못').hasMatch(query)) {
+      checks.add('발생 시각과 오류 문구를 알려주세요. 화면을 첨부하실 때는 개인정보를 가려주세요.');
+    }
+    return '안녕하세요. 보내주신 ${subject.isEmpty ? '문의' : '「$subject」 문의'} 내용을 확인했습니다.\n\n'
+        '현재 확인된 자료만으로는 정확한 해결 절차나 지원 조건을 확정하기 어려워, '
+        '확인에 필요한 내용을 안내드립니다.\n\n'
+        '${checks.map((item) => '• $item').join('\n')}';
+  }
+
   String answerForQuery(String query, List<SimilarVocResult> references) {
     if (needsWholeDataset(query)) {
       return '이 질문은 전체 자료의 집계가 필요합니다. 현재 자료 검색 결과만으로는 정확한 수치나 순위를 판단할 수 없습니다. VOC 목록에서 확인해 주세요.\n근거: 없음';
@@ -509,9 +537,10 @@ class LocalAnswerService {
 
   bool needsWholeDataset(String query) {
     final normalized = _normalize(query);
-    return RegExp(r'(voc|문의|접수|처리|답변).*(통계|집계|몇 건|몇건|가장 많|현황 요약|보고서)')
+    return RegExp(r'(voc|문의|접수|처리|답변).*(통계|집계|몇 건|몇건|가장 많|현황 요약)')
         .hasMatch(normalized) ||
-        RegExp(r'(통계|집계|가장 많).*(voc|문의|접수|처리)').hasMatch(normalized);
+        RegExp(r'(통계|집계|가장 많).*(voc|문의|접수|처리)').hasMatch(normalized) ||
+        RegExp(r'(전체|월별|기간별)\s*(voc|문의|접수|처리|답변).*보고서').hasMatch(normalized);
   }
 
   // Adjacent paragraphs are searched together so a heading, steps, table rows
@@ -588,4 +617,3 @@ class LocalAnswerService {
     return corpus.contains(term) || corpus.replaceAll(' ', '').contains(term);
   }
 }
-

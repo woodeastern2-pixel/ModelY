@@ -61,6 +61,11 @@ void main() {
     expect(service.answerForQuery('전체 VOC 보고서', results), contains('집계가 필요합니다'));
     expect(service.answerForQuery('전체 VOC 보고서', results), isNot(contains('회의 목록에서 참가')));
   });
+  test('a product report feature is not mistaken for VOC statistics', () {
+    expect(service.needsWholeDataset('Copilot · 보고서 초안 처음 이용하는 절차\n보고서 작성을 문의한 직원입니다. 보고서 초안을 만들고 싶습니다.'), isFalse);
+    expect(service.needsWholeDataset('전체 VOC 보고서'), isTrue);
+  });
+
   test('long context does not echo each sentence as missing evidence', () {
     const query = '메신저 알림 설정\n상황을 확인하고 있습니다\n직원들이 도움을 요청했습니다\n이 부분도 살펴봐 주세요';
     final refs = [SimilarVocResult(knowledgeBase: messenger, similarityScore: 1)];
@@ -85,4 +90,5 @@ void main() {
   });
 
 }
+
 

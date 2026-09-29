@@ -86,8 +86,9 @@ class _DemoDataDialogState extends State<DemoDataDialog> {
               '브리티웍스의 실제 장애나 운영 실적을 뜻하지 않습니다.'),
           const SizedBox(height: 8),
           const Text('현재 데이터에 추가되며 대시보드 집계에 포함됩니다. '
-              '제목과 출처에 시연 표시가 남습니다. 반복 입력 시 기존 자료는 건너뜁니다. '
-              '가상 답변·지식자료는 자동 생성하지 않습니다.'),
+              '제목·본문에 시연 문구를 붙이지 않으며 내부 출처로 구분합니다. 반복 입력 시 기존 자료는 건너뜁니다. '
+              '답변 화면에서 내부 자료로 초안을 만들며, 자료가 부족하면 추가 확인용 초안을 제공합니다. '
+              '가상 답변을 승인된 지식자료로 자동 등록하지 않습니다.'),
           const SizedBox(height: 8),
           Text('현재 등록된 시연 문의: $_count건'),
           if (_busy) const Padding(padding: EdgeInsets.symmetric(vertical: 12),

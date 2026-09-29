@@ -1,3 +1,4 @@
+import 'package:ai_voc_assistant/data/services/sample_voc_generator.dart';
 import 'package:ai_voc_assistant/domain/repositories/indexed_knowledge_repository.dart';
 import 'package:ai_voc_assistant/domain/repositories/knowledge_base_repository.dart';
 import 'package:ai_voc_assistant/domain/repositories/voc_repository.dart';
@@ -27,6 +28,58 @@ Future<Database> database() async {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(sqfliteFfiInit);
+  test('all 1000 demo requests produce an offline draft without model calls', () async {
+    final db = await database();
+    addTearDown(db.close);
+    final store = OfflineSearchStore(db);
+    await store.initialize(maintenance: false);
+    final pack = await BundledManualService.load();
+    final batch = db.batch();
+    for (final row in [...BritySuiteManualSeed.entries, ...pack['entries'] as List]) {
+      batch.insert('knowledge_base', {'id': row['id'], 'question': row['question'],
+        'answer': row['answer'], 'category': '시스템매뉴얼',
+        'customer': row['sourceName'], 'project': row['project']});
+    }
+    await batch.commit(noResult: true);
+    await store.refresh();
+    final settings = SettingsViewModel(_EmptySettings());
+    final vm = AiViewModel(_IndexRepository(store), _NoVocScan(), settings);
+    addTearDown(vm.dispose);
+    addTearDown(settings.dispose);
+    final counts = <String, Map<String, int>>{};
+    final examples = <Map<String, Object?>>[];
+    var grounded = 0;
+    for (final voc in SampleVocGenerator.generateSampleVocs(now: DateTime(2026, 9, 29, 20))) {
+      final result = await vm.generateAnswer(voc.title, voc.content, excludeVocId: voc.id);
+      expect(result, isNotNull, reason: voc.title);
+      expect(result!.answer.trim(), isNotEmpty, reason: voc.title);
+      expect(vm.error, isNull, reason: voc.title);
+      expect(vm.isAiConnected, isFalse);
+      expect(vm.isAiAnswer, isFalse);
+      expect(store.index.lastTotalCandidates, lessThanOrEqualTo(512));
+      final key = vm.isClarificationAnswer ? 'clarification' : 'grounded';
+      final field = counts.putIfAbsent(voc.project, () => {'grounded': 0, 'clarification': 0});
+      field[key] = field[key]! + 1;
+      if (vm.isClarificationAnswer) {
+        expect(result.referencedCases, isEmpty);
+        expect(result.confidence, 0);
+        expect(result.notes, contains('검증된 해결 답변이 아닙니다'));
+      } else {
+        grounded++;
+        expect(result.referencedCases, isNotEmpty);
+      }
+      if (examples.length < 20) examples.add({'title': voc.title, 'kind': key, 'answer': result.answer});
+    }
+    expect(grounded, greaterThan(0), reason: 'Known manuals must contribute real evidence, not only clarification templates.');
+    expect(counts.values.fold<int>(0, (n, c) => n + c['grounded']! + c['clarification']!), 1000);
+    final report = File('test/goldens/demo-offline-coverage.json');
+    await report.parent.create(recursive: true);
+    await report.writeAsString(const JsonEncoder.withIndent('  ').convert({
+      'total': 1000, 'grounded': grounded, 'clarification': 1000 - grounded,
+      'modelCalls': 0, 'fields': counts, 'examples': examples,
+    }));
+  }, timeout: const Timeout(Duration(minutes: 8)));
+
   test('original corpus answers with ZERO QA records; persistent index stays under 5s', () async {
     final db=await database();addTearDown(db.close);
     var store=OfflineSearchStore(db);
@@ -281,5 +334,6 @@ class _EmptySettings implements SettingsRepository {
   @override
   dynamic noSuchMethod(Invocation i)=>super.noSuchMethod(i);
 }
+
 
 

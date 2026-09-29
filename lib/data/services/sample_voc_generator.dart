@@ -94,17 +94,17 @@ class SampleVocGenerator {
             '${(i + 1).toString().padLeft(3, '0')}';
         result.add(VocEntity(
           id: id,
-          title: '[시연] ${field.name} · ${topic.name} ${suffixes[variant]}',
+          title: '${field.name} · ${topic.name} ${suffixes[variant]}',
           content: '${persona.department}에서 ${persona.role} 역할로 '
               '${field.project}를 이용하고 있습니다. ${persona.context}\n\n'
-              '${prompts[variant]}\n\n[시연용 가상 문의 — 실제 고객 접수가 아닙니다.]',
+              '${prompts[variant]}',
           category: categories[variant],
-          tags: '시연,${field.name},${topic.name},${persona.role}',
-          customer: '시연 ${persona.department} ${persona.role}',
+          tags: '${field.name},${topic.name},${persona.role}',
+          customer: '${persona.department} ${persona.role}',
           project: field.project,
           businessType: const ['이메일', '사용자 직접 등록', '회의', '메신저'][i % 4],
           department: '${field.name} 지원',
-          assignee: status == 'OPEN' ? null : '시연 담당자 ${(fieldIndex % 5) + 1}',
+          assignee: status == 'OPEN' ? null : '담당자 ${(fieldIndex % 5) + 1}',
           priority: priority,
           status: status,
           isBusinessRelated: true,

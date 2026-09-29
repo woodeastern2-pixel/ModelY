@@ -14,6 +14,37 @@ class DemoVocStore {
   DemoVocStore(this.db);
   final Database db;
 
+  /// Upgrade only generator-owned rows. Keep IDs, dates, edits and answers.
+  Future<int> removeVisibleMarkers() => db.transaction((txn) async {
+    final rows = await txn.query('vocs', where: 'source = ?', whereArgs: ['demo']);
+    await VocIdentityStore.ensureSchema(txn);
+    var changed = 0;
+    for (final row in rows) {
+      final id = row['id'] as String;
+      if (!id.startsWith('${SampleVocGenerator.batchId}-') &&
+          !RegExp(r'^demo-voc-00[1-8]$').hasMatch(id)) continue;
+      final updates = <String, Object?>{};
+      void clean(String key, String value) {
+        if (row[key] != null && value != row[key]) updates[key] = value;
+      }
+      clean('title', (row['title'] as String? ?? '')
+          .replaceFirst(RegExp(r'^\[시연\]\s*'), ''));
+      clean('content', (row['content'] as String? ?? '').replaceAll(
+          '\n\n[시연용 가상 문의 — 실제 고객 접수가 아닙니다.]', ''));
+      clean('customer', (row['customer'] as String? ?? '')
+          .replaceFirst(RegExp(r'^시연\s+'), ''));
+      clean('assignee', (row['assignee'] as String? ?? '')
+          .replaceFirst(RegExp(r'^시연\s+(?=담당자)'), ''));
+      clean('tags', (row['tags'] as String? ?? '').split(',')
+          .where((tag) => tag.trim() != '시연').join(','));
+      if (updates.isEmpty) continue;
+      await txn.update('vocs', updates, where: 'id = ?', whereArgs: [id]);
+      await VocIdentityStore.index(txn, {...row, ...updates});
+      changed++;
+    }
+    return changed;
+  });
+
   Future<DemoImportResult> insert(List<VocEntity> samples) async {
     if (samples.any((v) => !SampleVocGenerator.isSample(v)) ||
         samples.map((v) => v.id).toSet().length != samples.length) {

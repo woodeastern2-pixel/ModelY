@@ -255,7 +255,7 @@ void main() {
       expect(tester.takeException(), isNull);
       await _capture(tester, key, 'manual-corpus-${dark ? "dark" : "light"}');
     });
-    testWidgets('offline answer blocks approval (${dark ? "dark" : "light"})', (tester) async {
+    testWidgets('offline clarification is clearly distinguished from verified evidence (${dark ? "dark" : "light"})', (tester) async {
       tester.view.physicalSize = const Size(1440, 1100);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
@@ -272,10 +272,10 @@ void main() {
             vocContent: '참석자 메뉴는 어디에 있나요?', category: '문의',
             customer: '테스트 고객', project: '미팅')))));
       await tester.pumpAndSettle();
-      expect(vm.hasAnswer, isFalse);
-      expect(find.textContaining('자료 자체가 없다는 뜻은 아닙니다'), findsOneWidget);
-      expect(find.text('답변 승인 및 저장'), findsNothing);
-      expect(find.text('평가 저장'), findsNothing);
+      expect(vm.hasAnswer, isTrue);
+      expect(vm.isClarificationAnswer, isTrue);
+      expect(find.text('추가 확인용 초안'), findsOneWidget);
+      expect(find.textContaining('검증된 해결 답변이 아닙니다'), findsOneWidget);
       expect(find.text('100%'), findsNothing);
       expect(tester.takeException(), isNull);
       await _capture(tester, key, 'offline-answer-${dark ? "dark" : "light"}');

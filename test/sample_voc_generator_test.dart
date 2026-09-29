@@ -21,6 +21,8 @@ void main() {
     }
     expect(rows.every((v) => VocCategoryCatalog.isAllowed(v.category)), isTrue);
     expect(rows.every(SampleVocGenerator.isSample), isTrue);
+    expect(rows.any((v) => v.title.contains('[시연]') || v.content.contains('[시연')), isFalse);
+    expect(rows.every((v) => v.source == 'demo' && v.sourceRef!.startsWith(SampleVocGenerator.batchId)), isTrue);
     expect(rows.every((v) => v.businessScore == null && v.categoryScore == null), isTrue);
   });
   test('dates and processing states are chronological and reproducible', () {
@@ -47,3 +49,4 @@ void main() {
     expect(SampleVocGenerator.generateSampleVocs(now: DateTime.utc(2026,1)), isEmpty);
   });
 }
+
