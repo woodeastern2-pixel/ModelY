@@ -225,8 +225,7 @@ class VocLocalDatasource {
       final mergedText = '$title $content';
       final tokens = VocKeywordExtractor.extract(mergedText);
 
-      if (createdAt != null) {
-        if (createdAt.isAfter(now)) continue;
+      if (createdAt != null && !createdAt.isAfter(now)) {
         if (!createdAt.isBefore(recentStart)) {
           recent30DayVocs += 1;
           for (final token in tokens) {

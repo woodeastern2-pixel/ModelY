@@ -17,7 +17,9 @@ Map<String, dynamic> entry(String id, {String answer = '휴지통에서 복원 �
   'created_at': '2026-09-29T00:00:00Z', 'resolved_at': '2026-09-29T00:00:00Z',
 };
 Future<Database> emptyDatabase() async {
-  final db = await databaseFactoryFfi.openDatabase(inMemoryDatabasePath);
+  final dir = await Directory.systemTemp.createTemp('knowledge-archive-test-');
+  final db = await databaseFactoryFfi.openDatabase('${dir.path}/knowledge.db');
+  addTearDown(() async { if (db.isOpen) await db.close(); await dir.delete(recursive: true); });
   await db.execute('CREATE TABLE knowledge_base (id TEXT PRIMARY KEY, question TEXT NOT NULL, '
       'answer TEXT NOT NULL, category TEXT NOT NULL, customer TEXT, project TEXT, '
       'voc_id TEXT, embedding TEXT, created_at TEXT NOT NULL, resolved_at TEXT NOT NULL)');
@@ -33,7 +35,6 @@ void main() {
   setUpAll(sqfliteFfiInit);
   late Database source, target;
   setUp(() async { source = await emptyDatabase(); target = await emptyDatabase(); });
-  tearDown(() async { await source.close(); await target.close(); });
 
   Future<Uint8List> sample() async {
     await source.insert('knowledge_base', entry('manual-source-one'));

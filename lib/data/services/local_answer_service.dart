@@ -220,7 +220,9 @@ class LocalAnswerService {
     if (plan.parts.length > 1) {
       final missing = plan.parts.where((part) => !_partCovered(part, references)).toList();
       if (missing.isNotEmpty) {
-        final topics = missing.where((part) => part.length <= 20).take(3).toList();
+        final topics = missing.where((part) => part.length <= 20 &&
+            !RegExp(r'습니다|합니다|입니다|했|주세요|요청|[.!]').hasMatch(part))
+            .take(3).toList();
         gaps.add(topics.isEmpty
             ? '요청하신 사항 중 일부는 자료에서 확인되지 않았습니다.'
             : '추가 확인이 필요한 항목: ${topics.join(', ')}.');

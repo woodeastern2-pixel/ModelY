@@ -1,3 +1,4 @@
+import 'package:ai_voc_assistant/data/datasources/local/voc_local_datasource.dart';
 import 'dart:io';
 import 'dart:convert';
 import 'package:ai_voc_assistant/data/services/in_app_sync_receiver_service.dart';
@@ -61,6 +62,21 @@ void main() {
     } finally {
       await receiver.stop();
     }
+    final now = DateTime.now();
+    for (var i = 0; i < 7; i++) {
+      final date = now.subtract(Duration(days: i == 0 ? 45 : i == 6 ? -2 : 1));
+      await connections.first.insert('vocs', {
+        'id': 'trend-$i', 'title': i < 3 ? '첨부파일 오류' : '받은 내용 확인 요청',
+        'content': i < 3 ? '메일에서 받은 첨부파일이 열리지 않습니다.' : '받은 사항을 확인 부탁드립니다.',
+        'customer': '고객', 'project': '메일', 'category': '기타',
+        'priority': i == 6 ? 'HIGH' : 'MEDIUM', 'status': 'OPEN',
+        'created_at': date.toIso8601String(), 'updated_at': date.toIso8601String(),
+      });
+    }
+    final metrics = await VocLocalDatasource(helper).getExecutiveInsightMetrics();
+    expect(metrics['risingKeyword'], '첨부파일');
+    expect(metrics['risingKeywordDelta'], 1); // 2 recent VOCs versus 1 previous VOC.
+    expect(metrics['highPriorityBacklogVocs'], 1); // Future dates must not hide backlog.
     await helper.close();
     final reopened = await helper.database;
     final row = (await reopened.query(AppConstants.tableSettings,
