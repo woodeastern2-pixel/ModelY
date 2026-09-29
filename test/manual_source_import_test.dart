@@ -3,12 +3,45 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:ai_voc_assistant/data/services/manual_media_store.dart';
 import 'package:archive/archive.dart';
+import 'package:excel/excel.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ai_voc_assistant/data/services/manual_document_import_service.dart';
 import 'package:ai_voc_assistant/domain/entities/knowledge_base_entity.dart';
 import 'package:ai_voc_assistant/domain/repositories/knowledge_base_repository.dart';
 
 void main() {
+  test('xlsx imports every sheet as offline source without invented QA', () async {
+    final dir = await Directory.systemTemp.createTemp('xlsx-source-');
+    addTearDown(() => dir.delete(recursive: true));
+    final excel = Excel.createExcel();
+    excel[excel.tables.keys.first].appendRow([
+      TextCellValue('메일 등록 방법'), TextCellValue('설정에서 계정을 추가합니다.'),
+    ]);
+    excel['Drive'].appendRow([
+      TextCellValue('휴지통 보관 기간'), IntCellValue(30),
+    ]);
+    final file = File('${dir.path}/manual.xlsx');
+    await file.writeAsBytes(excel.encode()!);
+    final repo = _MemoryRepository();
+    final service = ManualDocumentImportService(repo,
+      mediaStore: ManualMediaStore(directory: Directory('${dir.path}/media')));
+    final result = await service.importDocuments([file.path]);
+    expect(result.processedFiles, 1);
+    expect(result.warnings, isEmpty);
+    final body = repo.entries.values.map((e) => e.answer).join('\n');
+    expect(body, contains('메일 등록 방법 | 설정에서 계정을 추가합니다.'));
+    expect(body, contains('[시트] Drive'));
+    expect(body, contains('휴지통 보관 기간 | 30'));
+    expect(repo.entries.values.every((e) => e.question.contains('원문 섹션')), isTrue);
+    final count = repo.entries.length;
+    await service.importDocuments([file.path]);
+    expect(repo.entries.length, count);
+    final old = await file.copy('${dir.path}/legacy.xls');
+    final unsupported = await service.importDocuments([old.path]);
+    expect(unsupported.processedFiles, 0);
+    expect(unsupported.warnings.join(), contains('OpenXML'));
+  });
+
   test('Word embedded image stays linked after source file removal', () async {
     final dir = await Directory.systemTemp.createTemp('manual-media-');
     addTearDown(() => dir.delete(recursive: true));
@@ -105,4 +138,5 @@ class _MemoryRepository implements KnowledgeBaseRepository {
   @override
   Future<void> updateEmbedding(String id, List<double> embedding) async {}
 }
+
 

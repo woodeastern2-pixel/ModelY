@@ -13,6 +13,7 @@ import '../../viewmodels/integration_viewmodel.dart';
 import '../../viewmodels/settings_viewmodel.dart';
 import '../../viewmodels/voc_viewmodel.dart';
 import '../../widgets/priority_chip.dart';
+import '../../widgets/dismissible_notice.dart';
 import '../../widgets/voc_status_chip.dart';
 import '../../widgets/workspace_ui.dart';
 import 'voc_detail_screen.dart';
@@ -339,7 +340,9 @@ class _VocListScreenState extends State<VocListScreen> {
         ? null
         : progress.completed / progress.total;
     final colors = Theme.of(context).colorScheme;
-    return SafeArea(
+    return DismissibleNotice(
+      key: ValueKey(_bulkRunning),
+      child: SafeArea(
       top: false,
       child: Material(
         elevation: 8,
@@ -401,6 +404,7 @@ class _VocListScreenState extends State<VocListScreen> {
             ],
           ),
         ),
+      ),
       ),
     );
   }
@@ -1122,3 +1126,4 @@ void _open(BuildContext context, VocEntity voc) {
     MaterialPageRoute(builder: (_) => VocDetailScreen(vocId: voc.id)),
   );
 }
+
