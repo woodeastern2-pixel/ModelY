@@ -343,68 +343,68 @@ class _VocListScreenState extends State<VocListScreen> {
     return DismissibleNotice(
       key: ValueKey(_bulkRunning),
       child: SafeArea(
-      top: false,
-      child: Material(
-        elevation: 8,
-        color: colors.surfaceContainerHigh,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (_bulkRunning) LinearProgressIndicator(value: value),
-              if (_bulkRunning) const SizedBox(height: 8),
-              Row(
-                children: [
-                  Icon(
-                    _bulkRunning
-                        ? Icons.auto_awesome
-                        : Icons.check_circle_outline,
-                    color: colors.primary,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 9),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _bulkMessage,
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                        if (progress?.currentTitle != null)
-                          Text(
-                            '최근 처리: ${progress!.currentTitle}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        if (_lastError != null)
-                          Text(
-                            '최근 오류: $_lastError',
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
-                                ?.copyWith(color: colors.error),
-                          ),
-                      ],
+        top: false,
+        child: Material(
+          elevation: 8,
+          color: colors.surfaceContainerHigh,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (_bulkRunning) LinearProgressIndicator(value: value),
+                if (_bulkRunning) const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(
+                      _bulkRunning
+                          ? Icons.auto_awesome
+                          : Icons.check_circle_outline,
+                      color: colors.primary,
+                      size: 20,
                     ),
-                  ),
-                  if (_bulkRunning)
-                    TextButton.icon(
-                      onPressed: _stop,
-                      icon: const Icon(Icons.stop_circle_outlined),
-                      label: const Text('중지'),
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _bulkMessage,
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          if (progress?.currentTitle != null)
+                            Text(
+                              '최근 처리: ${progress!.currentTitle}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          if (_lastError != null)
+                            Text(
+                              '최근 오류: $_lastError',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(color: colors.error),
+                            ),
+                        ],
+                      ),
                     ),
-                ],
-              ),
-            ],
+                    if (_bulkRunning)
+                      TextButton.icon(
+                        onPressed: _stop,
+                        icon: const Icon(Icons.stop_circle_outlined),
+                        label: const Text('중지'),
+                      ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
-      ),
       ),
     );
   }

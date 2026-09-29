@@ -7,7 +7,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'support/ui_harness.dart';
+
 void main() {
+  setUpAll(loadUiHarnessFonts);
   for (final dark in [false, true]) {
     for (final phone in [false, true]) {
       testWidgets('notices close and reset: dark=$dark phone=$phone', (tester) async {
