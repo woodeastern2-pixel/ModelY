@@ -888,11 +888,15 @@ class AiViewModel extends ChangeNotifier {
         if (!_localAnswers.focusedEvidence(query, result.knowledgeBase)) continue;
         final id = result.knowledgeBase.id;
         if (!matches.containsKey(id) ||
-            result.similarityScore > matches[id]!.similarityScore) matches[id] = result;
+            result.similarityScore > matches[id]!.similarityScore) {
+          matches[id] = result;
+        }
       }
       if (_localAnswers.canAnswer(query, matches.values.toList()) &&
           _localAnswers.evidenceGap(query,
-              _localAnswers.answerReferences(matches.values.toList(), query: query)).isEmpty) break;
+              _localAnswers.answerReferences(matches.values.toList(), query: query)).isEmpty) {
+        break;
+      }
     }
     return (matches.values.toList()
       ..sort((a, b) => b.similarityScore.compareTo(a.similarityScore))).take(16).toList();

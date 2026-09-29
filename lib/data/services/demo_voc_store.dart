@@ -22,7 +22,9 @@ class DemoVocStore {
     for (final row in rows) {
       final id = row['id'] as String;
       if (!id.startsWith('${SampleVocGenerator.batchId}-') &&
-          !RegExp(r'^demo-voc-00[1-8]$').hasMatch(id)) continue;
+          !RegExp(r'^demo-voc-00[1-8]$').hasMatch(id)) {
+        continue;
+      }
       final updates = <String, Object?>{};
       void clean(String key, String value) {
         if (row[key] != null && value != row[key]) updates[key] = value;

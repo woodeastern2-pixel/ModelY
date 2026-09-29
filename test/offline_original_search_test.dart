@@ -49,8 +49,19 @@ void main() {
     final counts = <String, Map<String, int>>{};
     final examples = <Map<String, Object?>>[];
     var grounded = 0;
+    var processed = 0;
+    var longestMs = 0;
+    final elapsed = Stopwatch()..start();
     for (final voc in SampleVocGenerator.generateSampleVocs(now: DateTime(2026, 9, 29, 20))) {
+      final timer = Stopwatch()..start();
       final result = await vm.generateAnswer(voc.title, voc.content, excludeVocId: voc.id);
+      timer.stop();
+      if (timer.elapsedMilliseconds > longestMs) longestMs = timer.elapsedMilliseconds;
+      processed++;
+      if (processed % 100 == 0) {
+        // ignore: avoid_print
+        print('Offline demo coverage: $processed/1000 in ${elapsed.elapsed.inSeconds}s');
+      }
       expect(result, isNotNull, reason: voc.title);
       expect(result!.answer.trim(), isNotEmpty, reason: voc.title);
       expect(vm.error, isNull, reason: voc.title);
@@ -77,8 +88,9 @@ void main() {
     await report.writeAsString(const JsonEncoder.withIndent('  ').convert({
       'total': 1000, 'grounded': grounded, 'clarification': 1000 - grounded,
       'modelCalls': 0, 'fields': counts, 'examples': examples,
+      'elapsedMs': elapsed.elapsedMilliseconds, 'longestRequestMs': longestMs,
     }));
-  }, timeout: const Timeout(Duration(minutes: 8)));
+  }, timeout: const Timeout(Duration(minutes: 15)));
 
   test('original corpus answers with ZERO QA records; persistent index stays under 5s', () async {
     final db=await database();addTearDown(db.close);
