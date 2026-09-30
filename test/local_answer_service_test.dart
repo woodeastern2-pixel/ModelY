@@ -22,6 +22,15 @@ void main() {
     createdAt: now,
   );
 
+  test('repeated insufficient-evidence boilerplate is excluded without deleting source', () {
+    final source = KnowledgeBaseEntity(id: 'legacy-draft', question: '쪽지 작성창 위치',
+      answer: '답할 근거가 부족합니다. 쪽지 안내. 답할 근거가 부족합니다. Copilot 메뉴.',
+      category: '문의', resolvedAt: now, createdAt: now);
+    expect(service.isAnswerSource(source), isFalse);
+    expect(source.answer, contains('쪽지 안내'));
+    expect(service.isAnswerSource(messenger), isTrue);
+  });
+
   test('unrelated feature and saved clarification never become answer evidence', () {
     final unrelated = KnowledgeBaseEntity(id: 'minutes',
       question: 'Brity Copilot 회의록 초안', answer: '회의 내용을 기반으로 회의록 초안을 생성합니다.',

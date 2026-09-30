@@ -43,6 +43,13 @@ class AiViewModel extends ChangeNotifier {
   final LocalAnswerService _localAnswers = LocalAnswerService();
 
   bool _aiConnected = false;
+  bool _connectionAttempted = false;
+  bool get hasAiConfiguration => _connectionAttempted ||
+      _settingsViewModel.settings['ai_connection_configured'] == 'true' ||
+      (_settingsViewModel.aiProvider != AppConstants.aiProviderOllama
+          ? _aiService.isConfigured
+          : _settingsViewModel.ollamaUrl != AppConstants.defaultOllamaUrl ||
+              _settingsViewModel.ollamaModel != AppConstants.defaultOllamaModel);
   bool _checkingConnection = false;
   int _configurationRevision = 0;
   List<Object?>? _configurationValues;
@@ -68,10 +75,17 @@ class AiViewModel extends ChangeNotifier {
   VocIntelligenceResult? _intelligenceResult;
   List<SimilarVocResult> _similarVocs = [];
   AiAnswerResult? _answerResult;
-  String _answerQuery = '';
   bool _hasPartialAnswer = false;
   List<SimilarVocResult>? _generatedEvidence;
-  bool get isAiAnswer => _generatedEvidence != null && !_isClarificationAnswer;
+  List<SimilarVocResult> _suppliedEvidence = [];
+  List<SimilarVocResult> get suppliedEvidence => _suppliedEvidence;
+  bool _isAiAnswer = false;
+  bool get isAiAnswer => _isAiAnswer;
+  String? _searchError;
+  String? get searchError => _searchError;
+  String get generationStatus => _isSearching ? '참고 자료를 검색하고 있습니다.'
+      : hasAiConfiguration ? 'AI에 답변 초안을 요청하고 있습니다.'
+      : '저장된 자료로 답변 초안을 구성하고 있습니다.';
   bool _isClarificationAnswer = false;
   bool get isClarificationAnswer => _isClarificationAnswer;
   bool get hasPartialAnswer => _hasPartialAnswer;
@@ -98,7 +112,7 @@ class AiViewModel extends ChangeNotifier {
   VocAnalysisResult? get analysisResult => _analysisResult;
   VocIntelligenceResult? get intelligenceResult => _intelligenceResult;
   List<SimilarVocResult> get similarVocs => _similarVocs;
-  List<SimilarVocResult> get answerEvidence => _generatedEvidence ?? _localAnswers.answerReferences(_similarVocs, query: _answerQuery);
+  List<SimilarVocResult> get answerEvidence => _generatedEvidence ?? const [];
   AiAnswerResult? get answerResult => _answerResult;
   bool get hasAnswer => _answerResult != null;
   String? get urgencyReason => _urgencyReason;
@@ -271,19 +285,20 @@ class AiViewModel extends ChangeNotifier {
 
   /// 2단계: 유사 VOC 검색
   Future<List<SimilarVocResult>> searchSimilarVocs(String query, {String? excludeVocId}) async {
+    if (_isSearching) return _similarVocs;
     _isSearching = true;
-    _error = null;
+    _searchError = null;
     notifyListeners();
     try {
       _similarVocs = await _localReferences(query, excludeVocId: excludeVocId);
       return _similarVocs;
     } catch (e) {
-      _error = '자료 검색 실패: $e';
+      _searchError = '자료 검색에 실패했습니다. 자료 다시 검색으로 재시도해 주세요.';
       _similarVocs = [];
       return [];
     } finally {
       _isSearching = false;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
     }
   }
 
@@ -446,28 +461,34 @@ class AiViewModel extends ChangeNotifier {
   }
 
   /// 3단계: 확인된 AI 연결은 검토용 초안, 미연결은 자료 기반 답변.
-  Future<AiAnswerResult?> generateAnswer(String title, String content, {String? excludeVocId}) async {
-    if (_isGenerating) return null;
+  Future<AiAnswerResult?> generateAnswer(String title, String content, {String? excludeVocId, bool useLocal = false}) async {
+    if (_isGenerating || _isSearching) return null;
+    final revision = _configurationRevision;
+    final requestAi = !useLocal && hasAiConfiguration;
     _isGenerating = true;
     _error = null;
     _answerResult = null;
     _hasPartialAnswer = false;
     _generatedEvidence = null;
+    _suppliedEvidence = [];
+    _isAiAnswer = false;
     _isClarificationAnswer = false;
     notifyListeners();
 
     try {
       final query = '$title\n$content';
-      _answerQuery = query;
       await searchSimilarVocs(query, excludeVocId: excludeVocId);
-      if (_error != null) return null;
-      String? connectionNote;
-      if (_aiConnected) {
-        final revision = _configurationRevision;
+      if (_disposed || revision != _configurationRevision) {
+        _error = '연결 설정이 변경되었습니다. 답변을 다시 생성해 주세요.';
+        return null;
+      }
+      if (requestAi) {
         final references = _similarVocs.where((r) =>
             r.similarityScore >= 0.40 &&
             _localAnswers.isAnswerSource(r.knowledgeBase) &&
             _localAnswers.focusedEvidence(query, r.knowledgeBase)).take(5).toList();
+        _suppliedEvidence = List.unmodifiable(references);
+        notifyListeners();
         try {
           final result = await _aiService.generateReviewDraft(title, content, references)
               .timeout(const Duration(seconds: 60));
@@ -476,7 +497,9 @@ class AiViewModel extends ChangeNotifier {
             return null;
           }
           _generatedEvidence = references.where((r) =>
-              result.referencedCases.contains(r.knowledgeBase.question)).toList();
+              result.referencedCaseIds.contains(r.knowledgeBase.id)).toList();
+          _aiConnected = true;
+          _isAiAnswer = true;
           _hasPartialAnswer = !_localAnswers.canAnswer(query, references) ||
               _localAnswers.evidenceGap(query, references).isNotEmpty ||
               _generatedEvidence!.isEmpty;
@@ -488,12 +511,13 @@ class AiViewModel extends ChangeNotifier {
             return null;
           }
           _aiConnected = false;
-          connectionNote = 'AI 응답을 받지 못해 저장된 자료로 답변을 구성했습니다. 연결을 다시 확인해 주세요.';
-          if (!_localAnswers.canAnswer(query, _similarVocs)) {
-            _error = 'AI 답변 요청에 실패했습니다. 설정에서 연결을 다시 확인한 뒤 재시도해 주세요. 저장된 자료만으로는 이 질문에 답할 근거가 충분하지 않습니다.';
-            return null;
-          }
+          _error = 'AI 답변 요청에 실패했습니다. 답변 다시 생성으로 재시도하거나, 저장 자료로 초안 만들기를 선택해 주세요.';
+          return null;
         }
+      }
+      if (_searchError != null) {
+        _error = _searchError;
+        return null;
       }
       if (!_localAnswers.canAnswer(query, _similarVocs)) {
         if (!_localAnswers.needsWholeDataset(query)) {
@@ -518,12 +542,13 @@ class AiViewModel extends ChangeNotifier {
       }
       _hasPartialAnswer = _localAnswers.evidenceGap(
           query, _localAnswers.answerReferences(_similarVocs, query: query)).isNotEmpty;
+      _generatedEvidence = _localAnswers.answerReferences(_similarVocs, query: query);
       _answerResult = AiAnswerResult(
         answer: _localAnswers.answerForQuery(query, _similarVocs),
         confidence: _similarVocs.first.similarityScore,
         referencedCases: _localAnswers.answerReferences(_similarVocs, query: query)
             .map((r) => r.knowledgeBase.question).toList(),
-        notes: connectionNote ?? 'AI 연결 없이 매뉴얼과 승인된 답변에서 안내를 구성했습니다. 검색 점수는 정답 확률이 아닙니다. 출처의 제품·버전과 제한 조건을 확인해 주세요.',
+        notes: 'AI 연결 없이 매뉴얼과 승인된 답변에서 안내를 구성했습니다. 검색 점수는 정답 확률이 아닙니다. 출처의 제품·버전과 제한 조건을 확인해 주세요.',
       );
       return _answerResult;
     } catch (e) {
@@ -546,6 +571,7 @@ class AiViewModel extends ChangeNotifier {
   }
 
   Future<String> testConnection() async {
+    _connectionAttempted = true;
     _configureServices();
     final revision = _configurationRevision;
     _checkingConnection = true;
@@ -557,6 +583,9 @@ class AiViewModel extends ChangeNotifier {
       if (result.trim().isEmpty) throw StateError('연결 응답이 없습니다.');
       if (_disposed || revision != _configurationRevision) {
         throw StateError('연결 설정이 변경되었습니다. 다시 확인해 주세요.');
+      }
+      if (_settingsViewModel.settings.isNotEmpty) {
+        await _settingsViewModel.saveSetting('ai_connection_configured', 'true');
       }
       _aiConnected = true;
       _error = null;
@@ -759,6 +788,9 @@ class AiViewModel extends ChangeNotifier {
   }
 
   void clearResults() {
+    _isAiAnswer = false;
+    _suppliedEvidence = [];
+    _searchError = null;
     _isClarificationAnswer = false;
     _generatedEvidence = null;
     _hasPartialAnswer = false;

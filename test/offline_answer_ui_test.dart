@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:ai_voc_assistant/data/services/ai_service.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -32,6 +33,51 @@ void main() {
   setUpAll(loadUiHarnessFonts);
   setUpAll(sqfliteFfiInit);
   for (final dark in [false, true]) {
+    testWidgets('reference panel survives completion and search preserves draft (${dark ? "dark" : "light"})', (tester) async {
+      tester.view.physicalSize = const Size(1440, 1600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final settings = SettingsViewModel(_Settings());
+      final source = KnowledgeBaseEntity(id: 'reference-stable', question: 'Brity Messenger 알림 설정',
+          answer: '설정에서 알림을 선택합니다.', category: '시스템매뉴얼',
+          resolvedAt: DateTime(2026), createdAt: DateTime(2026));
+      final repo = _ChangingKnowledge([source]);
+      final service = _DelayedDraft();
+      final vm = AiViewModel(repo, _Vocs(), settings, aiService: service);
+      addTearDown(vm.dispose);
+      addTearDown(settings.dispose);
+      await vm.checkCopilotConnection();
+      final key = GlobalKey();
+      await tester.pumpWidget(ChangeNotifierProvider.value(value: vm,
+        child: MaterialApp(theme: dark ? AppTheme.darkTheme : AppTheme.lightTheme,
+          home: RepaintBoundary(key: key, child: const AiAnswerScreen(
+            vocId: 'reference-test', vocTitle: 'Brity Messenger 알림 설정',
+            vocContent: '알림 설정 방법', category: '기능문의', customer: '', project: '')))));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(vm.isGenerating, isTrue);
+      expect(find.text('이 답변의 참고 자료'), findsOneWidget);
+      service.result.complete(const AiAnswerResult(answer: '알림 안내 초안입니다.',
+          confidence: 0.5, referencedCases: [], notes: '검토용'));
+      await tester.pumpAndSettle();
+      expect(vm.suppliedEvidence, isNotEmpty);
+      expect(vm.answerEvidence, isEmpty);
+      expect(find.text('이 답변의 참고 자료'), findsOneWidget);
+      expect(find.text('검색된 자료 · 답변 인용 미확인'), findsOneWidget);
+      expect(find.textContaining('인용이 확인된 자료가 없습니다'), findsOneWidget);
+      final original = vm.answerResult;
+      await _capture(tester, key, 'ai-reference-stable-${dark ? "dark" : "light"}');
+      repo.entries = [];
+      await tester.tap(find.text('자료 다시 검색'));
+      await tester.pumpAndSettle();
+      expect(service.calls, 1);
+      expect(identical(vm.answerResult, original), isTrue);
+      expect(vm.suppliedEvidence.single.knowledgeBase.id, source.id);
+      expect(find.text('알림 안내 초안입니다.'), findsOneWidget);
+      expect(find.text('AI에 제공 · 인용 미확인'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
     testWidgets('connected note request displays a review draft (${dark ? "dark" : "light"})', (tester) async {
       tester.view.physicalSize = const Size(1440, 1200);
       tester.view.devicePixelRatio = 1;
@@ -156,7 +202,7 @@ void main() {
       expect(vm.similarVocs, hasLength(1));
       expect(find.text('참고할 유사 사례가 없습니다.'), findsNothing);
       expect(tester.takeException(), isNull);
-      expect(tester.getSize(find.text('자료 기반 답변 초안').last).height, lessThan(40));
+      expect(tester.getSize(find.text('저장 자료 기반 답변 초안').last).height, lessThan(40));
       expect(tester.getSize(find.text('답변을 승인하기 전에 사실관계와 안내 절차를 확인해 주세요.')).height,
           lessThan(80));
       await _capture(tester, key, 'meeting-help-phone-${dark ? "dark" : "light"}');
@@ -277,7 +323,7 @@ void main() {
       expect(vm.answerEvidence, isEmpty);
       expect(tester.widget<FilledButton>(find.widgetWithText(FilledButton, '답변 승인 및 저장')).onPressed, isNull);
       expect(find.text('도움이 됨'), findsNothing);
-      expect(find.text('이 답변의 참고 자료'), findsNothing);
+      expect(find.text('이 답변의 참고 자료'), findsOneWidget);
       expect(find.text('추가 확인용 초안'), findsOneWidget);
       expect(find.textContaining('검증된 해결 답변이 아닙니다'), findsOneWidget);
       expect(find.text('100%'), findsNothing);
@@ -384,5 +430,22 @@ class _ConnectedDraft extends AiService {
       answer: '안녕하세요. 쪽지 복사 시 글자색과 진하게 서식이 유지되지 않는다는 말씀을 확인했습니다. 서식 보존 기능의 지원 여부와 개선 가능 여부는 제품 담당자 확인이 필요합니다. 사용 중인 메신저 버전과 복사한 내용을 붙여넣는 프로그램을 알려주시면 확인에 도움이 됩니다.\n\n보낸 쪽지와 받은 쪽지의 보관 기간은 현재 확인된 자료만으로 확정하기 어렵습니다. 담당 관리자에게 적용된 보관 정책을 확인해 주세요.',
       confidence: 0, referencedCases: [],
       notes: '연결된 AI로 작성한 검토용 초안입니다. 확인되지 않은 정책과 기능은 담당자 확인이 필요합니다.');
+  }
+}
+
+class _ChangingKnowledge extends _Knowledge {
+  List<KnowledgeBaseEntity> entries;
+  _ChangingKnowledge(this.entries);
+  @override
+  Future<List<KnowledgeBaseEntity>> getAllEntries() async => entries;
+}
+
+class _DelayedDraft extends _ConnectedDraft {
+  final result = Completer<AiAnswerResult>();
+  @override
+  Future<AiAnswerResult> generateReviewDraft(String title, String content,
+      List<SimilarVocResult> references) {
+    calls++;
+    return result.future;
   }
 }

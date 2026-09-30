@@ -81,7 +81,7 @@ jobs:
           }
           changed = set(subprocess.check_output(
               ['git', 'diff', '--name-only', baseline, 'HEAD'], text=True).splitlines()) if baseline else None
-          command = ['flutter', 'test', '--exclude-tags=golden']
+          command = ['flutter', 'test', '--fail-fast', '--exclude-tags=golden']
           if changed is not None and changed <= allowed:
               print('Presentation-only change: corpus audit reused from 918a294d (run 36670010382).', flush=True)
               command += [str(p) for p in sorted(pathlib.Path('test').rglob('*_test.dart'))

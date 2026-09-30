@@ -436,7 +436,8 @@ class LocalAnswerService {
 
   bool isAnswerSource(KnowledgeBaseEntity entry) =>
       !entry.id.startsWith('registered-voc-') && entry.answer.trim().isNotEmpty &&
-      !entry.answer.contains('현재 확인된 자료만으로는 정확한 해결 절차나 지원 조건을 확정하기 어려워');
+      !entry.answer.contains('현재 확인된 자료만으로는 정확한 해결 절차나 지원 조건을 확정하기 어려워') &&
+      RegExp(r'답할 근거가 부족합니다').allMatches(entry.answer).length < 2;
 
   bool canAnswer(String query, List<SimilarVocResult> references) =>
       !needsWholeDataset(query) && references.any((item) =>

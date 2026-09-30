@@ -29,6 +29,26 @@ void main() {
     expect(result.answer, contains('정확한 안내가 어렵습니다'));
   });
 
+  test('review citations use validated stable IDs and never infer all sources', () {
+    final service = AiService();
+    final now = DateTime(2026, 9, 30);
+    final source = SimilarVocResult(knowledgeBase: KnowledgeBaseEntity(
+      id: 'stable-source', question: '동일한 제목', answer: '설정에서 알림을 선택합니다.',
+      category: '시스템매뉴얼', resolvedAt: now, createdAt: now), similarityScore: 0.9);
+    final cited = service.parseReviewDraft(
+      '{"answer":"안내", "referenced_case_ids":["stable-source","unknown","stable-source"], "referenced_cases":["다른 제목"]}', [source]);
+    expect(cited.referencedCaseIds, ['stable-source']);
+    expect(cited.referencedCases, ['동일한 제목']);
+    for (final raw in ['{"answer":"안내"}', '일반 텍스트 답변',
+      '{"answer":"안내","referenced_case_ids":["unknown"]}',
+      '{"answer":"안내","referenced_cases":["동일한 제목"]}',
+      '{"answer":"안내","referenced_case_ids":"invalid"}']) {
+      expect(service.parseReviewDraft(raw, [source]).referencedCaseIds, isEmpty);
+      expect(service.parseReviewDraft(raw, [source]).referencedCases, isEmpty);
+    }
+    expect(AiPrompts.answerGenerationUser('질문', '내용', [source]), contains('자료 ID: stable-source'));
+  });
+
   test('answer prompt explicitly prohibits unsupported UI and integration claims', () {
     expect(AiPrompts.answerGenerationSystem, contains('메뉴명'));
     expect(AiPrompts.answerGenerationSystem, contains('외부 서비스'));
@@ -36,3 +56,4 @@ void main() {
     expect(AiPrompts.answerGenerationSystem, contains('서로 다른 사례'));
   });
 }
+

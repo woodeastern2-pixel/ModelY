@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:ai_voc_assistant/core/constants/app_constants.dart';
 import 'package:ai_voc_assistant/data/services/ai_service.dart';
 import 'package:ai_voc_assistant/domain/entities/knowledge_base_entity.dart';
 import 'package:ai_voc_assistant/domain/entities/voc_entity.dart';
@@ -62,18 +64,72 @@ void main() {
     expect(vm.error, contains('AI 답변 요청에 실패'));
     expect(vm.isAiConnected, isFalse);
     expect(vm.isGenerating, isFalse);
+    service.failDraft = false;
+    expect(await vm.generateAnswer('쪽지 서식', '보관 기간'), isNotNull);
+    expect(service.calls, 2);
+    expect(vm.isAiConnected, isTrue);
+    expect(vm.isAiAnswer, isTrue);
   });
 
-  test('offline answer does not invoke a configured model without verified connection', () async {
-    final settings = SettingsViewModel(_EmptySettingsRepository());
+  test('saved AI configuration invokes model after restart without connection test', () async {
+    final settings = SettingsViewModel(_SavedAiSettings());
     final service = _DraftService();
     final vm = AiViewModel(_EmptyKnowledgeBaseRepository(), _VocRepository([]), settings,
         aiService: service);
     addTearDown(vm.dispose);
     addTearDown(settings.dispose);
+    await settings.loadSettings();
     expect(await vm.generateAnswer('쪽지 서식', '보관 기간'), isNotNull);
-    expect(vm.isClarificationAnswer, isTrue);
+    expect(vm.isAiAnswer, isTrue);
+    expect(service.calls, 1);
+  });
+
+  test('search failure does not block AI and remains visible separately', () async {
+    final settings = SettingsViewModel(_SavedAiSettings());
+    await settings.loadSettings();
+    final service = _DraftService();
+    final vm = AiViewModel(_BrokenKnowledge(), _VocRepository([]), settings, aiService: service);
+    addTearDown(vm.dispose);
+    addTearDown(settings.dispose);
+    expect(await vm.generateAnswer('쪽지 서식', '보관 기간'), isNotNull);
+    expect(service.calls, 1);
+    expect(vm.error, isNull);
+    expect(vm.searchError, isNotNull);
+    final answer = vm.answerResult;
+    await vm.searchSimilarVocs('다시 검색');
+    expect(identical(vm.answerResult, answer), isTrue);
+    expect(service.calls, 1);
+  });
+
+  test('explicit local draft never invokes saved AI', () async {
+    final settings = SettingsViewModel(_SavedAiSettings());
+    await settings.loadSettings();
+    final service = _DraftService();
+    final vm = AiViewModel(_EmptyKnowledgeBaseRepository(), _VocRepository([]), settings, aiService: service);
+    addTearDown(vm.dispose);
+    addTearDown(settings.dispose);
+    expect(await vm.generateAnswer('쪽지 서식', '보관 기간', useLocal: true), isNotNull);
     expect(service.calls, 0);
+    expect(vm.isAiAnswer, isFalse);
+  });
+
+  test('late provider response is discarded after configuration change', () async {
+    final repo = _SavedAiSettings();
+    final settings = SettingsViewModel(repo);
+    await settings.loadSettings();
+    final service = _PendingDraft();
+    final vm = AiViewModel(_EmptyKnowledgeBaseRepository(), _VocRepository([]), settings, aiService: service);
+    addTearDown(vm.dispose);
+    addTearDown(settings.dispose);
+    final pending = vm.generateAnswer('쪽지 서식', '보관 기간');
+    await service.started.future;
+    repo.model = 'changed-model';
+    await settings.loadSettings();
+    service.response.complete(const AiAnswerResult(answer: 'old answer', confidence: 0,
+        referencedCases: [], notes: ''));
+    expect(await pending, isNull);
+    expect(vm.hasAnswer, isFalse);
+    expect(vm.error, contains('설정이 변경'));
   });
 
   test('configured but unreachable AI cannot create a copilot answer', () async {
@@ -217,5 +273,30 @@ class _DraftService extends _ConnectionService {
     if (failDraft) throw StateError('generation unavailable');
     return const AiAnswerResult(answer: '쪽지 서식 보존과 보관 기간은 담당자 확인이 필요합니다.',
         confidence: 0, referencedCases: [], notes: '연결된 AI 검토용 초안');
+  }
+}
+
+class _SavedAiSettings extends _EmptySettingsRepository {
+  String model = 'configured-model';
+  @override
+  Future<Map<String, String>> getAllSettings() async => {
+    AppConstants.settingAiProvider: AppConstants.aiProviderOllama,
+    AppConstants.settingOllamaModel: model,
+  };
+}
+
+class _BrokenKnowledge extends _EmptyKnowledgeBaseRepository {
+  @override
+  Future<List<KnowledgeBaseEntity>> getAllEntries() async => throw StateError('search unavailable');
+}
+
+class _PendingDraft extends _DraftService {
+  final started = Completer<void>();
+  final response = Completer<AiAnswerResult>();
+  @override
+  Future<AiAnswerResult> generateReviewDraft(String title, String content,
+      List<SimilarVocResult> references) {
+    started.complete();
+    return response.future;
   }
 }
