@@ -274,6 +274,10 @@ void main() {
       await tester.pumpAndSettle();
       expect(vm.hasAnswer, isTrue);
       expect(vm.isClarificationAnswer, isTrue);
+      expect(vm.answerEvidence, isEmpty);
+      expect(tester.widget<FilledButton>(find.widgetWithText(FilledButton, '답변 승인 및 저장')).onPressed, isNull);
+      expect(find.text('도움이 됨'), findsNothing);
+      expect(find.text('이 답변의 참고 자료'), findsNothing);
       expect(find.text('추가 확인용 초안'), findsOneWidget);
       expect(find.textContaining('검증된 해결 답변이 아닙니다'), findsOneWidget);
       expect(find.text('100%'), findsNothing);

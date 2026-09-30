@@ -47,7 +47,7 @@ class OfflineQueryPlan {
     final lines = query.split('\n');
     if (lines.length < 2) return null;
     final title = searchText(lines.first).trim();
-    if (!title.contains('·') || title.length > 120) return null;
+    if (title.isEmpty || title.length > 120) return null;
     return title.replaceFirst(RegExp(
         r'\s+(처음 이용하는 절차|지원 조건 확인|진행되지 않는 문제|응답 지연|사용자별 권한 차이|정보 공개 범위|작업 결과 확인|휴대폰 이용 차이|진행 안내 개선|부서 운영 기준)$'), '').trim();
   }
@@ -83,4 +83,3 @@ class OfflineQueryPlan {
         parts.length > 1 ? parts : [focus], request);
   }
 }
-

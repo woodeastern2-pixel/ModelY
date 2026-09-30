@@ -80,6 +80,7 @@ class _AiAnswerScreenState extends State<AiAnswerScreen> {
     final answer = _answer.trim();
     if (answer.isEmpty || _adopting ||
         !context.read<AiViewModel>().hasAnswer ||
+        context.read<AiViewModel>().isClarificationAnswer ||
         context.read<AiViewModel>().isGenerating) return;
     setState(() => _adopting = true);
     final aiVm = context.read<AiViewModel>();
@@ -152,7 +153,7 @@ class _AiAnswerScreenState extends State<AiAnswerScreen> {
         final desktop = constraints.maxWidth >= 1050;
         return Scaffold(
           backgroundColor: context.visualColors.canvas,
-          appBar: AppBar(title: const Text('자료 기반 답변 초안')),
+          appBar: AppBar(title: const Text('문의 답변 검토')),
           body: Consumer<AiViewModel>(
             builder: (context, vm, _) {
               return SingleChildScrollView(
@@ -434,8 +435,10 @@ class _AnswerWorkspace extends StatelessWidget {
     return Column(
       children: [
         _Panel(
-          title: '자료 기반 답변 초안',
-          subtitle: '답변을 승인하기 전에 사실관계와 안내 절차를 확인해 주세요.',
+          title: vm.isClarificationAnswer ? '추가 확인 안내' : '자료 기반 답변 초안',
+          subtitle: vm.isClarificationAnswer
+              ? '해결 방법을 확인하지 못했습니다. 아래 안내는 복사할 수 있지만 해결 답변으로 승인하거나 지식 자료에 등록할 수 없습니다.'
+              : '답변을 승인하기 전에 사실관계와 안내 절차를 확인해 주세요.',
           icon: Icons.auto_awesome_outlined,
           trailing: Wrap(
             spacing: 4,
@@ -499,7 +502,7 @@ class _AnswerWorkspace extends StatelessWidget {
                         Align(
                           alignment: Alignment.centerRight,
                           child: FilledButton.icon(
-                            onPressed: !vm.hasAnswer || vm.isGenerating || answer.trim().isEmpty ? null : onAdopt,
+                            onPressed: !vm.hasAnswer || vm.isClarificationAnswer || vm.isGenerating || answer.trim().isEmpty ? null : onAdopt,
                             icon: adopting
                                 ? const SizedBox(
                                     width: 16,
@@ -514,9 +517,11 @@ class _AnswerWorkspace extends StatelessWidget {
                     ),
         ),
         const SizedBox(height: 14),
-        if (selected != null) _SelectedEvidence(item: selected),
+        if (!vm.isClarificationAnswer && selected != null &&
+            vm.answerEvidence.any((r) => r.knowledgeBase.id == selected.knowledgeBase.id))
+          _SelectedEvidence(item: selected),
         const SizedBox(height: 14),
-        if (vm.hasAnswer && !vm.isGenerating) _FeedbackPanel(
+        if (vm.hasAnswer && !vm.isGenerating && !vm.isClarificationAnswer) _FeedbackPanel(
           type: feedbackType,
           controller: feedbackController,
           saving: feedbackSaving,

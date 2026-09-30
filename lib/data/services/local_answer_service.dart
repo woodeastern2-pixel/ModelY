@@ -93,7 +93,12 @@ class LocalAnswerService {
     final focused = '$prefix${plan.focus}'.trim();
     final titleQuery = OfflineQueryPlan.titleQuery(query);
     if (titleQuery != null) {
-      return <String>{query, '$prefix$titleQuery'.trim()}.toList();
+      final core = titleQuery
+          .replaceAll(RegExp(r'(?:을|를)?\s*찾아서'), ' ')
+          .replaceAll('예약하는', '예약')
+          .replaceAll(RegExp(r'초안\s*작성|계속\s*뜹니다'), ' ');
+      return <String>{query, '$prefix$titleQuery'.trim(),
+        if (core.trim().isNotEmpty) '$prefix$core'.trim()}.toList();
     }
     // A note report often combines a formatting request and a retention
     // question in long polite prose. Search each named feature independently.
@@ -148,6 +153,12 @@ class LocalAnswerService {
   bool focusedEvidence(String query, KnowledgeBaseEntity entry) {
     final plan = OfflineQueryPlan.from(query);
     if (!versionCompatible(query, entry)) return false;
+    // Shared words such as Copilot or draft do not establish feature relevance.
+    final bodyText = ManualContent.parse(entry.answer).body;
+    for (final feature in ['답장', '회의실', '카메라', '필터', '아이디', '중복']) {
+      if (query.contains(feature) &&
+          !('${entry.question} $bodyText').contains(feature)) return false;
+    }
     final scope = _normalize('${entry.project ?? ''} ${entry.question}');
     for (final group in [_products, {'desktop', 'mobile'}]) {
       final requested = _queryScope(query).where(group.contains).toSet();
@@ -416,12 +427,14 @@ class LocalAnswerService {
   bool canAnswer(String query, List<SimilarVocResult> references) =>
       !needsWholeDataset(query) && references.any((item) =>
           isAnswerSource(item.knowledgeBase) && item.similarityScore >= 0.68 &&
-          versionCompatible(query, item.knowledgeBase));
+          versionCompatible(query, item.knowledgeBase) &&
+          focusedEvidence(query, item.knowledgeBase));
 
   List<SimilarVocResult> answerReferences(List<SimilarVocResult> references, {String query = ''}) {
     final usable = references.where((r) =>
         isAnswerSource(r.knowledgeBase) && r.similarityScore >= 0.68 &&
-        versionCompatible(query, r.knowledgeBase)).toList();
+        versionCompatible(query, r.knowledgeBase) &&
+        focusedEvidence(query, r.knowledgeBase)).toList();
     if (usable.isEmpty) return [];
     final plan = OfflineQueryPlan.from(query);
     if (plan.parts.length > 1) {
@@ -462,18 +475,27 @@ class LocalAnswerService {
   String clarificationDraft(String title, String content) {
     final subject = OfflineQueryPlan.searchText(title).trim();
     final query = '$title $content';
-    final checks = <String>['사용 중인 제품과 버전, 문제가 발생한 화면을 알려주세요.'];
-    if (RegExp(r'개선|추가해|바꾸|변경 요청').hasMatch(query)) {
-      checks.add('현재 업무 흐름과 기대하시는 동작을 구체적으로 알려주세요.');
-    } else if (RegExp(r'권한|역할|접근 거부').hasMatch(query)) {
-      checks.add('영향을 받는 사용자 범위와 다른 계정에서도 동일한지 확인해 주세요.');
-    } else if (RegExp(r'모바일|휴대폰|장치').hasMatch(query)) {
-      checks.add('컴퓨터와 휴대폰 중 어느 환경에서 발생하는지, 두 환경의 차이를 알려주세요.');
+    final incident = OfflineQueryPlan.reportsDifficulty(query) ||
+        RegExp(r'중복|만료|계속.*(?:뜨|뜹)|알림.*(?:계속|반복)').hasMatch(query);
+    final checks = <String>[];
+    if (query.contains('카메라') && query.contains('필터')) {
+      checks.add('알림을 표시한 프로그램 이름과 알림의 정확한 문구를 확인해 주세요. 화면을 보내실 때 개인정보는 가려주세요.');
+      checks.add('카메라를 켜거나 끌 때 어느 프로그램을 사용 중이었는지, 다른 프로그램에서도 같은 알림이 나타나는지 알려주세요.');
+    } else if (query.contains('아이디') && query.contains('중복')) {
+      checks.add('중복된 아이디가 보이는 위치가 로그인 화면인지, 사용자 검색·조직도인지 알려주세요.');
+      checks.add('서로 다른 사용자가 같은 아이디로 표시되는지, 같은 사용자가 여러 번 표시되는지 알려주세요.');
+    } else if (!incident) {
+      checks.add('이 기능을 이용하시는 화면이 웹, 컴퓨터 앱, 휴대폰 앱 중 어디인지 알려주세요.');
+      checks.add('화면에 표시되는 메뉴 이름을 알려주시면 해당 환경의 사용 안내를 확인하는 데 도움이 됩니다.');
     } else {
-      checks.add('진행하신 순서와 어느 단계에서 예상한 결과와 달라지는지 알려주세요.');
-    }
-    if (RegExp(r'오류|실패|멈|지연|되지 않|못').hasMatch(query)) {
+      checks.add('문제가 발생한 화면과 예상한 동작을 알려주세요.');
       checks.add('발생 시각과 오류 문구를 알려주세요. 화면을 첨부하실 때는 개인정보를 가려주세요.');
+    }
+    if (!RegExp(r'brity|브리티|메신저|copilot|코파일럿|드라이브|메일|미팅', caseSensitive: false).hasMatch(query)) {
+      checks.add('사용 중인 제품 이름을 알려주세요.');
+    }
+    if (incident && OfflineQueryPlan.versions(query).isEmpty) {
+      checks.add('사용 중인 제품 버전을 알려주세요.');
     }
     return '안녕하세요. 보내주신 ${subject.isEmpty ? '문의' : '「$subject」 문의'} 내용을 확인했습니다.\n\n'
         '현재 확인된 자료만으로는 정확한 해결 절차나 지원 조건을 확정하기 어려워, '

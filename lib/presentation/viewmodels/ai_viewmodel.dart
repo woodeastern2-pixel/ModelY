@@ -457,7 +457,7 @@ class AiViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final query = title.contains('·') ? '$title\n$content' : '$title $content';
+      final query = '$title\n$content';
       _answerQuery = query;
       await searchSimilarVocs(query, excludeVocId: excludeVocId);
       if (_error != null) return null;
@@ -499,6 +499,7 @@ class AiViewModel extends ChangeNotifier {
         if (!_localAnswers.needsWholeDataset(query)) {
           _isClarificationAnswer = true;
           _hasPartialAnswer = true;
+          _generatedEvidence = const [];
           _answerResult = AiAnswerResult(
             answer: _localAnswers.clarificationDraft(title, content),
             confidence: 0,
@@ -876,7 +877,7 @@ class AiViewModel extends ChangeNotifier {
     final candidates = entries.where((entry) =>
         (excludeVocId == null || entry.vocId != excludeVocId) &&
         (includeRegisteredQuestions || _localAnswers.isAnswerSource(entry)));
-    if (includeRegisteredQuestions || !query.split('\n').first.contains('·')) {
+    if (includeRegisteredQuestions || !query.contains('\n')) {
       return _localAnswers.rank(query, candidates,
           preferredVocIds: preferredVocIds);
     }

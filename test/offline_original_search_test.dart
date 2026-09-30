@@ -28,6 +28,62 @@ Future<Database> database() async {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(sqfliteFfiInit);
+  test('reported ordinary questions retrieve procedures and reject unrelated evidence', () async {
+    final db = await database();
+    addTearDown(db.close);
+    final store = OfflineSearchStore(db);
+    await store.initialize(maintenance: false);
+    final pack = await BundledManualService.load();
+    final batch = db.batch();
+    for (final row in [...BritySuiteManualSeed.entries, ...pack['entries'] as List]) {
+      batch.insert('knowledge_base', {'id': row['id'], 'question': row['question'],
+        'answer': row['answer'], 'category': '시스템매뉴얼',
+        'customer': row['sourceName'], 'project': row['project']});
+    }
+    await batch.commit(noResult: true);
+    await store.refresh();
+    final settings = SettingsViewModel(_EmptySettings());
+    final vm = AiViewModel(_IndexRepository(store), _NoVocScan(), settings);
+    addTearDown(vm.dispose);
+    addTearDown(settings.dispose);
+    final cases = [
+      ['회의실을 찾아서 예약하는 방법', '내일 오후에 프로젝터가 있는 빈 회의실을 찾아 예약하려고 합니다. 어디에서 어떻게 예약하면 되나요?'],
+      ['Copilot으로 답장 초안 작성', '받은 메일 내용을 바탕으로 정중한 답장 초안을 자동 작성하고 싶은데 어떻게 사용하나요?'],
+      ['메신저 아이디 중복', '메신저 아이디가 중복되는 현상이 발생하고 있습니다. 조치 방법 알려주세요.'],
+      ['카메라 필터 알림이 계속 뜹니다.', 'Zoom 회의 중 Brity Messenger에서 카메라를 켜거나 끌 때 카메라 필터 사용 기간이 만료되었다는 알림이 계속 뜹니다.'],
+    ];
+    final report = <Map<String, Object?>>[];
+    for (var i = 0; i < cases.length; i++) {
+      final item = cases[i];
+      final result = await vm.generateAnswer(item[0], item[1]);
+      expect(result, isNotNull);
+      expect(vm.error, isNull);
+      if (i < 2) {
+        expect(vm.isClarificationAnswer, isFalse, reason: item[0]);
+        expect(vm.answerEvidence, isNotEmpty);
+        expect(result!.answer, contains(i == 0 ? '예약' : '답장'));
+        expect(result.answer, isNot(contains('문제가 발생한 화면')));
+        if (i == 0) expect(result.answer, contains('클릭'));
+        if (i == 1) {
+          expect(vm.answerEvidence.every((r) => r.knowledgeBase.answer.contains('답장')), isTrue);
+          expect(vm.answerEvidence.any((r) => r.knowledgeBase.question.contains('회의록')), isFalse);
+        }
+      } else {
+        expect(vm.isClarificationAnswer, isTrue, reason: item[0]);
+        expect(vm.answerEvidence, isEmpty);
+        expect(result!.referencedCases, isEmpty);
+        expect(result.answer, contains(i == 2 ? '서로 다른 사용자' : '알림을 표시한 프로그램'));
+        expect(result.answer, isNot(contains('제품 이름을 알려주세요')));
+      }
+      report.add({'title': item[0], 'clarification': vm.isClarificationAnswer,
+        'answer': result!.answer, 'notes': result.notes,
+        'sources': vm.answerEvidence.map((r) => r.knowledgeBase.question).toList()});
+    }
+    final output = File('test/goldens/reported-question-audit.json');
+    await output.parent.create(recursive: true);
+    await output.writeAsString(const JsonEncoder.withIndent('  ').convert(report));
+  });
+
   test('all 1000 demo requests produce an offline draft without model calls', () async {
     final db = await database();
     addTearDown(db.close);

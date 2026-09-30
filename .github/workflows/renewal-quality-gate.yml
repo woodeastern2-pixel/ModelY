@@ -114,6 +114,7 @@ jobs:
             test/goldens/offline-search-performance.json
             test/goldens/knowledge-input-performance.json
             test/goldens/demo-offline-coverage.json
+            test/goldens/reported-question-audit.json
             test/failures/*.png
           if-no-files-found: error
 
