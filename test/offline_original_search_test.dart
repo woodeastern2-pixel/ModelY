@@ -63,7 +63,11 @@ void main() {
         expect(vm.answerEvidence, isNotEmpty);
         expect(result!.answer, contains(i == 0 ? '예약' : '답장'));
         expect(result.answer, isNot(contains('문제가 발생한 화면')));
-        if (i == 0) expect(result.answer, contains('클릭'));
+        if (i == 0) {
+          expect(result.answer, contains('클릭'));
+          expect(result.answer, contains('비품'));
+        }
+        expect(result.answer, isNot(contains('추가 확인이 필요한 항목: ${item[0]}')));
         if (i == 1) {
           expect(vm.answerEvidence.every((r) => r.knowledgeBase.answer.contains('답장')), isTrue);
           expect(vm.answerEvidence.any((r) => r.knowledgeBase.question.contains('회의록')), isFalse);
@@ -72,11 +76,11 @@ void main() {
         expect(vm.isClarificationAnswer, isTrue, reason: item[0]);
         expect(vm.answerEvidence, isEmpty);
         expect(result!.referencedCases, isEmpty);
-        expect(result.answer, contains(i == 2 ? '서로 다른 사용자' : '알림을 표시한 프로그램'));
+        expect(result.answer, contains(i == 2 ? '서로 다른 사용자' : '알림 창의 제목'));
         expect(result.answer, isNot(contains('제품 이름을 알려주세요')));
       }
       report.add({'title': item[0], 'clarification': vm.isClarificationAnswer,
-        'answer': result!.answer, 'notes': result.notes,
+        'answer': result.answer, 'notes': result.notes,
         'sources': vm.answerEvidence.map((r) => r.knowledgeBase.question).toList()});
     }
     final output = File('test/goldens/reported-question-audit.json');

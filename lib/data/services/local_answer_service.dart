@@ -98,7 +98,8 @@ class LocalAnswerService {
           .replaceAll('예약하는', '예약')
           .replaceAll(RegExp(r'초안\s*작성|계속\s*뜹니다'), ' ');
       return <String>{query, '$prefix$titleQuery'.trim(),
-        if (core.trim().isNotEmpty) '$prefix$core'.trim()}.toList();
+        if (core.trim().isNotEmpty) '$prefix$core'.trim(),
+        if (_needsRoomEquipment(query)) '회의실 비품'}.take(4).toList();
     }
     // A note report often combines a formatting request and a retention
     // question in long polite prose. Search each named feature independently.
@@ -161,7 +162,9 @@ class LocalAnswerService {
     final bodyText = ManualContent.parse(entry.answer).body;
     for (final feature in ['답장', '회의실', '카메라', '필터', '아이디', '중복']) {
       if (query.contains(feature) &&
-          !('${entry.question} $bodyText').contains(feature)) return false;
+          !('${entry.question} $bodyText').contains(feature)) {
+        return false;
+      }
     }
     final scope = _normalize('${entry.project ?? ''} ${entry.question}');
     for (final group in [_products, {'desktop', 'mobile'}]) {
@@ -250,8 +253,11 @@ class LocalAnswerService {
         !references.any((r) => hasNavigationLocation(query, r.knowledgeBase))) {
       gaps.add('요청하신 메뉴의 정확한 위치와 여는 경로는 찾은 자료에서 확인되지 않습니다.');
     }
-    if (plan.parts.length > 1) {
-      final missing = plan.parts.where((part) => !_partCovered(part, references)).toList();
+    final title = query.split('\n').first.trim();
+    final requestedParts = plan.parts.where((part) =>
+        !query.contains('\n') || part.trim() != title).toList();
+    if (requestedParts.length > 1) {
+      final missing = requestedParts.where((part) => !_partCovered(part, references)).toList();
       if (missing.isNotEmpty) {
         final topics = missing.where((part) => part.length <= 20 &&
             !RegExp(r'습니다|합니다|입니다|했|주세요|요청|[.!]').hasMatch(part))
@@ -267,6 +273,9 @@ class LocalAnswerService {
       if (!knownVersions.contains(version)) gaps.add('요청하신 버전 $version 에 적용되는지는 확인되지 않았습니다.');
     }
     final bodies = references.map((r) => ManualContent.parse(r.knowledgeBase.answer).body).join('\n');
+    if (_needsRoomEquipment(query) && !bodies.contains('비품')) {
+      gaps.add('회의실의 비품 확인 방법은 찾은 자료에서 확인되지 않았습니다.');
+    }
     if (OfflineQueryPlan.reportsDifficulty(plan.request) &&
         !RegExp(r'오류|실패|해결|조치|원인').hasMatch(bodies)) {
       gaps.add('동작하지 않는 원인은 자료만으로 확인되지 않습니다. 아래는 확인된 사용 절차와 권한 조건입니다.');
@@ -450,7 +459,7 @@ class LocalAnswerService {
           selected[matches.first.knowledgeBase.id] = matches.first;
         }
       }
-      if (selected.isNotEmpty) return selected.values.toList();
+      if (selected.isNotEmpty) return _withRoomEquipment(query, selected.values.toList(), usable);
     }
     final best = usable.first;
     final conflicting = usable.where((r) => _sourcesDisagree(best.knowledgeBase, r.knowledgeBase)).toList();
@@ -470,7 +479,21 @@ class LocalAnswerService {
           RegExp(r'제한|주의|조건|권한|restriction|caution|permission',
               caseSensitive: false).hasMatch(heading);
     });
-    return [best, ...supplements.take(2)];
+    return _withRoomEquipment(query, [best, ...supplements.take(2)], usable);
+  }
+
+  bool _needsRoomEquipment(String query) => query.contains('회의실') &&
+      RegExp(r'프로젝터|비품|장비').hasMatch(query);
+
+  List<SimilarVocResult> _withRoomEquipment(String query,
+      List<SimilarVocResult> selected, List<SimilarVocResult> usable) {
+    if (!_needsRoomEquipment(query)) return selected;
+    final extra = usable.where((r) =>
+        !selected.any((s) => s.knowledgeBase.id == r.knowledgeBase.id) &&
+        ManualContent.parse(r.knowledgeBase.answer).body.contains('비품') &&
+        r.knowledgeBase.answer.contains('회의실'));
+    if (selected.any((r) => r.knowledgeBase.answer.contains('비품'))) return selected;
+    return [...selected, ...extra.take(1)];
   }
 
   String answer(List<SimilarVocResult> references) => answerForQuery('', references);
@@ -484,8 +507,10 @@ class LocalAnswerService {
         RegExp(r'중복|만료|계속.*(?:뜨|뜹)|알림.*(?:계속|반복)').hasMatch(query);
     final checks = <String>[];
     if (query.contains('카메라') && query.contains('필터')) {
-      checks.add('알림을 표시한 프로그램 이름과 알림의 정확한 문구를 확인해 주세요. 화면을 보내실 때 개인정보는 가려주세요.');
-      checks.add('카메라를 켜거나 끌 때 어느 프로그램을 사용 중이었는지, 다른 프로그램에서도 같은 알림이 나타나는지 알려주세요.');
+      checks.add('알림 창의 제목과 프로그램 아이콘이 보이는 화면을 보내주세요. 개인정보는 가려주세요.');
+      checks.add(RegExp(r'zoom|줌', caseSensitive: false).hasMatch(query)
+          ? 'Zoom을 사용하지 않을 때에도 같은 알림이 나타나는지 알려주세요.'
+          : '다른 프로그램에서도 카메라를 사용할 때 같은 알림이 나타나는지 알려주세요.');
     } else if (query.contains('아이디') && query.contains('중복')) {
       checks.add('중복된 아이디가 보이는 위치가 로그인 화면인지, 사용자 검색·조직도인지 알려주세요.');
       checks.add('서로 다른 사용자가 같은 아이디로 표시되는지, 같은 사용자가 여러 번 표시되는지 알려주세요.');
