@@ -71,7 +71,7 @@ class AiViewModel extends ChangeNotifier {
   String _answerQuery = '';
   bool _hasPartialAnswer = false;
   List<SimilarVocResult>? _generatedEvidence;
-  bool get isAiAnswer => _generatedEvidence != null;
+  bool get isAiAnswer => _generatedEvidence != null && !_isClarificationAnswer;
   bool _isClarificationAnswer = false;
   bool get isClarificationAnswer => _isClarificationAnswer;
   bool get hasPartialAnswer => _hasPartialAnswer;
