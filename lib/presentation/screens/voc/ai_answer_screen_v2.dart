@@ -90,7 +90,7 @@ class _AiAnswerScreenState extends State<AiAnswerScreen> {
         vocId: widget.vocId,
         content: answer,
         confidence: aiVm.answerResult?.confidence,
-        referencedVocIds: aiVm.similarVocs
+        referencedVocIds: aiVm.answerEvidence
             .map((item) => item.knowledgeBase.vocId)
             .whereType<String>()
             .toList(),

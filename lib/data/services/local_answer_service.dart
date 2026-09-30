@@ -151,7 +151,11 @@ class LocalAnswerService {
       }.contains(t)).toList();
 
   bool focusedEvidence(String query, KnowledgeBaseEntity entry) {
-    final plan = OfflineQueryPlan.from(query);
+    final bodyQuery = query.split('\n').skip(1).join(' ').trim();
+    final explicitLocation = RegExp(r'(?:메뉴|버튼|패널).{0,15}어디|어느.{0,8}(?:메뉴|버튼|패널)')
+        .hasMatch(bodyQuery);
+    final navigationQuery = explicitLocation ? bodyQuery : query;
+    final plan = OfflineQueryPlan.from(navigationQuery);
     if (!versionCompatible(query, entry)) return false;
     // Shared words such as Copilot or draft do not establish feature relevance.
     final bodyText = ManualContent.parse(entry.answer).body;
@@ -167,7 +171,7 @@ class LocalAnswerService {
           !requested.any(known.contains)) return false;
     }
     if (!plan.navigation || plan.parts.length > 1) return true;
-    final targets = _navigationTargets(query);
+    final targets = _navigationTargets(navigationQuery);
     if (targets.isEmpty) return false;
     final parsed = ManualContent.parse(entry.answer);
     final body = _normalize('${parsed.body} ${parsed.transcription}');
@@ -422,7 +426,8 @@ class LocalAnswerService {
   }
 
   bool isAnswerSource(KnowledgeBaseEntity entry) =>
-      !entry.id.startsWith('registered-voc-') && entry.answer.trim().isNotEmpty;
+      !entry.id.startsWith('registered-voc-') && entry.answer.trim().isNotEmpty &&
+      !entry.answer.contains('현재 확인된 자료만으로는 정확한 해결 절차나 지원 조건을 확정하기 어려워');
 
   bool canAnswer(String query, List<SimilarVocResult> references) =>
       !needsWholeDataset(query) && references.any((item) =>

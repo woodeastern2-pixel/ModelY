@@ -22,6 +22,20 @@ void main() {
     createdAt: now,
   );
 
+  test('unrelated feature and saved clarification never become answer evidence', () {
+    final unrelated = KnowledgeBaseEntity(id: 'minutes',
+      question: 'Brity Copilot 회의록 초안', answer: '회의 내용을 기반으로 회의록 초안을 생성합니다.',
+      category: '시스템매뉴얼', resolvedAt: now, createdAt: now);
+    final refs = [SimilarVocResult(knowledgeBase: unrelated, similarityScore: 0.99)];
+    expect(service.canAnswer('Copilot으로 메일 답장 초안 작성', refs), isFalse);
+    expect(service.answerReferences(refs, query: 'Copilot으로 메일 답장 초안 작성'), isEmpty);
+    final saved = KnowledgeBaseEntity(id: 'saved', question: '카메라 필터 알림',
+      answer: service.clarificationDraft('카메라 필터 알림', '계속 뜹니다'),
+      category: '문의', resolvedAt: now, createdAt: now);
+    expect(service.isAnswerSource(saved), isFalse);
+    expect(service.focusedEvidence('진행권 부여 방법\n참석자 메뉴는 어디에 있나요?', meeting), isFalse);
+  });
+
   test('Korean alias retrieves an English titled manual without a model', () {
     final results = LocalAnswerService().rank(
       '미팅 접속 방법', [messenger, meeting]);
