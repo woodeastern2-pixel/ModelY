@@ -4,7 +4,9 @@ import '../../core/utils/voc_category_catalog.dart';
 import '../../domain/entities/voc_entity.dart';
 
 String analysisUrgencyLabel(String? value) {
-  if (value == null || value.trim().isEmpty) return '분석 전';
+  if (value == null || value.trim().isEmpty) {
+    return '분석 전';
+  }
   return switch (value.toLowerCase()) {
     'critical' => '매우 긴급',
     'high' => '높음',
@@ -30,7 +32,7 @@ class VocAnalysisMetrics extends StatelessWidget {
           voc.businessScore == null ? '분석 전' : (voc.isBusinessRelated ? '관련' : '비관련'),
           voc.businessScore,
           '문의 내용이 회사의 업무 또는 지원 대상 서비스와 관련되는지 분석한 결과입니다. '
-          '관련은 업무 문의로 보았다는 뜻이며, 비관련이어도 자동으로 반려되지는 않습니다.'),
+          '관련은 업무 문의로 보았다는 뜻입니다. 현재 앱은 비관련 분석 결과를 적용하면 문의 상태를 반려로 변경하므로 결과를 확인해 주세요.'),
       _Metric('category', '추천 문의 유형',
           voc.aiCategory == null ? '분석 전' : VocCategoryCatalog.displayName(voc.aiCategory),
           voc.categoryScore,
@@ -42,7 +44,7 @@ class VocAnalysisMetrics extends StatelessWidget {
           '실제 업무 영향과 회사 대응 기준을 함께 확인해 주세요.'),
       _Metric('department', '검토 부서', voc.department ?? '분석 전', voc.departmentScore,
           '문의 내용을 검토할 곳으로 분석에서 제안한 부서입니다. '
-          '실제 조직도나 담당 업무와 일치하는지 확인해야 하며, 이 표시만으로 부서에 자동 배정되지 않습니다.'),
+          '제안된 부서명은 분석 결과를 저장할 때 문의 정보에 반영됩니다. 실제 조직도와 담당 업무에 맞는지는 운영 담당자가 확인해 주세요.'),
       _Metric('duplicate', '중복 판단 점수',
           voc.duplicateScore == null ? '분석 전' : '${(voc.duplicateScore! * 100).toStringAsFixed(0)}%',
           null,
