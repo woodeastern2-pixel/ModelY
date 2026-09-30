@@ -43,8 +43,8 @@ class AiViewModel extends ChangeNotifier {
   final LocalAnswerService _localAnswers = LocalAnswerService();
 
   bool _aiConnected = false;
-  bool _connectionAttempted = false;
-  bool get hasAiConfiguration => _connectionAttempted ||
+  bool _aiWasConnected = false;
+  bool get hasAiConfiguration => _aiWasConnected ||
       _settingsViewModel.settings['ai_connection_configured'] == 'true' ||
       (_settingsViewModel.aiProvider != AppConstants.aiProviderOllama
           ? _aiService.isConfigured
@@ -80,11 +80,13 @@ class AiViewModel extends ChangeNotifier {
   List<SimilarVocResult> _suppliedEvidence = [];
   List<SimilarVocResult> get suppliedEvidence => _suppliedEvidence;
   bool _isAiAnswer = false;
+  bool _requestingAi = false;
+  bool get isRequestingAi => _requestingAi;
   bool get isAiAnswer => _isAiAnswer;
   String? _searchError;
   String? get searchError => _searchError;
   String get generationStatus => _isSearching ? '참고 자료를 검색하고 있습니다.'
-      : hasAiConfiguration ? 'AI에 답변 초안을 요청하고 있습니다.'
+      : _requestingAi ? 'AI에 답변 초안을 요청하고 있습니다.'
       : '저장된 자료로 답변 초안을 구성하고 있습니다.';
   bool _isClarificationAnswer = false;
   bool get isClarificationAnswer => _isClarificationAnswer;
@@ -465,6 +467,7 @@ class AiViewModel extends ChangeNotifier {
     if (_isGenerating || _isSearching) return null;
     final revision = _configurationRevision;
     final requestAi = !useLocal && hasAiConfiguration;
+    _requestingAi = requestAi;
     _isGenerating = true;
     _error = null;
     _answerResult = null;
@@ -571,7 +574,6 @@ class AiViewModel extends ChangeNotifier {
   }
 
   Future<String> testConnection() async {
-    _connectionAttempted = true;
     _configureServices();
     final revision = _configurationRevision;
     _checkingConnection = true;
@@ -587,6 +589,10 @@ class AiViewModel extends ChangeNotifier {
       if (_settingsViewModel.settings.isNotEmpty) {
         await _settingsViewModel.saveSetting('ai_connection_configured', 'true');
       }
+      if (_disposed || revision != _configurationRevision) {
+        throw StateError('연결 설정이 변경되었습니다. 다시 확인해 주세요.');
+      }
+      _aiWasConnected = true;
       _aiConnected = true;
       _error = null;
       _chatError = null;

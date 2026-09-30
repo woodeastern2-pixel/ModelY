@@ -84,6 +84,31 @@ void main() {
     expect(service.calls, 1);
   });
 
+  test('AI failure with usable sources stays an error; cited snapshot survives new search', () async {
+    final settings = SettingsViewModel(_SavedAiSettings());
+    await settings.loadSettings();
+    final repo = _SourceKnowledge();
+    final service = _DraftService()..failDraft = true;
+    final vm = AiViewModel(repo, _VocRepository([]), settings, aiService: service);
+    addTearDown(vm.dispose);
+    addTearDown(settings.dispose);
+    expect(await vm.generateAnswer('Brity Messenger 알림 설정', '알림 설정 방법'), isNull);
+    expect(vm.similarVocs, isNotEmpty);
+    expect(vm.hasAnswer, isFalse);
+    expect(vm.error, contains('AI 답변 요청에 실패'));
+    service.failDraft = false;
+    service.citeSources = true;
+    expect(await vm.generateAnswer('Brity Messenger 알림 설정', '알림 설정 방법'), isNotNull);
+    expect(vm.answerEvidence.single.knowledgeBase.id, 'stable-source');
+    final answer = vm.answerResult;
+    repo.empty = true;
+    await vm.searchSimilarVocs('다른 검색');
+    expect(vm.similarVocs, isEmpty);
+    expect(identical(vm.answerResult, answer), isTrue);
+    expect(vm.answerEvidence.single.knowledgeBase.id, 'stable-source');
+    expect(service.calls, 2);
+  });
+
   test('search failure does not block AI and remains visible separately', () async {
     final settings = SettingsViewModel(_SavedAiSettings());
     await settings.loadSettings();
@@ -266,13 +291,16 @@ class _ConnectionService extends AiService {
 class _DraftService extends _ConnectionService {
   int calls = 0;
   bool failDraft = false;
+  bool citeSources = false;
   @override
   Future<AiAnswerResult> generateReviewDraft(String title, String content,
       List<SimilarVocResult> references) async {
     calls++;
     if (failDraft) throw StateError('generation unavailable');
-    return const AiAnswerResult(answer: '쪽지 서식 보존과 보관 기간은 담당자 확인이 필요합니다.',
-        confidence: 0, referencedCases: [], notes: '연결된 AI 검토용 초안');
+    return AiAnswerResult(answer: '쪽지 서식 보존과 보관 기간은 담당자 확인이 필요합니다.',
+        confidence: 0, referencedCases: [],
+        referencedCaseIds: citeSources ? references.map((r) => r.knowledgeBase.id).toList() : [],
+        notes: '연결된 AI 검토용 초안');
   }
 }
 
@@ -299,4 +327,14 @@ class _PendingDraft extends _DraftService {
     started.complete();
     return response.future;
   }
+}
+
+class _SourceKnowledge extends _EmptyKnowledgeBaseRepository {
+  bool empty = false;
+  @override
+  Future<List<KnowledgeBaseEntity>> getAllEntries() async => empty ? [] : [
+    KnowledgeBaseEntity(id: 'stable-source', question: 'Brity Messenger 알림 설정',
+      answer: '설정에서 알림을 선택합니다.', category: '시스템매뉴얼',
+      resolvedAt: DateTime(2026), createdAt: DateTime(2026)),
+  ];
 }

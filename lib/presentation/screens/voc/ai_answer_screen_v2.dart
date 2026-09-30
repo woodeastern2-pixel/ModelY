@@ -203,6 +203,12 @@ class _AiAnswerScreenState extends State<AiAnswerScreen> {
                           actions: [
                             FilledButton.icon(
                               key: const Key('ai-answer-regenerate'),
+                              onPressed: vm.isSearching || vm.isGenerating ? null : _runPipeline,
+                              icon: const Icon(Icons.auto_awesome_outlined),
+                              label: const Text('답변 다시 생성'),
+                            ),
+                            FilledButton.icon(
+                              key: const Key('ai-answer-search'),
                               onPressed: vm.isSearching || vm.isGenerating
                                   ? null
                                   : _searchOnly,
@@ -447,7 +453,7 @@ class _AnswerWorkspace extends StatelessWidget {
       children: [
         _Panel(
           title: vm.isClarificationAnswer ? '추가 확인 안내'
-              : vm.isAiAnswer || (vm.isGenerating && vm.hasAiConfiguration)
+              : vm.isAiAnswer || (vm.isGenerating && vm.isRequestingAi)
                   ? 'AI 답변 초안' : '저장 자료 기반 답변 초안',
           subtitle: vm.isClarificationAnswer
               ? '해결 방법을 확인하지 못했습니다. 아래 안내는 복사할 수 있지만 해결 답변으로 승인하거나 지식 자료에 등록할 수 없습니다.'
@@ -552,13 +558,15 @@ class _AnswerWorkspace extends StatelessWidget {
               if (vm.isAiAnswer)
                 Text('AI에 제공한 자료 ${vm.suppliedEvidence.length}건'),
               for (final item in vm.answerEvidence)
-                ExpansionTile(title: Text(item.knowledgeBase.question),
-                  children: [_SelectedEvidence(item: item, status: '답변 인용 확인')]),
+                Material(color: Colors.transparent,
+                  child: ExpansionTile(title: Text(item.knowledgeBase.question),
+                    children: [_SelectedEvidence(item: item, status: '답변 인용 확인')])),
               for (final item in vm.suppliedEvidence.where((r) =>
                   !vm.answerEvidence.any((e) => e.knowledgeBase.id == r.knowledgeBase.id)))
-                ExpansionTile(title: Text(item.knowledgeBase.question),
-                  subtitle: const Text('AI에 제공 · 인용 미확인'),
-                  children: [_SelectedEvidence(item: item, status: 'AI에 제공 · 인용 미확인')]),
+                Material(color: Colors.transparent,
+                  child: ExpansionTile(title: Text(item.knowledgeBase.question),
+                    subtitle: const Text('AI에 제공 · 인용 미확인'),
+                    children: [_SelectedEvidence(item: item, status: 'AI에 제공 · 인용 미확인')])),
             ],
           ),
         ),
