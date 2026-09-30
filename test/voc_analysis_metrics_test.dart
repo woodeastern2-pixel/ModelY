@@ -31,7 +31,7 @@ void main() {
       padding: const EdgeInsets.all(24), child: Column(crossAxisAlignment: CrossAxisAlignment.start,
         children: [const Text('AI 분석 결과', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          const Text('각 항목의 ⓘ에 마우스를 올리거나 클릭하면 의미와 점수 해석을 확인할 수 있습니다.'),
+          const Text('각 항목의 도움말 아이콘에 마우스를 올리거나 클릭하면 의미와 점수 해석을 확인할 수 있습니다.'),
           const SizedBox(height: 18), VocAnalysisMetrics(voc: voc)],
       ),
     )),

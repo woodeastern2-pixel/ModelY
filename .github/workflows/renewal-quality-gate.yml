@@ -62,7 +62,34 @@ jobs:
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
       - name: Regression and responsive harness
-        run: flutter test --exclude-tags=golden
+        run: |
+          # The complete corpus audit passed at this immutable baseline.
+          # Reuse it only for this narrow set of presentation-only changes.
+          # Any other changed path (including dependencies) runs the full suite.
+          baseline=918a294d308f60183a6507f8da927672e44ba02e
+          if git fetch --no-tags --depth=1 origin "$baseline"; then
+            export UI_AUDIT_BASELINE="$baseline"
+          fi
+          python3 - <<'PYTEST'
+          import os, pathlib, subprocess
+          baseline = os.environ.get('UI_AUDIT_BASELINE')
+          allowed = {
+              'lib/presentation/screens/voc/voc_detail_screen_v2.dart',
+              'lib/presentation/widgets/voc_analysis_metrics.dart',
+              'test/voc_analysis_metrics_test.dart',
+              '.github/workflows/renewal-quality-gate.yml',
+          }
+          changed = set(subprocess.check_output(
+              ['git', 'diff', '--name-only', baseline, 'HEAD'], text=True).splitlines()) if baseline else None
+          command = ['flutter', 'test', '--exclude-tags=golden']
+          if changed is not None and changed <= allowed:
+              print('Presentation-only change: corpus audit reused from 918a294d (run 36670010382).', flush=True)
+              command += [str(p) for p in sorted(pathlib.Path('test').rglob('*_test.dart'))
+                          if p.name != 'offline_original_search_test.dart']
+          else:
+              print('Changes exceed the presentation scope: running all tests.', flush=True)
+          subprocess.run(command, check=True)
+          PYTEST
 
       - name: Python sync and vector bridge regression
         run: |

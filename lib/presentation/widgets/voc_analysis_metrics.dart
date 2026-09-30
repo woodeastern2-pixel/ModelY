@@ -84,6 +84,7 @@ class _MetricTile extends StatelessWidget {
 
   void _showHelp(BuildContext context) {
     showDialog<void>(context: context, builder: (context) => AlertDialog(
+      constraints: const BoxConstraints(maxWidth: 560),
       title: Text('${metric.label} 안내'),
       scrollable: true,
       content: Text(metric.explanation, style: const TextStyle(height: 1.6)),
