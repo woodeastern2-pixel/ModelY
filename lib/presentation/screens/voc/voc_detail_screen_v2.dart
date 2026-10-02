@@ -13,6 +13,7 @@ import '../../viewmodels/jira_viewmodel.dart';
 import '../../viewmodels/settings_viewmodel.dart';
 import '../../viewmodels/voc_viewmodel.dart';
 import '../../widgets/priority_chip.dart';
+import '../../widgets/voc_analysis_metrics.dart';
 import '../../widgets/voc_status_chip.dart';
 import '../../widgets/workspace_ui.dart';
 import 'ai_answer_screen.dart';
@@ -482,22 +483,14 @@ class _VocSummaryCard extends StatelessWidget {
               VocCategoryCatalog.displayName(voc.aiCategory),
             ),
           if (voc.urgency != null)
-            _MetaRow(Icons.priority_high_outlined, '긴급도', voc.urgency!),
+            _MetaRow(Icons.priority_high_outlined, '긴급도', analysisUrgencyLabel(voc.urgency)),
           if (voc.department != null)
-            _MetaRow(Icons.apartment_outlined, '담당 부서', voc.department!),
-          if (voc.assignee != null)
-            _MetaRow(Icons.badge_outlined, '추천 담당자', voc.assignee!),
+            _MetaRow(Icons.apartment_outlined, '검토 부서', voc.department!),
           if (voc.duplicateScore != null)
             _MetaRow(
               Icons.copy_all_outlined,
               '중복 가능성',
               '${(voc.duplicateScore! * 100).toStringAsFixed(0)}%',
-            ),
-          if (voc.jiraScore != null)
-            _MetaRow(
-              Icons.bug_report_outlined,
-              'Jira 등록',
-              voc.jiraRequired ? '필요' : '필요 없음',
             ),
         ],
       ),
@@ -583,42 +576,10 @@ class _IntelligencePanelState extends State<_IntelligencePanel> {
   @override
   Widget build(BuildContext context) {
     final voc = widget.voc;
-    final metrics = [
-      _MetricData(
-        '업무 관련성',
-        voc.businessScore == null
-            ? '분석 전'
-            : (voc.isBusinessRelated ? '관련' : '비관련'),
-        voc.businessScore,
-      ),
-      _MetricData(
-        '추천 유형',
-        voc.aiCategory == null
-            ? '분석 전'
-            : VocCategoryCatalog.displayName(voc.aiCategory),
-        voc.categoryScore,
-      ),
-      _MetricData('긴급도', voc.urgency ?? '분석 전', voc.urgencyScore),
-      _MetricData('담당 부서', voc.department ?? '분석 전', voc.departmentScore),
-      _MetricData('추천 담당자', voc.assignee ?? '분석 전', voc.assigneeScore),
-      _MetricData(
-        '중복 가능성',
-        voc.duplicateScore == null
-            ? '분석 전'
-            : '${(voc.duplicateScore! * 100).toStringAsFixed(0)}%',
-        voc.duplicateScore,
-      ),
-      _MetricData(
-        'Jira 등록',
-        voc.jiraScore == null ? '분석 전' : (voc.jiraRequired ? '필요' : '필요 없음'),
-        voc.jiraScore,
-      ),
-    ];
-
     return _Panel(
       title: 'AI 분석 결과',
       icon: Icons.analytics_outlined,
-      subtitle: 'AI가 분석한 유형, 긴급도, 담당자와 각 항목의 신뢰도를 확인하세요.',
+      subtitle: '각 항목의 도움말 아이콘에 마우스를 올리거나 클릭하면 의미와 점수 해석을 확인할 수 있습니다.',
       trailing: OutlinedButton.icon(
         onPressed: _running ? null : _run,
         icon: _running
@@ -633,83 +594,11 @@ class _IntelligencePanelState extends State<_IntelligencePanel> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final columns = widget.desktop
-                  ? (constraints.maxWidth > 1200 ? 4 : 3)
-                  : 2;
-              const gap = 10.0;
-              final width =
-                  (constraints.maxWidth - gap * (columns - 1)) / columns;
-              return Wrap(
-                spacing: gap,
-                runSpacing: gap,
-                children: metrics
-                    .map(
-                      (item) => SizedBox(
-                        width: width,
-                        child: _MetricTile(data: item),
-                      ),
-                    )
-                    .toList(),
-              );
-            },
-          ),
+          VocAnalysisMetrics(voc: voc),
           if (voc.analysisReason?.trim().isNotEmpty == true) ...[
             const SizedBox(height: 12),
             _ReasonBox(text: voc.analysisReason!),
           ],
-        ],
-      ),
-    );
-  }
-}
-
-class _MetricData {
-  const _MetricData(this.label, this.value, this.confidence);
-  final String label;
-  final String value;
-  final double? confidence;
-}
-
-class _MetricTile extends StatelessWidget {
-  const _MetricTile({required this.data});
-  final _MetricData data;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final confidence = data.confidence == null
-        ? '아직 분석하지 않음'
-        : '신뢰도 ${(data.confidence! * 100).toStringAsFixed(0)}%';
-    return Container(
-      padding: const EdgeInsets.all(13),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(13),
-        border: Border.all(color: cs.outlineVariant),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            data.label,
-            style: Theme.of(context).textTheme.labelMedium
-                ?.copyWith(color: cs.onSurfaceVariant),
-          ),
-          const SizedBox(height: 5),
-          Text(
-            data.value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            confidence,
-            style: Theme.of(context).textTheme.bodySmall
-                ?.copyWith(color: cs.onSurfaceVariant),
-          ),
         ],
       ),
     );
@@ -1335,3 +1224,4 @@ class _MetaRow extends StatelessWidget {
 String _formatDate(DateTime dt) =>
     '${dt.year}.${dt.month.toString().padLeft(2, '0')}.${dt.day.toString().padLeft(2, '0')} '
     '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+

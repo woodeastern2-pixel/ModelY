@@ -249,8 +249,15 @@ class SettingsViewModel extends ChangeNotifier {
   }
 
   Future<void> saveSettings(Map<String, String> newSettings) async {
-    await _repository.setMultiple(newSettings);
-    _settings.addAll(newSettings);
+    final values = Map<String, String>.from(newSettings);
+    if ([AppConstants.settingAiProvider, AppConstants.settingOllamaUrl,
+        AppConstants.settingOllamaModel, AppConstants.settingOpenAiKey,
+        AppConstants.settingGeminiKey, AppConstants.settingClaudeKey]
+        .any(values.containsKey)) {
+      values['ai_connection_configured'] = 'true';
+    }
+    await _repository.setMultiple(values);
+    _settings.addAll(values);
     notifyListeners();
   }
 
@@ -269,3 +276,4 @@ class SettingsViewModel extends ChangeNotifier {
     await saveSetting(AppConstants.settingCustomCategories, next.join(','));
   }
 }
+

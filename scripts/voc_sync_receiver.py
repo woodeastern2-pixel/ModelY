@@ -4,7 +4,8 @@ import argparse
 import json
 import os
 import sqlite3
-import uuid
+import threading
+from functools import wraps
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
@@ -30,6 +31,8 @@ class VocPayload(BaseModel):
     status: str = "OPEN"
     business_type: Optional[str] = None
     urgency: Optional[str] = None
+    source_ref: Optional[str] = None
+    source: Optional[str] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
 
@@ -246,6 +249,48 @@ def _require_auth(authorization: Optional[str], bearer_token: Optional[str]) -> 
         raise HTTPException(status_code=401, detail="invalid bearer token")
 
 
+def _serialized(lock, conn):
+    def decorate(function):
+        @wraps(function)
+        def wrapped(*args, **kwargs):
+            with lock:
+                try:
+                    return function(*args, **kwargs)
+                except Exception:
+                    conn.rollback()
+                    raise
+        return wrapped
+    return decorate
+
+
+def _resolve_voc(conn, row, source_app):
+    source_ref = (row.get("source_ref") if str(row.get("source") or "").startswith("peer-") else None) or f"{source_app}:{row['id']}"
+    exists = conn.execute(
+        "SELECT id FROM vocs WHERE id = ? OR source_ref = ? LIMIT 1",
+        (row["id"], source_ref),
+    ).fetchone()
+    if exists:
+        return exists["id"]
+    if conn.execute("SELECT name FROM sqlite_master WHERE name='voc_identity_aliases'").fetchone():
+        alias = conn.execute(
+            "SELECT a.voc_id FROM voc_identity_aliases a JOIN vocs v ON v.id=a.voc_id "
+            "WHERE a.identity_key IN (?, ?) LIMIT 1",
+            (f"id:{row['id']}", f"peer:{source_ref}"),
+        ).fetchone()
+        if alias:
+            return alias["voc_id"]
+    if row.get("created_at"):
+        same = conn.execute(
+            "SELECT id FROM vocs WHERE title=? AND content=? AND customer=? "
+            "AND project=? AND created_at=? LIMIT 1",
+            (row.get("title"), row.get("content"), row.get("customer", "미입력"),
+             row.get("project", "미입력"), row["created_at"]),
+        ).fetchone()
+        if same:
+            return same["id"]
+    return row["id"]
+
+
 def create_app(
     db_path: Path,
     bearer_token: Optional[str] = None,
@@ -253,8 +298,10 @@ def create_app(
 ) -> FastAPI:
     app = FastAPI(title="AI VOC Sync Receiver")
     conn = _connect(db_path)
+    lock = threading.RLock()
 
     @app.get("/health")
+    @_serialized(lock, conn)
     def health() -> dict:
         row = conn.execute("SELECT COUNT(*) AS cnt FROM vocs").fetchone()
         return {
@@ -264,6 +311,7 @@ def create_app(
         }
 
     @app.post("/webhook/voc")
+    @_serialized(lock, conn)
     def receive_voc(
         event: VocCreatedEvent,
         authorization: Optional[str] = Header(default=None),
@@ -272,23 +320,19 @@ def create_app(
             raise HTTPException(status_code=400, detail="unsupported event")
         _require_auth(authorization, bearer_token)
 
-        source_ref = f"{event.source_app}:{event.voc.id}"
-        exists = conn.execute(
-            "SELECT id FROM vocs WHERE source = ? AND source_ref = ? LIMIT 1",
-            ("peer-sync", source_ref),
-        ).fetchone()
+        source_ref = (event.voc.source_ref if (event.voc.source or "").startswith("peer-") else None) or f"{event.source_app}:{event.voc.id}"
+        conn.execute("BEGIN IMMEDIATE")
+        row = event.voc.model_dump()
+        new_id = _resolve_voc(conn, row, event.source_app)
+        exists = conn.execute("SELECT id FROM vocs WHERE id=?", (new_id,)).fetchone()
         if exists:
-            return {
-                "ok": True,
-                "action": "duplicate",
-                "id": exists["id"],
-                "source_ref": source_ref,
-            }
+            conn.commit()
+            return {"ok": True, "action": "duplicate", "id": new_id,
+                    "source_ref": source_ref}
 
         now = _now_iso()
         created_at = event.voc.created_at or now
-        updated_at = event.voc.updated_at or now
-        new_id = str(uuid.uuid4())
+        updated_at = event.voc.updated_at or created_at
 
         conn.execute(
             """
@@ -342,6 +386,7 @@ def create_app(
         }
 
     @app.post("/webhook/sync/full")
+    @_serialized(lock, conn)
     def receive_full_sync(
         event: FullSyncEvent,
         authorization: Optional[str] = Header(default=None),
@@ -479,14 +524,32 @@ def create_app(
         }
 
         try:
-            conn.execute("BEGIN")
-            voc_count = _insert_or_replace(
-                conn,
-                "vocs",
-                voc_columns,
-                event.snapshot.vocs,
-                voc_defaults,
-            )
+            conn.execute("BEGIN IMMEDIATE")
+            voc_count = 0
+            id_map = {}
+            for incoming in event.snapshot.vocs:
+                if not incoming.get("id"):
+                    continue
+                row = dict(incoming)
+                canonical = _resolve_voc(conn, row, event.source_app)
+                id_map[row["id"]] = canonical
+                row["id"] = canonical
+                row["source_ref"] = (row.get("source_ref") if str(row.get("source") or "").startswith("peer-") else None) or f"{event.source_app}:{incoming['id']}"
+                row["source"] = row.get("source") or "peer-sync-full"
+                old = conn.execute("SELECT * FROM vocs WHERE id=?", (canonical,)).fetchone()
+                if old:
+                    if not row.get("updated_at") or row["updated_at"] <= old["updated_at"]:
+                        continue
+                    values = {k: row[k] for k in voc_columns
+                              if k not in ("id", "created_at", "source", "source_ref")
+                              and row.get(k) is not None}
+                    if values:
+                        assignments = ",".join(f"{key}=?" for key in values)
+                        conn.execute(f"UPDATE vocs SET {assignments} WHERE id=?",
+                                     (*values.values(), canonical))
+                        voc_count += 1
+                else:
+                    voc_count += _insert_or_replace(conn, "vocs", voc_columns, [row], voc_defaults)
 
             # voc_id 또는 id가 없는 응답은 무시
             valid_responses = [
@@ -494,6 +557,8 @@ def create_app(
                 for r in event.snapshot.responses
                 if (r.get("id") is not None and r.get("voc_id") is not None)
             ]
+            valid_responses = [dict(r, voc_id=id_map.get(r["voc_id"], r["voc_id"]))
+                               for r in valid_responses]
             response_count = _insert_or_replace(
                 conn,
                 "responses",
@@ -508,6 +573,8 @@ def create_app(
                 for m in event.snapshot.manuals
                 if (m.get("id") is not None and m.get("question") and m.get("answer"))
             ]
+            valid_manuals = [dict(m, voc_id=id_map.get(m.get("voc_id"), m.get("voc_id")))
+                             for m in valid_manuals]
             manual_count = _insert_or_replace(
                 conn,
                 "knowledge_base",

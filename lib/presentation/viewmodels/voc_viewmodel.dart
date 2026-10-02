@@ -17,6 +17,20 @@ class VocViewModel extends ChangeNotifier {
   VocEntity? _selectedVoc;
   List<ResponseEntity> _responses = [];
   bool _isLoading = false;
+  int _loadGeneration = 0;
+  bool _disposed = false;
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _loadGeneration++;
+    super.dispose();
+  }
+
+  @override
+  void notifyListeners() {
+    if (!_disposed) super.notifyListeners();
+  }
   String? _error;
   String _searchQuery = '';
   String _filterStatus = '';
@@ -79,23 +93,32 @@ class VocViewModel extends ChangeNotifier {
   }
 
   Future<void> loadVocs() async {
+    final generation = ++_loadGeneration;
     _isLoading = true;
     _error = null;
     notifyListeners();
     try {
-      _vocs = await _repository.getAllVocs();
+      final rows = await _repository.getAllVocs();
+      if (generation != _loadGeneration || _disposed) return;
+      _vocs = {for (final row in rows) row.id: row}.values.toList();
     } catch (e) {
-      _error = e.toString();
+      if (generation == _loadGeneration) _error = e.toString();
     } finally {
-      _isLoading = false;
-      notifyListeners();
+      if (generation == _loadGeneration) {
+        _isLoading = false;
+        notifyListeners();
+      }
     }
   }
 
   Future<void> selectVoc(String id) async {
-    _selectedVoc =
-        _vocs.firstWhere((v) => v.id == id, orElse: () => _vocs.first);
-    await loadResponsesForVoc(id);
+    _selectedVoc = await _repository.getVocById(id);
+    if (_selectedVoc == null) {
+      _responses = [];
+      notifyListeners();
+      return;
+    }
+    await loadResponsesForVoc(_selectedVoc!.id);
     notifyListeners();
   }
 
@@ -183,7 +206,9 @@ class VocViewModel extends ChangeNotifier {
       updatedAt: now,
     );
     final created = await _repository.createVoc(voc);
-    _vocs.insert(0, created);
+    _loadGeneration++;
+    _isLoading = false;
+    _vocs = [created, ..._vocs.where((item) => item.id != created.id)];
     notifyListeners();
     return created;
   }

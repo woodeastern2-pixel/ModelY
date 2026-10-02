@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:ai_voc_assistant/core/constants/app_constants.dart';
 import 'package:ai_voc_assistant/data/services/ai_service.dart';
 import 'package:ai_voc_assistant/domain/entities/knowledge_base_entity.dart';
 import 'package:ai_voc_assistant/domain/entities/voc_entity.dart';
@@ -10,6 +12,180 @@ import 'package:ai_voc_assistant/presentation/viewmodels/settings_viewmodel.dart
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('unanswered requests are context only, never offline answers', () async {
+    final now = DateTime(2026, 9, 28);
+    final voc = VocEntity(id: 'question-only', title: '진행권 부여 방법',
+      content: '참석자 메뉴는 어디에 있나요?', category: '문의',
+      customer: '고객', project: '미팅', priority: 'NORMAL', status: 'OPEN',
+      createdAt: now, updatedAt: now);
+    final settings = SettingsViewModel(_EmptySettingsRepository());
+    final vm = AiViewModel(_EmptyKnowledgeBaseRepository(), _VocRepository([voc]), settings);
+    addTearDown(vm.dispose);
+    addTearDown(settings.dispose);
+    expect(await vm.searchSimilarVocs('진행권 부여 방법'), isEmpty);
+    final draft = await vm.generateAnswer(voc.title, voc.content);
+    expect(draft, isNotNull);
+    expect(vm.isClarificationAnswer, isTrue);
+    expect(draft!.referencedCases, isEmpty);
+    expect(draft.confidence, 0);
+    expect(draft.answer, isNot(contains('등록된 VOC 상태')));
+    expect(vm.error, isNull);
+    expect(await vm.resolveChatReferences('진행권 부여 방법'), hasLength(1));
+  });
+
+  test('connected answer screen invokes AI even without answer evidence', () async {
+    final settings = SettingsViewModel(_EmptySettingsRepository());
+    final service = _DraftService();
+    final vm = AiViewModel(_EmptyKnowledgeBaseRepository(), _VocRepository([]), settings,
+        aiService: service);
+    addTearDown(vm.dispose);
+    addTearDown(settings.dispose);
+    expect(await vm.checkCopilotConnection(), isTrue);
+    final result = await vm.generateAnswer('쪽지 서식 복사', '쪽지 보관 기간도 궁금합니다.');
+    expect(service.calls, 1);
+    expect(result, isNotNull);
+    expect(vm.hasAnswer, isTrue);
+    expect(vm.error, isNull);
+    expect(vm.hasPartialAnswer, isTrue);
+    expect(vm.answerEvidence, isEmpty);
+    expect(result!.answer, contains('보관 기간'));
+  });
+
+  test('failed answer request is distinguished from insufficient sources', () async {
+    final settings = SettingsViewModel(_EmptySettingsRepository());
+    final service = _DraftService()..failDraft = true;
+    final vm = AiViewModel(_EmptyKnowledgeBaseRepository(), _VocRepository([]), settings,
+        aiService: service);
+    addTearDown(vm.dispose);
+    addTearDown(settings.dispose);
+    await vm.checkCopilotConnection();
+    expect(await vm.generateAnswer('쪽지 서식', '보관 기간'), isNull);
+    expect(service.calls, 1);
+    expect(vm.error, contains('AI 답변 요청에 실패'));
+    expect(vm.isAiConnected, isFalse);
+    expect(vm.isGenerating, isFalse);
+    service.failDraft = false;
+    expect(await vm.generateAnswer('쪽지 서식', '보관 기간'), isNotNull);
+    expect(service.calls, 2);
+    expect(vm.isAiConnected, isTrue);
+    expect(vm.isAiAnswer, isTrue);
+  });
+
+  test('saved AI configuration invokes model after restart without connection test', () async {
+    final settings = SettingsViewModel(_SavedAiSettings());
+    final service = _DraftService();
+    final vm = AiViewModel(_EmptyKnowledgeBaseRepository(), _VocRepository([]), settings,
+        aiService: service);
+    addTearDown(vm.dispose);
+    addTearDown(settings.dispose);
+    await settings.loadSettings();
+    expect(await vm.generateAnswer('쪽지 서식', '보관 기간'), isNotNull);
+    expect(vm.isAiAnswer, isTrue);
+    expect(service.calls, 1);
+  });
+
+  test('AI failure with usable sources stays an error; cited snapshot survives new search', () async {
+    final settings = SettingsViewModel(_SavedAiSettings());
+    await settings.loadSettings();
+    final repo = _SourceKnowledge();
+    final service = _DraftService()..failDraft = true;
+    final vm = AiViewModel(repo, _VocRepository([]), settings, aiService: service);
+    addTearDown(vm.dispose);
+    addTearDown(settings.dispose);
+    expect(await vm.generateAnswer('Brity Messenger 알림 설정', '알림 설정 방법'), isNull);
+    expect(vm.similarVocs, isNotEmpty);
+    expect(vm.hasAnswer, isFalse);
+    expect(vm.error, contains('AI 답변 요청에 실패'));
+    service.failDraft = false;
+    service.citeSources = true;
+    expect(await vm.generateAnswer('Brity Messenger 알림 설정', '알림 설정 방법'), isNotNull);
+    expect(vm.answerEvidence.single.knowledgeBase.id, 'stable-source');
+    final answer = vm.answerResult;
+    repo.empty = true;
+    await vm.searchSimilarVocs('다른 검색');
+    expect(vm.similarVocs, isEmpty);
+    expect(identical(vm.answerResult, answer), isTrue);
+    expect(vm.answerEvidence.single.knowledgeBase.id, 'stable-source');
+    expect(service.calls, 2);
+  });
+
+  test('search failure does not block AI and remains visible separately', () async {
+    final settings = SettingsViewModel(_SavedAiSettings());
+    await settings.loadSettings();
+    final service = _DraftService();
+    final vm = AiViewModel(_BrokenKnowledge(), _VocRepository([]), settings, aiService: service);
+    addTearDown(vm.dispose);
+    addTearDown(settings.dispose);
+    expect(await vm.generateAnswer('쪽지 서식', '보관 기간'), isNotNull);
+    expect(service.calls, 1);
+    expect(vm.error, isNull);
+    expect(vm.searchError, isNotNull);
+    final answer = vm.answerResult;
+    await vm.searchSimilarVocs('다시 검색');
+    expect(identical(vm.answerResult, answer), isTrue);
+    expect(service.calls, 1);
+  });
+
+  test('explicit local draft never invokes saved AI', () async {
+    final settings = SettingsViewModel(_SavedAiSettings());
+    await settings.loadSettings();
+    final service = _DraftService();
+    final vm = AiViewModel(_EmptyKnowledgeBaseRepository(), _VocRepository([]), settings, aiService: service);
+    addTearDown(vm.dispose);
+    addTearDown(settings.dispose);
+    expect(await vm.generateAnswer('쪽지 서식', '보관 기간', useLocal: true), isNotNull);
+    expect(service.calls, 0);
+    expect(vm.isAiAnswer, isFalse);
+  });
+
+  test('late provider response is discarded after configuration change', () async {
+    final repo = _SavedAiSettings();
+    final settings = SettingsViewModel(repo);
+    await settings.loadSettings();
+    final service = _PendingDraft();
+    final vm = AiViewModel(_EmptyKnowledgeBaseRepository(), _VocRepository([]), settings, aiService: service);
+    addTearDown(vm.dispose);
+    addTearDown(settings.dispose);
+    final pending = vm.generateAnswer('쪽지 서식', '보관 기간');
+    await service.started.future;
+    repo.model = 'changed-model';
+    await settings.loadSettings();
+    service.response.complete(const AiAnswerResult(answer: 'old answer', confidence: 0,
+        referencedCases: [], notes: ''));
+    expect(await pending, isNull);
+    expect(vm.hasAnswer, isFalse);
+    expect(vm.error, contains('설정이 변경'));
+  });
+
+  test('configured but unreachable AI cannot create a copilot answer', () async {
+    final settings = SettingsViewModel(_EmptySettingsRepository());
+    final vm = AiViewModel(_EmptyKnowledgeBaseRepository(), _VocRepository([]), settings,
+        aiService: _ConnectionService(fail: true));
+    addTearDown(vm.dispose);
+    addTearDown(settings.dispose);
+    expect(await vm.checkCopilotConnection(), isFalse);
+    expect(await vm.sendChatMessage('로그인 오류 해결 방법'), isNull);
+    expect(vm.chatMessages, isEmpty);
+    expect(vm.isAiConnected, isFalse);
+    expect(vm.chatError, AiViewModel.copilotUnavailable);
+    expect(vm.isChatting, isFalse);
+  });
+
+  test('copilot readiness requires a nonempty live response', () async {
+    final settings = SettingsViewModel(_EmptySettingsRepository());
+    final service = _ConnectionService();
+    final vm = AiViewModel(_EmptyKnowledgeBaseRepository(), _VocRepository([]), settings,
+        aiService: service);
+    addTearDown(vm.dispose);
+    addTearDown(settings.dispose);
+    expect(vm.isAiConnected, isFalse);
+    expect(await vm.checkCopilotConnection(), isTrue);
+    expect(vm.isAiConnected, isTrue);
+    service.empty = true;
+    expect(await vm.checkCopilotConnection(), isFalse);
+    expect(vm.isAiConnected, isFalse);
+  });
+
   test(
     'AI Chat includes a matching registered VOC without a saved answer',
     () async {
@@ -95,4 +271,70 @@ class _EmptySettingsRepository implements SettingsRepository {
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+
+class _ConnectionService extends AiService {
+  _ConnectionService({this.fail = false});
+  bool fail;
+  bool empty = false;
+  @override
+  bool get isConfigured => true;
+  @override
+  Future<String> testConnection() async {
+    if (fail) throw StateError('offline');
+    return empty ? '' : 'connected';
+  }
+}
+
+
+class _DraftService extends _ConnectionService {
+  int calls = 0;
+  bool failDraft = false;
+  bool citeSources = false;
+  @override
+  Future<AiAnswerResult> generateReviewDraft(String title, String content,
+      List<SimilarVocResult> references) async {
+    calls++;
+    if (failDraft) throw StateError('generation unavailable');
+    return AiAnswerResult(answer: '쪽지 서식 보존과 보관 기간은 담당자 확인이 필요합니다.',
+        confidence: 0, referencedCases: [],
+        referencedCaseIds: citeSources ? references.map((r) => r.knowledgeBase.id).toList() : [],
+        notes: '연결된 AI 검토용 초안');
+  }
+}
+
+class _SavedAiSettings extends _EmptySettingsRepository {
+  String model = 'configured-model';
+  @override
+  Future<Map<String, String>> getAllSettings() async => {
+    AppConstants.settingAiProvider: AppConstants.aiProviderOllama,
+    AppConstants.settingOllamaModel: model,
+  };
+}
+
+class _BrokenKnowledge extends _EmptyKnowledgeBaseRepository {
+  @override
+  Future<List<KnowledgeBaseEntity>> getAllEntries() async => throw StateError('search unavailable');
+}
+
+class _PendingDraft extends _DraftService {
+  final started = Completer<void>();
+  final response = Completer<AiAnswerResult>();
+  @override
+  Future<AiAnswerResult> generateReviewDraft(String title, String content,
+      List<SimilarVocResult> references) {
+    started.complete();
+    return response.future;
+  }
+}
+
+class _SourceKnowledge extends _EmptyKnowledgeBaseRepository {
+  bool empty = false;
+  @override
+  Future<List<KnowledgeBaseEntity>> getAllEntries() async => empty ? [] : [
+    KnowledgeBaseEntity(id: 'stable-source', question: 'Brity Messenger 알림 설정',
+      answer: '설정에서 알림을 선택합니다.', category: '시스템매뉴얼',
+      resolvedAt: DateTime(2026), createdAt: DateTime(2026)),
+  ];
 }

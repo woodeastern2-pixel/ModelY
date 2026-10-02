@@ -7,7 +7,7 @@ import 'package:sqflite/sqflite.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/database/database_helper.dart';
-import '../../core/utils/voc_category_catalog.dart';
+import 'voc_identity_store.dart';
 import '../../domain/repositories/settings_repository.dart';
 
 class InAppSyncReceiverService {
@@ -311,75 +311,23 @@ class InAppSyncReceiverService {
         : <String, dynamic>{};
     final sourceApp = payload['source_app']?.toString() ?? 'unknown-app';
 
-    final now = DateTime.now().toIso8601String();
-    final sourceRef = '$sourceApp:${voc['id'] ?? ''}';
     final db = await DatabaseHelper.instance.database;
-
-    final exists = await db.query(
-      AppConstants.tableVocs,
-      columns: ['id'],
-      where: 'source = ? AND source_ref = ?',
-      whereArgs: ['peer-sync', sourceRef],
-      limit: 1,
-    );
-
-    if (exists.isNotEmpty) {
-      await _writeJson(
-        request.response,
-        HttpStatus.ok,
-        {
-          'ok': true,
-          'action': 'duplicate',
-          'id': exists.first['id'],
-          'source_ref': sourceRef,
-        },
-      );
+    final result = await db.transaction((txn) => VocIdentityStore.save(
+        txn, VocIdentityStore.remoteRow(voc, sourceApp), peerApp: sourceApp));
+    final id = result.id;
+    final sourceRef = result.row['source_ref'];
+    if (!result.created && !result.updated) {
+      await _writeJson(request.response, HttpStatus.ok, {
+        'ok': true, 'action': 'duplicate', 'id': id, 'source_ref': sourceRef,
+      });
       return;
     }
-
-    final id = DateTime.now().microsecondsSinceEpoch.toString();
-    final normalizedCategory = VocCategoryCatalog.normalize(
-      voc['category']?.toString(),
-      title: voc['title']?.toString(),
-      content: voc['content']?.toString(),
-      aiCategory: voc['ai_category']?.toString(),
-      tags: voc['tags']?.toString(),
-    );
-    await db.insert(AppConstants.tableVocs, {
-      'id': id,
-      'title': (voc['title']?.toString().trim().isNotEmpty == true)
-          ? voc['title'].toString().trim()
-          : '제목없음',
-      'content': (voc['content']?.toString().trim().isNotEmpty == true)
-          ? voc['content'].toString().trim()
-          : '내용 없음',
-      'category': normalizedCategory,
-      'tags': voc['tags']?.toString(),
-      'customer': (voc['customer']?.toString().trim().isNotEmpty == true)
-          ? voc['customer'].toString().trim()
-          : '미입력',
-      'project': (voc['project']?.toString().trim().isNotEmpty == true)
-          ? voc['project'].toString().trim()
-          : '미입력',
-      'priority': (voc['priority']?.toString().trim().isNotEmpty == true)
-          ? voc['priority'].toString().trim()
-          : 'MEDIUM',
-      'status': (voc['status']?.toString().trim().isNotEmpty == true)
-          ? voc['status'].toString().trim()
-          : 'OPEN',
-      'urgency': voc['urgency']?.toString(),
-      'business_type': voc['business_type']?.toString(),
-      'source': 'peer-sync',
-      'source_ref': sourceRef,
-      'created_at': voc['created_at']?.toString() ?? now,
-      'updated_at': voc['updated_at']?.toString() ?? now,
-    });
 
     await _logEvent(
       eventType: 'voc.created',
       sourceApp: sourceApp,
       syncMode: 'upsert',
-      status: 'created',
+      status: result.created ? 'created' : 'updated',
       endpoint: '/webhook/voc',
       message: 'VOC 단건 동기화 수신',
       counts: const {'vocs': 1, 'responses': 0, 'manuals': 0},
@@ -390,7 +338,7 @@ class InAppSyncReceiverService {
       HttpStatus.ok,
       {
         'ok': true,
-        'action': 'created',
+        'action': result.created ? 'created' : 'updated',
         'id': id,
         'source_ref': sourceRef,
       },
@@ -422,6 +370,7 @@ class InAppSyncReceiverService {
     final manuals = (snapshot['manuals'] as List?) ?? const [];
 
     final db = await DatabaseHelper.instance.database;
+    await VocIdentityStore.reconcile(db);
     int vocCount = 0;
     int responseCount = 0;
     int manualCount = 0;
@@ -432,54 +381,10 @@ class InAppSyncReceiverService {
         final row = Map<String, dynamic>.from(item);
         final id = row['id']?.toString();
         if (id == null || id.isEmpty) continue;
-        final normalizedCategory = VocCategoryCatalog.normalize(
-          row['category']?.toString(),
-          title: row['title']?.toString(),
-          content: row['content']?.toString(),
-          aiCategory: row['ai_category']?.toString(),
-          tags: row['tags']?.toString(),
-        );
-        await txn.insert(
-          AppConstants.tableVocs,
-          {
-            'id': id,
-            'title': row['title']?.toString() ?? '제목없음',
-            'content': row['content']?.toString() ?? '내용 없음',
-            'category': normalizedCategory,
-            'tags': row['tags']?.toString(),
-            'customer': row['customer']?.toString() ?? '미입력',
-            'project': row['project']?.toString() ?? '미입력',
-            'priority': row['priority']?.toString() ?? 'MEDIUM',
-            'status': row['status']?.toString() ?? 'OPEN',
-            'ai_category': row['ai_category']?.toString(),
-            'is_business_related':
-                int.tryParse('${row['is_business_related'] ?? 1}') ?? 1,
-            'business_score': row['business_score'],
-            'category_score': row['category_score'],
-            'urgency': row['urgency']?.toString(),
-            'urgency_score': row['urgency_score'],
-            'business_type': row['business_type']?.toString(),
-            'department': row['department']?.toString(),
-            'department_score': row['department_score'],
-            'assignee': row['assignee']?.toString(),
-            'assignee_score': row['assignee_score'],
-            'duplicate_of_voc_id': row['duplicate_of_voc_id']?.toString(),
-            'duplicate_score': row['duplicate_score'],
-            'jira_required': int.tryParse('${row['jira_required'] ?? 0}') ?? 0,
-            'jira_score': row['jira_score'],
-            'analysis_reason': row['analysis_reason']?.toString(),
-            'embedding': row['embedding']?.toString(),
-            'source': row['source']?.toString() ?? 'peer-sync-full',
-            'source_ref': row['source_ref']?.toString(),
-            'processing_minutes':
-                int.tryParse('${row['processing_minutes'] ?? ''}'),
-            'created_at': row['created_at']?.toString() ??
-                DateTime.now().toIso8601String(),
-            'updated_at': row['updated_at']?.toString() ??
-                DateTime.now().toIso8601String(),
-          },
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
+        final result = await VocIdentityStore.save(txn,
+            VocIdentityStore.remoteRow(row, sourceApp, source: 'peer-sync-full'),
+            peerApp: sourceApp);
+        if (!result.created && !result.updated) continue;
         vocCount += 1;
       }
 
@@ -487,11 +392,23 @@ class InAppSyncReceiverService {
         if (item is! Map) continue;
         final row = Map<String, dynamic>.from(item);
         final id = row['id']?.toString();
-        final vocId = row['voc_id']?.toString();
+        final incomingVocId = row['voc_id']?.toString();
+        final vocId = incomingVocId == null ? null
+            : await VocIdentityStore.resolve(txn, incomingVocId);
         if (id == null || id.isEmpty || vocId == null || vocId.isEmpty) {
           continue;
         }
 
+        final parent = await txn.query(AppConstants.tableVocs,
+            columns: ['id'], where: 'id = ?', whereArgs: [vocId]);
+        if (parent.isEmpty) continue;
+        final previous = await txn.query(AppConstants.tableResponses,
+            where: 'id = ?', whereArgs: [id], limit: 1);
+        if (previous.isNotEmpty) {
+          final oldTime = DateTime.tryParse('${previous.first['updated_at']}');
+          final newTime = DateTime.tryParse('${row['updated_at']}');
+          if (oldTime != null && (newTime == null || !newTime.isAfter(oldTime))) continue;
+        }
         await txn.insert(
           AppConstants.tableResponses,
           {
@@ -536,7 +453,8 @@ class InAppSyncReceiverService {
             'category': row['category']?.toString() ?? '시스템매뉴얼',
             'customer': row['customer']?.toString(),
             'project': row['project']?.toString() ?? 'manual-upload',
-            'voc_id': row['voc_id']?.toString(),
+            'voc_id': row['voc_id'] == null ? null
+                : await VocIdentityStore.resolve(txn, row['voc_id'].toString()),
             'embedding': row['embedding']?.toString(),
             'resolved_at': row['resolved_at']?.toString() ??
                 DateTime.now().toIso8601String(),

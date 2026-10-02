@@ -265,6 +265,8 @@ class AppTheme {
         ),
       ),
       snackBarTheme: SnackBarThemeData(
+        showCloseIcon: true,
+        closeIconColor: isDark ? AppPalette.ink : Colors.white,
         behavior: SnackBarBehavior.floating,
         backgroundColor: isDark ? const Color(0xFFF1F2F6) : AppPalette.ink,
         contentTextStyle: TextStyle(
@@ -417,3 +419,4 @@ class AppTheme {
     return AppPalette.red;
   }
 }
+

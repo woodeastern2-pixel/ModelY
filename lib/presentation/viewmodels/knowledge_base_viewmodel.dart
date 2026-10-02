@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../core/constants/app_constants.dart';
@@ -15,6 +16,14 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
   final AiService _aiService = AiService();
 
   List<KnowledgeBaseEntity> _entries = [];
+  List<KnowledgeBaseEntity> _visible = [];
+  Map<String, String> _searchBodies = {};
+  Timer? _searchTimer;
+  bool _disposed = false;
+  int _loadGeneration = 0;
+  int searchPasses = 0;
+  final Completer<void> _ready = Completer<void>();
+  Future<void> get ready => _ready.future;
   bool _isLoading = false;
   bool _isImportingManual = false;
   int _manualImportTotalSections = 0;
@@ -28,7 +37,6 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
   String _manualFileFilter = '';
   static const String _manualCategory =
       ManualDocumentImportService.manualCategory;
-  static const String _manualProjectMarker = 'manual-upload';
 
   KnowledgeBaseViewModel(this._repository, this._settingsViewModel) {
     _manualImportService = ManualDocumentImportService(_repository);
@@ -39,11 +47,14 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
+    _loadGeneration++;
+    _searchTimer?.cancel();
     _settingsViewModel.removeListener(_configureAiService);
     super.dispose();
   }
 
-  List<KnowledgeBaseEntity> get entries => _filtered;
+  List<KnowledgeBaseEntity> get entries => _visible;
   bool get isLoading => _isLoading;
   bool get isImportingManual => _isImportingManual;
   int get manualImportTotalSections => _manualImportTotalSections;
@@ -62,14 +73,18 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
   String get filterProduct => _filterProduct;
   String get searchQuery => _searchQuery;
   String get manualFileFilter => _manualFileFilter;
+  bool get isAllSelected => _filterCategory.isEmpty &&
+      _filterProduct.isEmpty && _manualFileFilter.isEmpty &&
+      _searchQuery.trim().isEmpty;
 
   List<KnowledgeBaseEntity> get _filtered {
+    searchPasses++;
     var list = _entries;
     if (_filterCategory.isNotEmpty) {
       list = list.where((e) => e.category == _filterCategory).toList();
     }
     if (_filterProduct.isNotEmpty) {
-      list = list.where((e) => e.project == _filterProduct).toList();
+      list = list.where((e) => (e.project ?? '').trim() == _filterProduct).toList();
     }
     if (_manualFileFilter.isNotEmpty) {
       list = list
@@ -80,23 +95,28 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
           )
           .toList();
     }
-    if (_searchQuery.isNotEmpty) {
-      list = list
-          .where(
-            (e) => SearchQueryExpander.matches(
-              _searchQuery,
-              [
-                e.question,
-                e.answer,
-                e.project ?? '',
-                e.customer ?? '',
-                e.category,
-              ].join(' '),
-            ),
-          )
-          .toList();
+    if (_searchQuery.trim().isNotEmpty) {
+      final matcher = SearchQueryExpander.compile(_searchQuery);
+      list = list.where((e) => matcher.matchesNormalized(_searchBodies[e.id] ?? '')).toList();
     }
     return list;
+  }
+
+  void _refreshVisible() {
+    _searchTimer?.cancel();
+    _visible = List.unmodifiable(_filtered);
+  }
+
+  Future<void> _installEntries(List<KnowledgeBaseEntity> entries) async {
+    final generation = ++_loadGeneration;
+    final bodies = entries.length > 100
+        ? await compute(_prepareSearchBodies, entries)
+        : _prepareSearchBodies(entries);
+    if (_disposed || generation != _loadGeneration) return;
+    _entries = List.of(entries);
+    _searchBodies = bodies;
+    _sanitizeManualFileFilter();
+    _refreshVisible();
   }
 
   Future<void> loadEntries() async {
@@ -104,19 +124,21 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
-      _entries = await _repository.getAllEntries();
-      _sanitizeManualFileFilter();
+      await _installEntries(await _repository.getAllEntries());
     } catch (e) {
       _error = e.toString();
     } finally {
       _isLoading = false;
-      notifyListeners();
+      if (!_ready.isCompleted) _ready.complete();
+      if (!_disposed) notifyListeners();
     }
   }
 
   Future<void> deleteEntry(String id) async {
     await _repository.deleteEntry(id);
     _entries.removeWhere((e) => e.id == id);
+    _searchBodies.remove(id);
+    _refreshVisible();
     notifyListeners();
   }
 
@@ -131,11 +153,6 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
       return null;
     }
 
-    if (!_ensureManualImportAiReady()) {
-      notifyListeners();
-      return null;
-    }
-
     _isImportingManual = true;
     _manualImportTotalSections = 0;
     _manualImportProcessedSections = 0;
@@ -147,38 +164,6 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
     try {
       final result = await _manualImportService.importDocuments(
         normalized,
-        qaGenerator:
-            (fileName, sectionNumber, sectionTitle, sectionBody) async {
-              final pairs = await _aiService.generateManualQaPairs(
-                fileName: fileName,
-                sectionLabel: '매뉴얼 섹션 $sectionNumber: $sectionTitle',
-                sectionText: sectionBody,
-              );
-
-              if (pairs.isEmpty) {
-                final fallbackQuestion =
-                    '[$fileName] 매뉴얼 섹션 $sectionNumber $sectionTitle은 어떻게 하나요?';
-                final fallbackAnswer = await _aiService.refineManualAnswer(
-                  question: fallbackQuestion,
-                  sourceText: sectionBody,
-                );
-                return [
-                  ManualGeneratedQa(
-                    question: fallbackQuestion,
-                    answer: fallbackAnswer,
-                  ),
-                ];
-              }
-
-              return pairs
-                  .map(
-                    (item) => ManualGeneratedQa(
-                      question: item.question,
-                      answer: item.answer,
-                    ),
-                  )
-                  .toList();
-            },
         onProgress: (progress) {
           _manualImportTotalSections = progress.totalSections;
           _manualImportProcessedSections = progress.processedSections;
@@ -186,12 +171,8 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
           _manualImportCurrentFile = progress.currentFile;
           notifyListeners();
         },
-        answerRefiner: (question, sourceText) => _aiService.refineManualAnswer(
-          question: question,
-          sourceText: sourceText,
-        ),
       );
-      _entries = await _repository.getAllEntries();
+      await _installEntries(await _repository.getAllEntries());
       return result;
     } catch (e) {
       _error = e.toString();
@@ -246,14 +227,6 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
     );
   }
 
-  bool _ensureManualImportAiReady() {
-    if (_aiService.isConfigured) {
-      return true;
-    }
-    _error = 'AI 설정이 필요합니다. 설정에서 AI 제공자/API를 먼저 구성해 주세요.';
-    return false;
-  }
-
   bool isSupportedManualFile(String fileName) {
     return _manualImportService.isSupported(fileName);
   }
@@ -287,31 +260,64 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
       (entry) => toDelete.any((item) => item.id == entry.id),
     );
     _sanitizeManualFileFilter();
+    _refreshVisible();
     notifyListeners();
     return toDelete.length;
   }
 
+  // Category, product and source are alternative browsing scopes. A new
+  // selection replaces the previous scope instead of silently intersecting it.
   void setFilter(String category) {
-    _filterCategory = category;
+    _filterCategory = category.trim();
+    _filterProduct = '';
+    _manualFileFilter = '';
+    if (_filterCategory.isEmpty) {
+      _searchQuery = '';
+    }
+    _refreshVisible();
     notifyListeners();
   }
 
   void setProductFilter(String product) {
-    _filterProduct = product.trim();
+    final value = product.trim();
+    if (value.isEmpty) {
+      setFilter('');
+      return;
+    }
+    _filterCategory = '';
+    _filterProduct = value;
+    _manualFileFilter = '';
+    _refreshVisible();
     notifyListeners();
   }
 
   void setManualFileFilter(String fileName) {
-    _manualFileFilter = fileName.trim();
-    if (_manualFileFilter.isNotEmpty && _filterCategory != _manualCategory) {
-      _filterCategory = _manualCategory;
+    final value = fileName.trim();
+    if (value.isEmpty) {
+      setFilter('');
+      return;
     }
+    _filterCategory = '';
+    _filterProduct = '';
+    _manualFileFilter = value;
+    _refreshVisible();
     notifyListeners();
   }
 
   void setSearch(String query) {
+    if (_searchQuery == query || _disposed) return;
     _searchQuery = query;
-    notifyListeners();
+    _searchTimer?.cancel();
+    if (query.isEmpty) {
+      _refreshVisible();
+      notifyListeners();
+      return;
+    }
+    _searchTimer = Timer(const Duration(milliseconds: 180), () {
+      if (_disposed) return;
+      _refreshVisible();
+      notifyListeners();
+    });
   }
 
   List<String> get categories {
@@ -339,13 +345,12 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
   }
 
   bool _isManualEntry(KnowledgeBaseEntity entry) {
-    return entry.category == _manualCategory &&
-        (entry.project == _manualProjectMarker ||
-            entry.question.contains('매뉴얼 섹션'));
+    return entry.category == _manualCategory;
   }
 
   String _manualFileNameOf(KnowledgeBaseEntity entry) {
-    return (entry.customer ?? '').trim();
+    final source = (entry.customer ?? '').trim();
+    return source.isNotEmpty ? source : '${entry.project ?? '기존 매뉴얼'} · 출처 미지정';
   }
 
   void _sanitizeManualFileFilter() {
@@ -357,3 +362,10 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
     }
   }
 }
+
+
+Map<String, String> _prepareSearchBodies(List<KnowledgeBaseEntity> entries) => {
+  for (final e in entries) e.id: SearchQueryExpander.normalize(
+      '${e.question} ${e.answer} ${e.project ?? ''} ${e.customer ?? ''} ${e.category}'),
+};
+
