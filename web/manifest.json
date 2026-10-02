@@ -1,11 +1,11 @@
 {
-    "name": "ai_voc_assistant",
-    "short_name": "ai_voc_assistant",
+    "name": "VoC Mate",
+    "short_name": "VoC Mate",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#6655EA",
+    "theme_color": "#6655EA",
+    "description": "지식 기반 고객 문의 응대 도우미",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
@@ -33,3 +33,4 @@
         }
     ]
 }
+

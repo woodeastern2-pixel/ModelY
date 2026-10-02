@@ -67,6 +67,8 @@ void main() {
             findsOneWidget,
           );
         }
+        expect(find.text('프로젝트: Commerce Cloud'), findsOneWidget);
+        expect(find.text('번호: CC-1042'), findsOneWidget);
         expect(tester.takeException(), isNull);
 
         await tester.pumpWidget(const SizedBox.shrink());
@@ -116,3 +118,4 @@ class _WorkspaceProfile {
   final Size size;
   final double textScale;
 }
+

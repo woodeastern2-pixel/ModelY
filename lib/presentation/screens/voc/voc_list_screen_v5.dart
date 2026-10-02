@@ -16,6 +16,7 @@ import '../../widgets/priority_chip.dart';
 import '../../widgets/dismissible_notice.dart';
 import '../../widgets/voc_status_chip.dart';
 import '../../widgets/workspace_ui.dart';
+import '../../widgets/voc_project_identity.dart';
 import 'voc_detail_screen.dart';
 import 'voc_register_screen.dart';
 
@@ -854,6 +855,8 @@ class _QueueRow extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      VocProjectIdentity(project: voc.project),
+                      const SizedBox(height: 5),
                       Text(
                         voc.title,
                         maxLines: 1,
@@ -1028,6 +1031,8 @@ class _QueueCard extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 5),
+                      VocProjectIdentity(project: voc.project),
+                      const SizedBox(height: 5),
                       Text(
                         voc.title,
                         maxLines: 2,
@@ -1126,4 +1131,5 @@ void _open(BuildContext context, VocEntity voc) {
     MaterialPageRoute(builder: (_) => VocDetailScreen(vocId: voc.id)),
   );
 }
+
 

@@ -30,4 +30,20 @@ void main() {
 
     expect(VocDisplayUtils.label(voc), 'GVBSO-2456 · 메신저 타교 겸임 등록 문의');
   });
+  test('Project identity preserves project names and inquiry numbers', () {
+    expect(VocDisplayUtils.projectIdentity('BW서비스운영 | GVBSO | 2456'),
+        (projectName: 'BW서비스운영', number: 'GVBSO-2456'));
+    expect(VocDisplayUtils.projectIdentity('Commerce Cloud | CC-1042'),
+        (projectName: 'Commerce Cloud', number: 'CC-1042'));
+    expect(VocDisplayUtils.projectIdentity('CC | 1042'),
+        (projectName: '', number: 'CC-1042'));
+    expect(VocDisplayUtils.projectIdentity('서비스 운영'),
+        (projectName: '서비스 운영', number: ''));
+    expect(VocDisplayUtils.projectIdentity('미입력'),
+        (projectName: '', number: ''));
+    expect(VocDisplayUtils.projectIdentity('프로젝트 | CODE | '),
+        (projectName: '프로젝트', number: ''));
+  });
+
 }
+

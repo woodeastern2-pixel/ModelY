@@ -111,7 +111,7 @@ class VocAssistantApp extends StatelessWidget {
       child: Consumer<SettingsViewModel>(
         builder: (context, settingsVm, _) {
           return MaterialApp(
-            title: 'AI VOC Assistant',
+            title: 'VoC Mate',
             debugShowCheckedModeBanner: false,
             scaffoldMessengerKey: _messengerKey,
             theme: AppTheme.lightTheme,
@@ -176,3 +176,4 @@ class _SelectableAppContentState extends State<_SelectableAppContent> {
     return Overlay(initialEntries: [_entry]);
   }
 }
+

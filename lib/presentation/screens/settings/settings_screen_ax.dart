@@ -1244,7 +1244,7 @@ class _IntegrationView extends StatelessWidget {
         const SizedBox(height: 14),
         _Panel(
           title: 'VOC 동기화',
-          subtitle: '다른 AI VOC Assistant와 VOC를 주고받습니다.',
+          subtitle: '다른 VoC Mate와 VOC를 주고받습니다.',
           icon: Icons.sync_outlined,
           trailing: _StatusBadge(
             vm.vocForwardWebhookTargets.isNotEmpty,
@@ -1922,3 +1922,4 @@ class _GeneralViewState extends State<_GeneralView> {
     );
   }
 }
+
