@@ -1,9 +1,14 @@
+import '../../data/services/portable_manual_media.dart';
 import 'dart:convert';
 
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../../data/seeds/brity_suite_manual_seed.dart';
+import '../../data/services/bundled_manual_service.dart';
+import '../../data/services/offline_search_store.dart';
+import '../../data/services/voc_identity_store.dart';
+import '../../data/services/demo_voc_store.dart';
 import '../constants/app_constants.dart';
 import '../utils/search_query_expander.dart';
 import '../utils/vector_utils.dart';
@@ -13,10 +18,16 @@ class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._internal();
 
   Database? _database;
+  Future<Database>? _opening;
 
   Future<Database> get database async {
-    _database ??= await _initDatabase();
-    return _database!;
+    if (_database != null) return _database!;
+    final opening = _opening ??= _initDatabase();
+    try {
+      return _database = await opening;
+    } finally {
+      if (identical(_opening, opening)) _opening = null;
+    }
   }
 
   Future<Database> _initDatabase() async {
@@ -33,8 +44,13 @@ class DatabaseHelper {
   }
 
   Future<void> _onOpen(Database db) async {
+    await PortableManualMedia.initialize(db);
     await _ensureVocTableColumns(db);
     await _ensureSyncEventTable(db);
+    await DemoVocStore(db).removeVisibleMarkers();
+    await VocIdentityStore.reconcile(db);
+    await BundledManualService.install(db);
+    await OfflineSearchStore.forDatabase(db).initialize();
     await db.insert(
         AppConstants.tableSettings,
         {
@@ -42,7 +58,7 @@ class DatabaseHelper {
           'value': AppConstants.defaultAdminPassword,
           'updated_at': DateTime.now().toIso8601String(),
         },
-        conflictAlgorithm: ConflictAlgorithm.replace);
+        conflictAlgorithm: ConflictAlgorithm.ignore);
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -567,7 +583,9 @@ class DatabaseHelper {
 
   Future<void> close() async {
     final db = await database;
+    OfflineSearchStore.forDatabase(db).dispose();
     await db.close();
     _database = null;
   }
 }
+

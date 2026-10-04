@@ -1,3 +1,8 @@
+import '../../../core/database/database_helper.dart';
+import '../../../data/services/voc_identity_store.dart';
+import '../../../data/services/knowledge_archive_service.dart';
+import '../../../data/services/offline_search_store.dart';
+import '../../widgets/voc_duplicate_review_dialog.dart';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -71,7 +76,7 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
       _show(
         '연결된 앱에서 VOC를 가져왔습니다. 전체 ${result.remoteTotal}개 · '
         '새 VOC ${result.created}개 · 업데이트 ${result.updated}개 · '
-        '반영 ${result.applied}개 · 성공 ${result.successApps}곳'
+        '중복 제외 ${result.skipped}개 · 기존 중복 정리 ${result.merged}개 · 성공 ${result.successApps}곳'
         '${result.failedApps > 0 ? ' · 실패 ${result.failedApps}곳' : ''}',
         error: result.failedApps > 0,
       );
@@ -92,7 +97,7 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
       await _refresh();
       _show(
         '초기 데이터 동기화를 완료했습니다.\n'
-        'VOC: 전체 ${result.vocRemoteTotal}개 · 새 VOC ${result.vocCreated}개 · 업데이트 ${result.vocUpdated}개\n'
+        'VOC: 전체 ${result.vocRemoteTotal}개 · 새 VOC ${result.vocCreated}개 · 업데이트 ${result.vocUpdated}개 · 중복 제외 ${result.vocSkipped}개 · 기존 중복 정리 ${result.merged}개\n'
         '지식 자료: 전체 ${result.manualRemoteTotal}개 · 새 자료 ${result.manualCreated}개 · 제외 ${result.manualSkipped}개\n'
         '앱: 성공 ${result.successApps}곳${result.failedApps > 0 ? ' · 실패 ${result.failedApps}곳' : ''}',
         error: result.failedApps > 0,
@@ -175,6 +180,79 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
     });
   }
 
+  Future<void> _reviewDuplicates() async {
+    if (_peerSyncRunning) return;
+    setState(() => _peerSyncRunning = true);
+    try {
+      final db = await DatabaseHelper.instance.database;
+      final automatic = await VocIdentityStore.reconcile(db);
+      final groups = await VocIdentityStore.duplicateCandidates(db);
+      if (!mounted) return;
+      var merged = 0;
+      if (groups.isNotEmpty) {
+        final selection = await showDialog<List<List<String>>>(context: context,
+          builder: (_) => VocDuplicateReviewDialog(groups: groups));
+        if (selection != null && selection.isNotEmpty) {
+          merged = await VocIdentityStore.mergeReviewed(db, selection);
+        }
+      }
+      if (!mounted) return;
+      await _refresh();
+      final remaining = await VocIdentityStore.duplicateCandidates(db);
+      _show('자동 정리 $automatic건 · 선택 병합 $merged건 · 남은 중복 후보 ${remaining.length}묶음');
+    } catch (e) {
+      _show('중복 점검을 완료하지 못했습니다: $e', error: true);
+    } finally {
+      if (mounted) setState(() => _peerSyncRunning = false);
+    }
+  }
+
+  Future<void> _knowledgeArchive(bool restore) async {
+    if (_peerSyncRunning) return;
+    setState(() => _peerSyncRunning = true);
+    var dataSaved = false;
+    try {
+      final db = await DatabaseHelper.instance.database;
+      final service = KnowledgeArchiveService(db);
+      if (restore) {
+        final picked = await FilePicker.platform.pickFiles(type: FileType.custom,
+            allowedExtensions: const ['json'], withData: true);
+        if (picked == null || picked.files.isEmpty) return;
+        final file = picked.files.single;
+        if (file.size > KnowledgeArchiveService.maxBytes) {
+          throw const FormatException('지식 백업은 300MB까지 지원합니다.');
+        }
+        final bytes = file.bytes ?? await File(file.path!).readAsBytes();
+        final result = await service.importData(bytes);
+        dataSaved = true;
+        final store = OfflineSearchStore.forDatabase(db);
+        await store.restorePendingOriginals();
+        await store.refresh();
+        if (!mounted) return;
+        await context.read<KnowledgeBaseViewModel>().loadEntries();
+        _show('지식 가져오기 완료: 추가 ${result.added}건 · 중복 제외 ${result.skipped}건 · '
+            '내용이 다른 자료 보존 ${result.conflicts}건 · 원문 ${result.documents}개 · 이미지 ${result.images}개');
+      } else {
+        final bytes = await service.exportData();
+        final path = await FilePicker.platform.saveFile(
+          dialogTitle: '지식자료 백업 저장',
+          fileName: 'VOC_Knowledge_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.json',
+          type: FileType.custom, allowedExtensions: const ['json'], bytes: bytes);
+        if (path == null) return;
+        if (!Platform.isAndroid && !Platform.isIOS) {
+          await File(path).writeAsBytes(bytes, flush: true);
+        }
+        _show('지식자료 백업을 저장했습니다. 질문·답변, 원문, 출처와 이미지가 포함됩니다.');
+      }
+    } catch (e) {
+      _show(dataSaved
+          ? '자료는 저장했으나 검색 색인 준비를 마치지 못했습니다. 앱을 다시 실행하면 이어서 준비합니다: $e'
+          : '지식자료 ${restore ? '가져오기' : '내보내기'}를 완료하지 못했습니다: $e', error: true);
+    } finally {
+      if (mounted) setState(() => _peerSyncRunning = false);
+    }
+  }
+
   Future<bool> _confirm(
     String title,
     String body, {
@@ -251,6 +329,11 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
                           busy ? null : _pullPeerVocs,
                         ),
                         _Cmd(
+                          '기존 중복 VOC 정리',
+                          Icons.playlist_remove_outlined,
+                          busy ? null : _reviewDuplicates,
+                        ),
+                        _Cmd(
                           '초기 데이터 동기화',
                           Icons.handshake_outlined,
                           busy ? null : _bootstrapPeerData,
@@ -264,6 +347,10 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
                         ),
                       ]),
                       _Group('가져오기·내보내기', Icons.folder_copy_outlined, [
+                        _Cmd('지식자료 내보내기', Icons.download_outlined,
+                            busy ? null : () => _knowledgeArchive(false)),
+                        _Cmd('지식자료 다시 가져오기', Icons.upload_outlined,
+                            busy ? null : () => _knowledgeArchive(true)),
                         if (AppConstants.showCollaborationTools)
                           _Cmd(
                             'Outlook 메일에서 VOC 수집',
@@ -290,7 +377,9 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
                           Icons.description_outlined,
                           busy ? null : () => _export(true),
                         ),
-                      ]),
+                      ], description: '지식자료 백업에는 질문·답변, 검색 원문, 출처와 연결 이미지가 포함됩니다. '
+                          'JSON 백업을 다시 가져올 수 있으며 기존 자료는 보존됩니다.',
+                          running: _peerSyncRunning),
                       _Group('AI 검색 데이터', Icons.auto_awesome_motion_outlined, [
                         _Cmd(
                           'AI 검색 데이터 다시 만들기',
@@ -830,7 +919,9 @@ class _Grid extends StatelessWidget {
 }
 
 class _Group extends StatelessWidget {
-  const _Group(this.title, this.icon, this.commands, {this.danger = false});
+  const _Group(this.title, this.icon, this.commands, {this.danger = false, this.description, this.running = false});
+  final String? description;
+  final bool running;
   final String title;
   final IconData icon;
   final List<_Cmd> commands;
@@ -864,6 +955,10 @@ class _Group extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 14),
+              if (description != null) Padding(padding: const EdgeInsets.only(bottom: 12),
+                  child: Text(description!)),
+              if (running) const Padding(padding: EdgeInsets.only(bottom: 12),
+                  child: LinearProgressIndicator()),
               ...commands.map(
                 (c) => Padding(
                   padding: const EdgeInsets.only(bottom: 8),

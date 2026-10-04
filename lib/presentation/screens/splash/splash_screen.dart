@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../widgets/voc_mate_logo.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_tokens.dart';
@@ -90,15 +91,11 @@ class _SplashScreenState extends State<SplashScreen>
                           ),
                         ],
                       ),
-                      child: const Icon(
-                        Icons.graphic_eq_rounded,
-                        size: 42,
-                        color: Colors.white,
-                      ),
+                      child: const VocMateLogo(size: 82),
                     ),
                     const SizedBox(height: AppSpacing.lg),
                     Text(
-                      'AI VOC',
+                      'VoC Mate',
                       style:
                           Theme.of(context).textTheme.headlineLarge?.copyWith(
                                 color: Colors.white,
@@ -108,7 +105,7 @@ class _SplashScreenState extends State<SplashScreen>
                     ),
                     const SizedBox(height: AppSpacing.xxs),
                     Text(
-                      'OPERATIONS ASSISTANT',
+                      '지식으로 연결하는 문의 응대',
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
                             color: const Color(0xFF9EA5B8),
                             letterSpacing: 1.8,
@@ -154,3 +151,4 @@ class _SplashScreenState extends State<SplashScreen>
     );
   }
 }
+

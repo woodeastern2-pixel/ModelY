@@ -1,3 +1,5 @@
+import '../../services/voc_keyword_extractor.dart';
+import '../../services/voc_identity_store.dart';
 import 'dart:convert';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/database/database_helper.dart';
@@ -7,36 +9,6 @@ import '../../../domain/entities/response_entity.dart';
 
 class VocLocalDatasource {
   final DatabaseHelper _dbHelper;
-  static final RegExp _tokenPattern = RegExp(r'[A-Za-z0-9가-힣]{2,}');
-  static const Set<String> _keywordStopwords = {
-    'the',
-    'and',
-    'for',
-    'with',
-    'this',
-    'that',
-    'from',
-    'are',
-    'was',
-    'were',
-    '있습니다',
-    '문의',
-    '요청',
-    '확인',
-    '처리',
-    '관련',
-    '대한',
-    '합니다',
-    '입니다',
-    '해주세요',
-    '기능',
-    '오류',
-    '이슈',
-    '사용',
-    '고객',
-    '서비스',
-  };
-
   VocLocalDatasource(this._dbHelper);
 
   Future<List<VocEntity>> getAllVocs() async {
@@ -50,6 +22,7 @@ class VocLocalDatasource {
 
   Future<VocEntity?> getVocById(String id) async {
     final db = await _dbHelper.database;
+    id = await VocIdentityStore.resolve(db, id);
     final maps = await db.query(
       AppConstants.tableVocs,
       where: 'id = ?',
@@ -91,19 +64,21 @@ class VocLocalDatasource {
 
   Future<VocEntity> insertVoc(VocEntity voc) async {
     final db = await _dbHelper.database;
-    await db.insert(AppConstants.tableVocs, _vocToMap(voc));
-    return voc;
+    final result = await db.transaction((txn) =>
+        VocIdentityStore.save(txn, _vocToMap(voc)));
+    return _mapToVoc(result.row);
   }
 
   Future<VocEntity> updateVoc(VocEntity voc) async {
     final db = await _dbHelper.database;
-    await db.update(
-      AppConstants.tableVocs,
-      _vocToMap(voc),
-      where: 'id = ?',
-      whereArgs: [voc.id],
-    );
-    return voc;
+    return db.transaction((txn) async {
+      final id = await VocIdentityStore.resolve(txn, voc.id);
+      final row = _vocToMap(voc)..['id'] = id;
+      await txn.update(AppConstants.tableVocs, row,
+          where: 'id = ?', whereArgs: [id]);
+      await VocIdentityStore.index(txn, row);
+      return _mapToVoc(row);
+    });
   }
 
   Future<int> reassignAllVocCategories() async {
@@ -248,15 +223,15 @@ class VocLocalDatasource {
           ? null
           : DateTime.tryParse(createdAtRaw)?.toLocal();
       final mergedText = '$title $content';
-      final tokens = _extractKeywords(mergedText);
+      final tokens = VocKeywordExtractor.extract(mergedText);
 
-      if (createdAt != null) {
-        if (createdAt.isAfter(recentStart)) {
+      if (createdAt != null && !createdAt.isAfter(now)) {
+        if (!createdAt.isBefore(recentStart)) {
           recent30DayVocs += 1;
           for (final token in tokens) {
             recentCounts[token] = (recentCounts[token] ?? 0) + 1;
           }
-        } else if (createdAt.isAfter(previousStart)) {
+        } else if (!createdAt.isBefore(previousStart)) {
           for (final token in tokens) {
             previousCounts[token] = (previousCounts[token] ?? 0) + 1;
           }
@@ -273,14 +248,16 @@ class VocLocalDatasource {
 
     String risingKeyword = '-';
     var risingDelta = 0;
-    recentCounts.forEach((keyword, recent) {
+    final keywords = recentCounts.keys.toList()..sort();
+    for (final keyword in keywords) {
+      final recent = recentCounts[keyword]!;
       final previous = previousCounts[keyword] ?? 0;
       final delta = recent - previous;
       if (recent >= 2 && delta > risingDelta) {
         risingDelta = delta;
         risingKeyword = keyword;
       }
-    });
+    }
 
     return {
       'recent30DayVocs': recent30DayVocs,
@@ -290,21 +267,10 @@ class VocLocalDatasource {
     };
   }
 
-  Set<String> _extractKeywords(String text) {
-    final matches = _tokenPattern.allMatches(text);
-    final tokens = <String>{};
-    for (final m in matches) {
-      final token = m.group(0)?.trim().toLowerCase() ?? '';
-      if (token.length < 2) continue;
-      if (_keywordStopwords.contains(token)) continue;
-      tokens.add(token);
-    }
-    return tokens;
-  }
-
   // Responses
   Future<List<ResponseEntity>> getResponsesByVocId(String vocId) async {
     final db = await _dbHelper.database;
+    vocId = await VocIdentityStore.resolve(db, vocId);
     final maps = await db.query(
       AppConstants.tableResponses,
       where: 'voc_id = ?',
@@ -316,8 +282,12 @@ class VocLocalDatasource {
 
   Future<ResponseEntity> insertResponse(ResponseEntity response) async {
     final db = await _dbHelper.database;
-    await db.insert(AppConstants.tableResponses, _responseToMap(response));
-    return response;
+    return db.transaction((txn) async {
+      final row = _responseToMap(response);
+      row['voc_id'] = await VocIdentityStore.resolve(txn, response.vocId);
+      await txn.insert(AppConstants.tableResponses, row);
+      return _mapToResponse(row);
+    });
   }
 
   Future<ResponseEntity> updateResponse(ResponseEntity response) async {
@@ -440,7 +410,7 @@ class VocLocalDatasource {
       content: map['content'] as String,
       status: map['status'] as String,
       aiGenerated: (map['ai_generated'] as int) == 1,
-      confidenceScore: map['confidence_score'] as double?,
+      confidenceScore: (map['confidence_score'] as num?)?.toDouble(),
       referencedVocIds: refs,
       approvedBy: map['approved_by'] as String?,
       approvedAt: map['approved_at'] != null

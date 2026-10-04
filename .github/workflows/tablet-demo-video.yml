@@ -1,0 +1,56 @@
+name: VOC Mate tablet demo videos
+# retry after Android build compatibility fix
+on:
+  push:
+    branches: [feature/brity-document-knowledge]
+  workflow_dispatch:
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/brity-document-knowledge
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.4'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter build apk --debug
+      - name: Install Ollama for real LLM demo
+        run: |
+          curl -fsSL https://ollama.com/install.sh | sh
+          nohup ollama serve > /tmp/ollama.log 2>&1 &
+          sleep 3
+          ollama pull qwen2.5:0.5b
+      - name: Record actual tablet emulator sessions
+        uses: ReactiveCircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_2
+          target: google_apis
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -memory 3072
+          disable-animations: true
+          script: |
+            adb wait-for-device
+            adb shell settings put global always_finish_activities 0
+            adb shell settings put system screen_off_timeout 1800000
+            adb shell wm size 1600x2560
+            adb shell wm density 320
+            adb install -r build/app/outputs/flutter-apk/app-debug.apk
+            adb reverse tcp:11434 tcp:11434 || true
+            python3 tool/demo_record.py voc-mate-no-llm
+            python3 tool/demo_record.py voc-mate-llm --llm
+      - name: Validate videos
+        run: |
+          test -s artifacts/voc-mate-no-llm.mp4
+          test -s artifacts/voc-mate-llm.mp4
+          ls -lh artifacts/*.mp4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: voc-mate-tablet-demo-videos
+          path: artifacts/*.mp4
+          retention-days: 14

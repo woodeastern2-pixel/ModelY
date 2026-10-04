@@ -32,6 +32,17 @@ void main() {
     expect(repository.vocs, hasLength(1));
   });
 
+  test('refresh racing registration cannot duplicate the visible row', () async {
+    final repository = _RefreshRaceRepository();
+    final vm = VocViewModel(repository);
+    addTearDown(vm.dispose);
+    await vm.loadVocs();
+    repository.onInserted = vm.loadVocs;
+    final created = await vm.createVoc(title: '동시 새로고침', content: '본문',
+      category: '기능문의', priority: 'MEDIUM');
+    expect(vm.allVocs.where((v) => v.id == created.id), hasLength(1));
+  });
+
   test('bulk AI resolve processes every pending VOC with one AI answer each', () async {
     final now = DateTime(2026, 8, 14);
     final repository = _VocRepository(vocs: _pendingVocs(3), responses: [
@@ -188,4 +199,16 @@ class _VocRepository implements VocRepository {
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+
+class _RefreshRaceRepository extends _VocRepository {
+  Future<void> Function()? onInserted;
+  @override
+  Future<VocEntity> createVoc(VocEntity voc) async {
+    // A DB read can complete after insert but before the create callback returns.
+    vocs.add(voc);
+    await onInserted?.call();
+    return voc;
+  }
 }
