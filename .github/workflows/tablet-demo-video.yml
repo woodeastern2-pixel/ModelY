@@ -28,14 +28,14 @@ jobs:
       - name: Record actual tablet emulator sessions
         uses: ReactiveCircus/android-emulator-runner@v2
         with:
-          api-level: 35
+          api-level: 34
           arch: x86_64
-          profile: pixel_tablet
+          profile: pixel_2
           target: google_apis
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -memory 4096
           disable-animations: true
           script: |
-            adb install -r build/app/outputs/flutter-apk/app-debug.apk
+            adb wait-for-device\n            adb shell settings put global always_finish_activities 0\n            adb shell settings put system screen_off_timeout 1800000\n            adb install -r build/app/outputs/flutter-apk/app-debug.apk
             adb reverse tcp:11434 tcp:11434 || true
             python3 tool/demo_record.py voc-mate-no-llm
             python3 tool/demo_record.py voc-mate-llm --llm
