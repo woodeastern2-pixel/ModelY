@@ -1,4 +1,5 @@
 name: VOC Mate tablet demo videos
+# retry after Android build compatibility fix
 on:
   push:
     branches: [feature/brity-document-knowledge]
