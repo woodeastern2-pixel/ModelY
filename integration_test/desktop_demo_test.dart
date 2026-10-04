@@ -94,7 +94,7 @@ void main() {
           'updated_at': DateTime.now().toIso8601String(),
         }, conflictAlgorithm: ConflictAlgorithm.replace);
       }
-      await app.main();
+      app.main();
       await waitFor(() => find.byType(HomeScreen).evaluate().isNotEmpty,
           'application startup', 150);
       await Process.run('wmctrl', ['-r', 'ai_voc_assistant', '-b', 'add,fullscreen']);
@@ -122,7 +122,7 @@ void main() {
           '브리티 드라이브에서 업무 파일을 실수로 삭제했습니다. 휴지통에 있는 파일을 원래 위치로 복원하는 방법을 알려 주세요.');
       await type(find.widgetWithText(TextFormField, '고객명 (선택)'), '시연 담당자');
       await mark('새 문의 입력');
-      await click(find.widgetWithText(FilledButton, 'VOC 등록'));
+      await click(find.ancestor(of: find.text('VOC 등록'), matching: find.byWidgetPredicate((w) => w is FilledButton)));
       await waitFor(() => find.byType(VocDetailScreen).evaluate().isNotEmpty,
           'registered detail');
       final detailContext = tester.element(find.byType(VocDetailScreen));
@@ -132,7 +132,7 @@ void main() {
           'registration and analysis', 150);
       expect(vocVm.selectedVoc!.title, '브리티 드라이브 삭제 파일 복원 문의');
       await mark('문의 등록 및 분류 결과');
-      await click(find.widgetWithText(FilledButton, 'AI 답변 초안 만들기'));
+      await click(find.byKey(const Key('voc-detail-ai-answer')));
       await waitFor(() => find.byType(AiAnswerScreen).evaluate().isNotEmpty,
           'answer review screen');
       await mark('답변 생성 실행');
@@ -153,7 +153,7 @@ void main() {
       }
       await pause(4500);
       await mark('매뉴얼 출처와 안내 내용 확인');
-      await click(find.widgetWithText(FilledButton, '답변 승인 및 저장'));
+      await click(find.ancestor(of: find.text('답변 승인 및 저장'), matching: find.byWidgetPredicate((w) => w is FilledButton)));
       await waitFor(() => find.byType(VocDetailScreen).evaluate().isNotEmpty &&
           vocVm.responses.any((r) => r.isApproved), 'approved response saved');
       await visible(find.text('승인 완료'));
