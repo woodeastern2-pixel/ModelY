@@ -1,0 +1,74 @@
+name: VOC Mate actual desktop recording
+on:
+  push:
+    branches: [work/voc-mate-desktop-recording]
+    paths:
+      - integration_test/desktop_demo_test.dart
+      - tool/record_desktop.sh
+      - .github/workflows/desktop-demo-video.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  desktop-recording:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.2'
+          channel: stable
+          cache: true
+      - name: Install native desktop and recording tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev libsqlite3-dev xvfb openbox xdotool wmctrl ffmpeg dbus-x11
+      - name: Prepare recording driver
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('pubspec.yaml')
+          p.write_text(p.read_text().replace('dev_dependencies:\n', 'dev_dependencies:\n  integration_test:\n    sdk: flutter\n'))
+          PY
+          flutter pub get
+          dart format integration_test/desktop_demo_test.dart
+          flutter analyze integration_test/desktop_demo_test.dart --no-fatal-infos --no-fatal-warnings
+      - name: Record actual application without a language model
+        id: offline
+        continue-on-error: true
+        run: xvfb-run -a -s "-screen 0 1600x1000x24" dbus-run-session -- bash tool/record_desktop.sh no-llm
+      - name: Save offline recording and verification
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: voc-mate-desktop-offline
+          path: artifacts/
+          retention-days: 7
+      - name: Start real local language model
+        if: steps.offline.outcome == 'success'
+        run: |
+          curl -fsSL https://ollama.com/install.sh | sh
+          nohup ollama serve > /tmp/ollama.log 2>&1 &
+          for i in {1..20}; do curl -sf http://127.0.0.1:11434/api/tags && break; sleep 1; done
+          ollama pull qwen2.5:1.5b
+          curl -sf http://127.0.0.1:11434/api/generate -d '{"model":"qwen2.5:1.5b","prompt":"안녕하세요","stream":false,"keep_alive":"15m","options":{"num_predict":8}}'
+      - name: Record actual application with the language model
+        if: steps.offline.outcome == 'success'
+        run: xvfb-run -a -s "-screen 0 1600x1000x24" dbus-run-session -- bash tool/record_desktop.sh llm
+      - name: Save recordings and verification
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: voc-mate-desktop-recordings
+          path: artifacts/
+          retention-days: 7
+      - name: Require two verified scenarios
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json
+          for mode in ('no-llm', 'llm'):
+              with open(f'artifacts/{mode}-verification.json') as f:
+                  assert json.load(f)['success'] is True
+          PY
