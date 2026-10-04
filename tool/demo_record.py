@@ -28,7 +28,14 @@ def record(name,llm=False):
     remote=f"/data/local/tmp/{name}.mp4"
     adb("shell","pm","clear",PKG)
     adb("shell","monkey","-p",PKG,"1")
-    time.sleep(12)
+    time.sleep(15)
+    focus=adb("shell","dumpsys","window","windows").stdout
+    if PKG not in focus:
+        raise RuntimeError("VOC Mate is not visible before recording")
+    os.makedirs("artifacts",exist_ok=True)
+    adb("exec-out","screencap","-p",check=True)
+    with open(f"artifacts/{name}-start.png","wb") as shot:
+        shot.write(subprocess.run(["adb","exec-out","screencap","-p"],capture_output=True,check=True).stdout)
     p=subprocess.Popen(["adb","shell","screenrecord","--bit-rate","6000000","--time-limit","90",remote])
     time.sleep(3)
     for labels in [
