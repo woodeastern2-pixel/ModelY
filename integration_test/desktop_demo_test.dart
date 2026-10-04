@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:provider/provider.dart';
@@ -83,9 +84,9 @@ void main() {
       // Configure user settings; do not seed answers or business records.
       final settings = <String, String>{
         AppConstants.settingAiAutoAnswerOnVocRegister: 'false',
-        AppConstants.settingAiMaxTokens: '640',
+        AppConstants.settingAiMaxTokens: '384',
         AppConstants.settingAiTemperature: '0.1',
-        if (llm) AppConstants.settingOllamaModel: 'qwen2.5:1.5b',
+        if (llm) AppConstants.settingOllamaModel: 'qwen2.5:0.5b',
         if (llm) 'ai_connection_configured': 'true',
       };
       for (final entry in settings.entries) {
@@ -119,7 +120,7 @@ void main() {
       await type(find.widgetWithText(TextFormField, '제목 *'),
           '브리티 드라이브 삭제 파일 복원 문의');
       await type(find.widgetWithText(TextFormField, '내용 *'),
-          '브리티 드라이브에서 업무 파일을 실수로 삭제했습니다. 휴지통에 있는 파일을 원래 위치로 복원하는 방법을 알려 주세요.');
+          '브리티 드라이브에서 업무 파일을 실수로 삭제했습니다. 휴지통에 있는 파일을 원래 위치로 복원할 수 있나요?');
       await type(find.widgetWithText(TextFormField, '고객명 (선택)'), '시연 담당자');
       await mark('새 문의 입력');
       await click(find.ancestor(of: find.text('VOC 등록'), matching: find.byWidgetPredicate((w) => w is FilledButton)));
@@ -153,9 +154,28 @@ void main() {
       }
       await pause(4500);
       await mark('매뉴얼 출처와 안내 내용 확인');
-      await click(find.ancestor(of: find.text('답변 승인 및 저장'), matching: find.byWidgetPredicate((w) => w is FilledButton)));
-      await waitFor(() => find.byType(VocDetailScreen).evaluate().isNotEmpty &&
-          vocVm.responses.any((r) => r.isApproved), 'approved response saved');
+      // Copy the real generated result, then review and edit using the app UI.
+      await click(find.byTooltip('답변 복사'));
+      final copied = await Clipboard.getData(Clipboard.kTextPlain);
+      expect(copied?.text?.trim(), isNotEmpty);
+      await click(find.byType(BackButton));
+      await waitFor(() => find.byType(VocDetailScreen).evaluate().isNotEmpty, 'back to detail');
+      final composer = find.byWidgetPredicate((w) => w is TextField &&
+          w.decoration?.hintText == '답변 내용을 작성해 주세요.');
+      await visible(composer);
+      await tester.enterText(composer, copied!.text!);
+      await pause(2000);
+      await click(find.ancestor(of: find.text('임시 저장'), matching: find.byWidgetPredicate((w) => w is FilledButton)));
+      await waitFor(() => vocVm.responses.any((r) => r.isDraft), 'draft stored');
+      await click(find.ancestor(of: find.text('수정'), matching: find.byWidgetPredicate((w) => w is TextButton)));
+      final editor = find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
+      const reviewedAnswer = '안녕하세요. 브리티 드라이브의 휴지통에서 삭제한 파일을 확인하실 수 있으며, 보관 기한 내에는 원래 위치로 복원할 수 있습니다.\n\n휴지통에 해당 파일이 남아 있는지 먼저 확인해 주세요.\n\n참고: Brity Drive 매뉴얼 · 2.3 전체화면 구성';
+      await type(editor, reviewedAnswer);
+      await mark('담당자가 매뉴얼을 확인하고 답변 수정');
+      await click(find.ancestor(of: find.text('저장'), matching: find.byWidgetPredicate((w) => w is FilledButton)));
+      await waitFor(() => vocVm.responses.any((r) => r.content == reviewedAnswer), 'review edit stored');
+      await click(find.ancestor(of: find.text('답변 승인'), matching: find.byWidgetPredicate((w) => w is TextButton)));
+      await waitFor(() => vocVm.responses.any((r) => r.isApproved), 'approved response saved');
       await visible(find.text('승인 완료'));
       await pause(3500);
       await mark('검토한 답변 승인 및 저장');
@@ -163,6 +183,8 @@ void main() {
       await click(find.text('처리 완료'));
       await waitFor(() => vocVm.selectedVoc?.status == AppConstants.vocStatusResolved,
           'resolved status saved');
+      await visible(find.byKey(const Key('voc-detail-hero')));
+      expect(find.text('처리 완료'), findsWidgets);
       await pause(3500);
       await mark('문의 처리 완료 확인');
       final id = vocVm.selectedVoc!.id;
@@ -176,8 +198,9 @@ void main() {
       File('$dir/$mode-verification.json').writeAsStringSync(
           const JsonEncoder.withIndent('  ').convert({
         'success': true, 'mode': mode, 'actual_app': true,
-        'model': llm ? 'qwen2.5:1.5b' : null,
+        'model': llm ? 'qwen2.5:0.5b' : null,
         'is_ai_answer': aiVm.isAiAnswer, 'answer': aiVm.answerResult!.answer,
+        'reviewed_answer': reviewedAnswer,
         'evidence_count': aiVm.answerEvidence.length,
         'supplied_evidence_count': aiVm.suppliedEvidence.length,
         'voc': storedVoc, 'responses': storedResponses, 'steps': marks,
