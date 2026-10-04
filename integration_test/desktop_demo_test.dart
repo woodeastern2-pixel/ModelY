@@ -165,15 +165,11 @@ void main() {
       await visible(composer);
       await tester.enterText(composer, copied!.text!);
       await pause(2000);
-      await click(find.ancestor(of: find.text('임시 저장'), matching: find.byWidgetPredicate((w) => w is FilledButton)));
-      await waitFor(() => vocVm.responses.any((r) => r.isDraft), 'draft stored');
-      await click(find.ancestor(of: find.text('수정'), matching: find.byWidgetPredicate((w) => w is TextButton)));
-      final editor = find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
       const reviewedAnswer = '안녕하세요. 브리티 드라이브의 휴지통에서 삭제한 파일을 확인하실 수 있으며, 보관 기한 내에는 원래 위치로 복원할 수 있습니다.\n\n휴지통에 해당 파일이 남아 있는지 먼저 확인해 주세요.\n\n참고: Brity Drive 매뉴얼 · 2.3 전체화면 구성';
-      await type(editor, reviewedAnswer);
+      await type(composer, reviewedAnswer);
       await mark('담당자가 매뉴얼을 확인하고 답변 수정');
-      await click(find.ancestor(of: find.text('저장'), matching: find.byWidgetPredicate((w) => w is FilledButton)));
-      await waitFor(() => vocVm.responses.any((r) => r.content == reviewedAnswer), 'review edit stored');
+      await click(find.ancestor(of: find.text('임시 저장'), matching: find.byWidgetPredicate((w) => w is FilledButton)));
+      await waitFor(() => vocVm.responses.any((r) => r.isDraft && r.content == reviewedAnswer), 'reviewed draft stored');
       await click(find.ancestor(of: find.text('답변 승인'), matching: find.byWidgetPredicate((w) => w is TextButton)));
       await waitFor(() => vocVm.responses.any((r) => r.isApproved), 'approved response saved');
       await visible(find.text('승인 완료'));
