@@ -2,7 +2,6 @@ name: VOC Mate tablet demo videos
 on:
   push:
     branches: [feature/brity-document-knowledge]
-    paths: [.github/workflows/tablet-demo-video.yml]
   workflow_dispatch:
 jobs:
   record:
