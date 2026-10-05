@@ -18,6 +18,7 @@ import 'package:ai_voc_assistant/presentation/viewmodels/voc_viewmodel.dart';
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   binding.framePolicy = LiveTestWidgetsFlutterBindingFramePolicy.fullyLive;
+  binding.shouldPropagateDevicePointerEvents = true;
   const mode = String.fromEnvironment('DEMO_MODE', defaultValue: 'no-llm');
   const llm = mode == 'llm';
   testWidgets('VOC Mate actual desktop scenario', (tester) async {
@@ -30,7 +31,7 @@ void main() {
     final watch = Stopwatch();
     Process? recorder;
     final recordingLog = File('$dir/$mode-recording.log').openWrite();
-    Future<void> pause([int ms = 1500]) async {
+    Future<void> pause([int ms = 400]) async {
       await tester.pump(Duration(milliseconds: ms));
     }
     Future<void> waitFor(bool Function() condition, String step,
@@ -42,7 +43,7 @@ void main() {
         }
         await tester.pump(const Duration(milliseconds: 250));
       }
-      await pause(600);
+      await pause(150);
     }
     Future<void> mark(String label) async {
       marks.add({'seconds': watch.elapsedMilliseconds / 1000, 'step': label});
@@ -59,25 +60,37 @@ void main() {
     Future<void> visible(Finder target) async {
       expect(target, findsWidgets);
       await tester.ensureVisible(target.first);
-      await pause(700);
+      await pause(200);
     }
     Future<void> click(Finder target) async {
       await visible(target);
       final point = tester.getCenter(target.first);
       await Process.run('xdotool',
           ['mousemove', point.dx.round().toString(), point.dy.round().toString()]);
-      await pause(350);
-      await tester.tap(target.first);
+      await Process.run('xdotool', ['click', '1']);
       await pause();
     }
-    Future<void> type(Finder field, String value) async {
+    final pasteEvents = <Map<String, Object?>>[];
+    Future<void> paste(Finder field, String value) async {
       await click(field);
-      for (var end = 4; end < value.length; end += 4) {
-        await tester.enterText(field.first, value.substring(0, end));
-        await pause(170);
-      }
-      await tester.enterText(field.first, value);
-      await pause(1500);
+      await Clipboard.setData(ClipboardData(text: value));
+      final startedAt = watch.elapsedMilliseconds / 1000;
+      final result = await Process.run(
+          'xdotool', ['key', '--clearmodifiers', 'ctrl+a', 'ctrl+v']);
+      expect(result.exitCode, 0);
+      final editable = find.descendant(
+          of: field.first, matching: find.byType(EditableText));
+      await waitFor(
+          () => tester.widget<EditableText>(editable.first).controller.text == value,
+          'native clipboard paste', 5);
+      pasteEvents.add({
+        'start': startedAt,
+        'end': watch.elapsedMilliseconds / 1000,
+        'characters': value.length,
+        'method': 'system clipboard and native Ctrl+V',
+      });
+      File('$dir/$mode-paste-events.json').writeAsStringSync(
+          const JsonEncoder.withIndent('  ').convert(pasteEvents));
     }
     try {
       sqfliteFfiInit();
@@ -115,16 +128,16 @@ void main() {
       recorder.stdout.drain<void>();
       recorder.stderr.transform(utf8.decoder).listen(recordingLog.write);
       watch.start();
-      await pause(3000);
+      await pause(700);
       await mark('앱 실행 및 현황 확인');
       await click(find.text('VOC 목록'));
       await mark('문의 목록 확인');
       await click(find.byKey(const Key('voc-register-primary')));
-      await type(find.widgetWithText(TextFormField, '제목 *'),
+      await paste(find.widgetWithText(TextFormField, '제목 *'),
           '브리티 메신저 PC 새 메시지 알림 문의');
-      await type(find.widgetWithText(TextFormField, '내용 *'),
+      await paste(find.widgetWithText(TextFormField, '내용 *'),
           '브리티 메신저 PC에서 새 메시지가 와도 팝업과 소리가 나오지 않습니다. 메시지는 대화방을 열면 보입니다. 알림 설정과 방해 금지 설정은 어디에서 확인하나요?');
-      await type(find.widgetWithText(TextFormField, '고객명 (선택)'), '시연 담당자');
+      await paste(find.widgetWithText(TextFormField, '고객명 (선택)'), '시연 담당자');
       await mark('새 문의 입력');
       await click(find.ancestor(of: find.text('VOC 등록'), matching: find.byWidgetPredicate((w) => w is FilledButton)));
       await waitFor(() => find.byType(VocDetailScreen).evaluate().isNotEmpty,
@@ -147,7 +160,7 @@ void main() {
       expect(aiVm.isClarificationAnswer, isFalse);
       expect(aiVm.isAiAnswer, llm);
       expect(aiVm.answerResult!.answer.trim(), isNotEmpty);
-      await pause(5000);
+      await pause(1500);
       await mark(llm ? '실제 모델이 생성한 답변' : '모델 없이 저장 자료로 구성한 답변');
       await visible(find.text('이 답변의 참고 자료'));
       await pause(2500);
@@ -155,7 +168,7 @@ void main() {
       if (evidenceTiles.evaluate().isNotEmpty) {
         await click(evidenceTiles.first);
       }
-      await pause(4500);
+      await pause(1500);
       await mark('매뉴얼 출처와 안내 내용 확인');
       // Copy the real generated result, then review and edit using the app UI.
       await click(find.byTooltip('답변 복사'));
@@ -166,17 +179,17 @@ void main() {
       final composer = find.byWidgetPredicate((w) => w is TextField &&
           w.decoration?.hintText == '답변 내용을 작성해 주세요.');
       await visible(composer);
-      await tester.enterText(composer, copied!.text!);
+      await paste(composer, copied!.text!);
       await pause(2000);
       const reviewedAnswer = '안녕하세요. PC 메신저에서 다음 설정을 확인해 주세요.\n\n1. 메인 화면 설정에서 전체 알림 활성화 여부를 확인합니다.\n2. 옵션 > 알림에서 새 메시지 알림 방식과 소리 설정을 확인합니다.\n3. 방해 금지 설정이 알림을 끄고 있는지 확인합니다.\n\n설정 확인 후 테스트 메시지로 알림을 확인해 주세요.\n\n참고: Brity Messenger Desktop 매뉴얼 · 설정 / 알림';
-      await type(composer, reviewedAnswer);
+      await paste(composer, reviewedAnswer);
       await mark('담당자가 매뉴얼을 확인하고 답변 수정');
       await click(find.ancestor(of: find.text('임시 저장'), matching: find.byWidgetPredicate((w) => w is FilledButton)));
       await waitFor(() => vocVm.responses.any((r) => r.isDraft && r.content == reviewedAnswer), 'reviewed draft stored');
       await click(find.ancestor(of: find.text('답변 승인'), matching: find.byWidgetPredicate((w) => w is TextButton)));
       await waitFor(() => vocVm.responses.any((r) => r.isApproved), 'approved response saved');
       await visible(find.text('승인 완료'));
-      await pause(3500);
+      await pause(1200);
       await mark('검토한 답변 승인 및 저장');
       await click(find.byTooltip('더보기'));
       await click(find.text('처리 완료'));
@@ -184,7 +197,7 @@ void main() {
           'resolved status saved');
       await visible(find.byKey(const Key('voc-detail-hero')));
       expect(find.text('처리 완료'), findsWidgets);
-      await pause(3500);
+      await pause(1200);
       await mark('문의 처리 완료 확인');
       final id = vocVm.selectedVoc!.id;
       final storedVoc = await db.query(AppConstants.tableVocs,
@@ -197,6 +210,7 @@ void main() {
       File('$dir/$mode-verification.json').writeAsStringSync(
           const JsonEncoder.withIndent('  ').convert({
         'success': true, 'mode': mode, 'actual_app': true,
+        'input_method': 'native clipboard paste', 'paste_events': pasteEvents,
         'model': llm ? 'qwen2.5:0.5b' : null,
         'is_ai_answer': aiVm.isAiAnswer, 'answer': aiVm.answerResult!.answer,
         'reviewed_answer': reviewedAnswer,
@@ -204,7 +218,7 @@ void main() {
         'supplied_evidence_count': aiVm.suppliedEvidence.length,
         'voc': storedVoc, 'responses': storedResponses, 'steps': marks,
       }));
-      await pause(3000);
+      await pause(700);
     } catch (error, stack) {
       await mark('오류 발생');
       File('$dir/$mode-error.txt').writeAsStringSync('$error\n$stack');
