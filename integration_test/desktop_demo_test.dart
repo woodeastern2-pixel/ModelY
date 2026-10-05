@@ -105,7 +105,7 @@ void main() {
       await pause(2500);
       final outputName = llm ? 'VOC_Mate_LLM_Actual' : 'VOC_Mate_No_LLM_Actual';
       recorder = await Process.start('ffmpeg', [
-        '-y', '-loglevel', 'warning', '-f', 'x11grab', '-draw_mouse', '1',
+        '-y', '-loglevel', 'warning', '-f', 'x11grab', '-draw_mouse', '0',
         '-framerate', '30', '-video_size', '1600x1000',
         '-i', Platform.environment['DISPLAY']!,
         '-an', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20',
