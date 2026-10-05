@@ -23,6 +23,9 @@ void main() {
   testWidgets('VOC Mate actual desktop scenario', (tester) async {
     const dir = 'artifacts';
     Directory(dir).createSync(recursive: true);
+    for (final weight in ['Regular', 'Bold']) {
+      File('assets/fonts/Pretendard-$weight.otf').copySync('$dir/Pretendard-$weight.otf');
+    }
     final marks = <Map<String, Object?>>[];
     final watch = Stopwatch();
     Process? recorder;
@@ -118,9 +121,9 @@ void main() {
       await mark('문의 목록 확인');
       await click(find.byKey(const Key('voc-register-primary')));
       await type(find.widgetWithText(TextFormField, '제목 *'),
-          '브리티 드라이브 삭제 파일 복원 문의');
+          '브리티 메신저 PC 새 메시지 알림 문의');
       await type(find.widgetWithText(TextFormField, '내용 *'),
-          '브리티 드라이브에서 업무 파일을 실수로 삭제했습니다. 휴지통에 있는 파일을 원래 위치로 복원할 수 있나요?');
+          '브리티 메신저 PC에서 새 메시지가 와도 팝업과 소리가 나오지 않습니다. 메시지는 대화방을 열면 보입니다. 알림 설정과 방해 금지 설정은 어디에서 확인하나요?');
       await type(find.widgetWithText(TextFormField, '고객명 (선택)'), '시연 담당자');
       await mark('새 문의 입력');
       await click(find.ancestor(of: find.text('VOC 등록'), matching: find.byWidgetPredicate((w) => w is FilledButton)));
@@ -131,7 +134,7 @@ void main() {
       final aiVm = detailContext.read<AiViewModel>();
       await waitFor(() => vocVm.selectedVoc != null && !aiVm.isAnalyzing,
           'registration and analysis', 150);
-      expect(vocVm.selectedVoc!.title, '브리티 드라이브 삭제 파일 복원 문의');
+      expect(vocVm.selectedVoc!.title, '브리티 메신저 PC 새 메시지 알림 문의');
       await mark('문의 등록 및 분류 결과');
       await click(find.byKey(const Key('voc-detail-ai-answer')));
       await waitFor(() => find.byType(AiAnswerScreen).evaluate().isNotEmpty,
@@ -165,7 +168,7 @@ void main() {
       await visible(composer);
       await tester.enterText(composer, copied!.text!);
       await pause(2000);
-      const reviewedAnswer = '안녕하세요. 브리티 드라이브의 휴지통에서 삭제한 파일을 확인하실 수 있으며, 보관 기한 내에는 원래 위치로 복원할 수 있습니다.\n\n휴지통에 해당 파일이 남아 있는지 먼저 확인해 주세요.\n\n참고: Brity Drive 매뉴얼 · 2.3 전체화면 구성';
+      const reviewedAnswer = '안녕하세요. PC 메신저에서 다음 설정을 확인해 주세요.\n\n1. 메인 화면 설정에서 전체 알림 활성화 여부를 확인합니다.\n2. 옵션 > 알림에서 새 메시지 알림 방식과 소리 설정을 확인합니다.\n3. 방해 금지 설정이 알림을 끄고 있는지 확인합니다.\n\n설정 확인 후 테스트 메시지로 알림을 확인해 주세요.\n\n참고: Brity Messenger Desktop 매뉴얼 · 설정 / 알림';
       await type(composer, reviewedAnswer);
       await mark('담당자가 매뉴얼을 확인하고 답변 수정');
       await click(find.ancestor(of: find.text('임시 저장'), matching: find.byWidgetPredicate((w) => w is FilledButton)));
