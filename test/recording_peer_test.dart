@@ -28,9 +28,9 @@ void main() {
     expect(receiver.isRunning, isTrue);
     File('artifacts/peer-ready').writeAsStringSync('real production receiver on 8789');
     final clock = Stopwatch()..start();
-    while (!File('artifacts/peer-stop').existsSync() && clock.elapsed.inMinutes < 22) {
+    while (!File('artifacts/peer-stop').existsSync() && clock.elapsed.inMinutes < 45) {
       await Future<void>.delayed(const Duration(seconds: 1));
     }
     await receiver.stop();
-  }, timeout: const Timeout(Duration(minutes: 24)));
+  }, timeout: const Timeout(Duration(minutes: 48)));
 }

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../../../core/constants/app_constants.dart';
 
 class OllamaService {
   String baseUrl;
@@ -32,7 +33,7 @@ class OllamaService {
 
     final response = await http
         .post(url, headers: {'Content-Type': 'application/json'}, body: body)
-        .timeout(const Duration(seconds: 120));
+        .timeout(const Duration(seconds: AppConstants.localLlmGenerationTimeoutSeconds));
 
     if (response.statusCode != 200) {
       throw Exception('Ollama 오류 (${response.statusCode}): ${response.body}');
@@ -85,3 +86,4 @@ class OllamaService {
     return models.map((m) => m['name'] as String).toList();
   }
 }
+

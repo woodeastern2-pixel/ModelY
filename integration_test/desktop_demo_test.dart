@@ -181,7 +181,7 @@ void main() {
         '-y', '-loglevel', 'warning', '-f', 'x11grab', '-draw_mouse', '0',
         '-framerate', '30', '-video_size', '1600x1000',
         '-i', Platform.environment['DISPLAY']!,
-        '-an', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20',
+        '-an', '-c:v', 'libx264', '-preset', 'ultrafast', '-threads', '1', '-crf', '20',
         '-pix_fmt', 'yuv420p', '-movflags', '+faststart',
         '$dir/$outputName.mp4',
       ]);
@@ -247,7 +247,7 @@ void main() {
       final vocVm = detailContext.read<VocViewModel>();
       final aiVm = detailContext.read<AiViewModel>();
       await waitFor(() => vocVm.selectedVoc != null && !aiVm.isAnalyzing,
-          'registration and analysis', 150);
+          'registration and analysis', 950);
       expect(vocVm.selectedVoc!.title, '브리티 메신저 PC 새 메시지 알림 문의');
       await mark('문의 등록 및 분류 결과');
       await click(find.byKey(const Key('voc-detail-ai-answer')));
@@ -255,7 +255,7 @@ void main() {
           'answer review screen');
       await mark('05 LLM 답변 생성');
       await waitFor(() => !aiVm.isGenerating && !aiVm.isSearching,
-          'real answer generation', 120);
+          'real answer generation', 950);
       expect(aiVm.error, isNull);
       expect(aiVm.hasAnswer, isTrue);
       expect(aiVm.isClarificationAnswer, isFalse);
@@ -342,7 +342,7 @@ void main() {
       expect(copilotReferences.any((r) => r.knowledgeBase.vocId == id), isTrue);
       await mark('코파일럿 질문 전송');
       await click(find.byKey(const Key('copilot-send')));
-      await waitFor(() => !aiVm.isChatting, 'copilot model response', 110);
+      await waitFor(() => !aiVm.isChatting, 'copilot model response', 950);
       expect(aiVm.chatError, isNull);
       expect(aiVm.chatMessages.any((m) => m.role == 'assistant'), isTrue);
       await mark('코파일럿 실제 응답 확인');
@@ -425,6 +425,6 @@ void main() {
       }
       await recordingLog.close();
     }
-  }, timeout: const Timeout(Duration(minutes: 20)));
+  }, timeout: const Timeout(Duration(minutes: 40)));
 }
 

@@ -51,7 +51,9 @@ class AiViewModel extends ChangeNotifier {
           : _settingsViewModel.ollamaUrl != AppConstants.defaultOllamaUrl ||
               _settingsViewModel.ollamaModel != AppConstants.defaultOllamaModel);
   Duration get _generationTimeout => Duration(seconds:
-      _settingsViewModel.aiProvider == AppConstants.aiProviderBundledQwen ? 240 : 60);
+      _settingsViewModel.aiProvider == AppConstants.aiProviderOllama
+          ? AppConstants.localLlmGenerationTimeoutSeconds
+          : _settingsViewModel.aiProvider == AppConstants.aiProviderBundledQwen ? 240 : 60);
   Duration get _connectionTimeout => Duration(seconds:
       _settingsViewModel.aiProvider == AppConstants.aiProviderBundledQwen ? 120 : 8);
   bool _checkingConnection = false;

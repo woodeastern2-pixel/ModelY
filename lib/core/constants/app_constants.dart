@@ -25,6 +25,9 @@ class AppConstants {
   static const String tableAiAccuracyMetrics = 'ai_accuracy_metrics';
   static const String tableSyncEvents = 'sync_events';
 
+  // Large local models can take several minutes to read retrieved manuals on CPU.
+  static const int localLlmGenerationTimeoutSeconds = 900;
+
   // Settings Keys
   static const String settingAiProvider = 'ai_provider';
   static const String settingAiTemperature = 'ai_temperature';
