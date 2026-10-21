@@ -1,0 +1,23 @@
+{
+  "model": "qwen3:4b-instruct-2507-q4_K_M",
+  "answer": "알림 설정은 [Options > Notification]에서 확인할 수 있습니다.\n- 소리 알림은 [Sound Alert Settings]에서 '소리 끄기' 설정을 확인합니다.\n- 방해 금지 설정은 [Do Not Disturb Settings]에서 'Busy' 상태로 설정하고 알람을 끄는 옵션을 확인합니다.\n이 설정 항목들은 시스템 매뉴얼의 'Notification' 섹션에 명시되어 있습니다.",
+  "notes": "연결된 AI로 작성한 검토용 초안입니다. 확인되지 않은 정책과 기능은 담당자 확인이 필요합니다.",
+  "referenced_case_ids": [
+    "brity-messenger-desktop-020",
+    "raw-messenger-desktop-22"
+  ],
+  "supplied_evidence": [
+    {
+      "id": "brity-messenger-desktop-020",
+      "question": "Brity Messenger Desktop에서 알림 기능은 어떻게 사용하나요?",
+      "answer": "[Desktop · 알림]\n3. Notification\n Options > Notification\n\n                         a\n\n                         b\n                         c\n                         d\n                         e\n                         f\n\n                         g\n                         h\n                         i\n\n a. Notification Settings : Select a notification method when a new message arrives.\n b. Sound Alert Settings : Check to mute sounds while viewing the chat window.\n c.   Notification Dialogue Box Settings : Check to display the message content on the notification toast.\n d. Notification Taskbar Notification Settings : Check to repeat blinking notifications in the taskbar.\n e. Chat Room Settings : Do not display a chat room in the taskbar when you turn off notifications.\n f.   Balloon Alert Settings : Notice unread messages with balloon when logged in\n g. Do Not Disturb Settings (Presentation mode) : Check to set state as ‘Busy’ and turn off alarms in\n      presentation mode\n h. Do Not Disturb Settings (When clone monitors) : Check to set state as ‘Busy’ and turn off alarms\n      when clone monitors\n i.   Do Not Disturb Settings : Check to set state as ‘Busy’ and turn off alarms\n\n[출처] Brity Messenger User Manual - Desktop (Samsung SDS, official PDF)\nhttps://image.samsungsds.com/en/resources/__icsFiles/afieldfile/2020/08/21/BrityMessenger_UserManual_Desktop_EN.pdf",
+      "score": 1.0
+    },
+    {
+      "id": "raw-messenger-desktop-22",
+      "question": "원문 · Brity Messenger 2020 messenger-desktop page 22",
+      "answer": "22\nCopyright 2020 Samsung SDS Co., Ltd. All rights reserved  \nBrity Messenger (Desktop)\n3. Notification \nOptions > Notification\nChapter V. Options\na.\nNotification Settings : Select a notification method when a new message arrives.\nb.\nSound Alert Settings : Check to mute sounds while viewing the chat window.\nc.\nNotification Dialogue Box Settings : Check to display the message content on the notification toast.\nd.\nNotification Taskbar Notification Settings : Check to repeat blinking notifications in the taskbar.\ne.\nChat Room Settings : Do not display a chat room in the taskbar when you turn off notifications.\nf.\nBalloon Alert Settings : Notice unread messages with balloon when logged in\ng.\nDo Not Disturb Settings (Presentation mode) : Check to set state as ‘Busy’ and turn off alarms in \npresentation mode\nh.\nDo Not Disturb Settings (When clone monitors) : Check to set state as ‘Busy’ and turn off alarms \nwhen clone monitors\ni.\nDo Not Disturb Settings : Check to set state as ‘Busy’ and turn off alarms\na\nb\nc\nd\ne\nf\ng\nh\ni\n\n\n[출처] messenger-desktop.pdf (2020) · Brity Messenger 2020 messenger-desktop page 22",
+      "score": 1.0
+    }
+  ]
+}

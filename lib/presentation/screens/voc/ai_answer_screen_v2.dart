@@ -616,7 +616,7 @@ class _SelectedEvidence extends StatelessWidget {
           Text(kb.question,
               style: const TextStyle(fontWeight: FontWeight.w800)),
           const SizedBox(height: 10),
-          ManualContentView(content: UserFacingText.fromAi(kb.answer), entryId: kb.id),
+          ManualContentView(content: kb.answer, entryId: kb.id),
           const SizedBox(height: 10),
           Wrap(
             spacing: 12,
@@ -826,4 +826,5 @@ class _NoteBox extends StatelessWidget {
     );
   }
 }
+
 

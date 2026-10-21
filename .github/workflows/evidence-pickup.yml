@@ -1,0 +1,52 @@
+name: VoC Mate Korean evidence pickup
+on:
+  push:
+    branches: [work/voc-mate-quality-recording]
+    paths: ['integration_test/evidence_pickup_test.dart', '.github/workflows/evidence-pickup.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  evidence-pickup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.2'
+          channel: stable
+          cache: true
+      - name: Prepare native recording environment
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev libsqlite3-dev xvfb openbox xdotool wmctrl ffmpeg dbus-x11 fonts-noto-cjk
+          python3 -m pip install edge-tts
+      - name: Validate pickup driver
+        run: |
+          flutter pub get
+          flutter analyze integration_test/evidence_pickup_test.dart --no-fatal-infos --no-fatal-warnings
+      - name: Record cited manual in the actual application
+        run: |
+          mkdir -p artifacts
+          cat > /tmp/evidence-pickup.sh <<'SH'
+          set -euo pipefail
+          export LIBGL_ALWAYS_SOFTWARE=1 GDK_BACKEND=x11
+          export XDG_DATA_HOME="$PWD/.demo-data/evidence-pickup"
+          export XDG_CONFIG_HOME="$PWD/.demo-config/evidence-pickup"
+          mkdir -p "$XDG_DATA_HOME" "$XDG_CONFIG_HOME"
+          openbox --sm-disable > artifacts/window-manager.log 2>&1 &
+          flutter drive --driver=test_driver/full_demo_driver.dart --target=integration_test/evidence_pickup_test.dart -d linux --profile 2>&1 | tee artifacts/evidence-driver.log
+          SH
+          xvfb-run -a -s "-screen 0 1600x1000x24" dbus-run-session -- bash /tmp/evidence-pickup.sh
+      - name: Narrate only the changed chapter
+        run: |
+          edge-tts --voice ko-KR-SunHiNeural --rate=+8% --text '답변에서 인용한 매뉴얼을 지식 자료에서 열어 확인합니다. 한국어로 정리된 알림 설정과 소리, 방해 금지 안내를 대조합니다. 원문의 출처와 영문 내용도 필요할 때 펼쳐 확인할 수 있습니다.' --write-media artifacts/06.mp3
+          ffmpeg -v error -xerror -i artifacts/evidence-pickup.mp4 -f null -
+      - name: Save pickup and provenance
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: voc-mate-korean-evidence-pickup
+          path: artifacts/
+          retention-days: 30

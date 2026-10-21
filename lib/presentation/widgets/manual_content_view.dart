@@ -10,12 +10,24 @@ class ManualContentView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final parsed = ManualContent.parse(content);
+    final parsed = ManualContent.forDisplay(content, entryId: entryId);
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       if (parsed.body.isNotEmpty)
-        SelectableText(parsed.body, style: const TextStyle(height: 1.55)),
-      ManualImageGallery(entryId: entryId,
-          expectImages: parsed.transcription.isNotEmpty),
+        SelectableText(parsed.body, key: ValueKey('manual-body-$entryId'),
+            style: const TextStyle(height: 1.55)),
+      if (parsed.original.isNotEmpty)
+        Material(type: MaterialType.transparency, child: ExpansionTile(
+          key: ValueKey('manual-original-$entryId'),
+          tilePadding: EdgeInsets.zero,
+          title: const Text('영문 원문과 출처 보기', style: TextStyle(fontSize: 13)),
+          children: [SelectableText(parsed.original,
+              style: const TextStyle(fontSize: 12, height: 1.4)),
+            ManualImageGallery(entryId: entryId,
+                expectImages: parsed.transcription.isNotEmpty)],
+        )),
+      if (parsed.original.isEmpty)
+        ManualImageGallery(entryId: entryId,
+            expectImages: parsed.transcription.isNotEmpty),
       if (parsed.transcription.isNotEmpty)
         Material(type: MaterialType.transparency, child: ExpansionTile(
           tilePadding: EdgeInsets.zero,
@@ -28,3 +40,4 @@ class ManualContentView extends StatelessWidget {
     ]);
   }
 }
+
