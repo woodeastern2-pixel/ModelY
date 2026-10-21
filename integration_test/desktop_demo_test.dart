@@ -254,6 +254,15 @@ void main() {
       await waitFor(() => find.byType(AiAnswerScreen).evaluate().isNotEmpty,
           'answer review screen');
       await mark('05 LLM 답변 생성');
+      await waitFor(() => !aiVm.isSearching && aiVm.suppliedEvidence.isNotEmpty,
+          'relevant manual supplied to model', 20);
+      File('$dir/pre-generation-evidence.json').writeAsStringSync(
+          const JsonEncoder.withIndent('  ').convert(aiVm.suppliedEvidence.map((r) => {
+        'id': r.knowledgeBase.id, 'question': r.knowledgeBase.question,
+        'answer': r.knowledgeBase.answer, 'score': r.similarityScore,
+      }).toList()));
+      expect(aiVm.suppliedEvidence.any((r) => r.knowledgeBase.id == 'brity-messenger-desktop-020'), isTrue);
+
       await waitFor(() => !aiVm.isGenerating && !aiVm.isSearching,
           'real answer generation', 950);
       expect(aiVm.error, isNull);

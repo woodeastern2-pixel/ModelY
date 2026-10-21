@@ -24,7 +24,11 @@ class OfflineSearchIndex {
   void put(KnowledgeBaseEntity entry, {Iterable<String>? keys}) {
     remove(entry.id);
     _rows[entry.id] = entry;
-    final tokens = (keys ?? keysFor('${entry.question} ${entry.answer}')).toSet();
+    final text = '${entry.question} ${entry.answer}';
+    // Cached bigrams stay valid when new bilingual feature aliases are added.
+    final tokens = keys == null ? keysFor(text) : <String>{
+      ...keys, ...LocalAnswerService().conceptKeys(text),
+    };
     _keys[entry.id] = tokens;
     for (final token in tokens) {
       (_postings[token] ??= <String>{}).add(entry.id);

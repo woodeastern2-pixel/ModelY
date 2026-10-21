@@ -33,6 +33,7 @@ jobs:
           flutter pub get
           dart format integration_test/desktop_demo_test.dart test/recording_peer_test.dart
           flutter analyze integration_test/desktop_demo_test.dart test/recording_peer_test.dart --no-fatal-infos --no-fatal-warnings
+          flutter test test/offline_original_search_test.dart --plain-name 'notification inquiry retrieves the notification manual before unrelated context'
           bash -n tool/record_full_system.sh
           python3 -m py_compile tool/prepare_full_demo.py tool/full_demo_narration.py
       - name: Start real language model

@@ -1,4 +1,5 @@
 import 'package:ai_voc_assistant/data/services/sample_voc_generator.dart';
+import 'package:ai_voc_assistant/data/services/ai_service.dart';
 import 'package:ai_voc_assistant/domain/repositories/indexed_knowledge_repository.dart';
 import 'package:ai_voc_assistant/domain/repositories/knowledge_base_repository.dart';
 import 'package:ai_voc_assistant/domain/repositories/voc_repository.dart';
@@ -28,6 +29,34 @@ Future<Database> database() async {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(sqfliteFfiInit);
+
+  test('notification inquiry retrieves the notification manual before unrelated context', () async {
+    final db = await database();
+    addTearDown(db.close);
+    final store = OfflineSearchStore(db);
+    await store.initialize(maintenance: false);
+    final pack = await BundledManualService.load();
+    final batch = db.batch();
+    for (final row in [...BritySuiteManualSeed.entries, ...pack['entries'] as List]) {
+      batch.insert('knowledge_base', {'id': row['id'], 'question': row['question'],
+        'answer': row['answer'], 'category': '시스템매뉴얼',
+        'customer': row['sourceName'], 'project': row['project']});
+    }
+    await batch.commit(noResult: true);
+    await store.refresh();
+    const title = '브리티 메신저 PC 새 메시지 알림 문의';
+    const body = '브리티 메신저 PC에서 새 메시지가 와도 팝업과 소리가 나오지 않습니다. 메시지는 대화방을 열면 보입니다. 알림 설정과 방해 금지 설정은 어디에서 확인하나요?';
+    final refs = await store.search('$title\n$body');
+    final primary = refs.take(3).toList();
+    print('NOTIFICATION_REFERENCES ${jsonEncode(primary.map((r) => {'id':r.knowledgeBase.id,'title':r.knowledgeBase.question,'characters':r.knowledgeBase.answer.length}).toList())}');
+    expect(primary.any((r) => r.knowledgeBase.id == 'brity-messenger-desktop-020'), isTrue,
+      reason: refs.map((r) => r.knowledgeBase.question).join('\n'));
+    expect(primary.any((r) => r.knowledgeBase.question.contains('임직원')), isFalse);
+    expect(primary.any((r) => r.knowledgeBase.answer.contains('Options > Notification')), isTrue);
+    final prompt = AiPrompts.answerGenerationUser(title, body, primary);
+    expect(prompt.length, lessThan(6500));
+  });
+
   test('reported ordinary questions retrieve procedures and reject unrelated evidence', () async {
     final db = await database();
     addTearDown(db.close);
@@ -406,6 +435,3 @@ class _EmptySettings implements SettingsRepository {
   @override
   dynamic noSuchMethod(Invocation i)=>super.noSuchMethod(i);
 }
-
-
-

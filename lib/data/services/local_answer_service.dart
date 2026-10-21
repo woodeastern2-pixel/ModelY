@@ -26,6 +26,10 @@ class LocalAnswerService {
     'schedule': ['일정', '캘린더', 'calendar', 'schedule'],
     'register': ['등록', 'register', 'registration'],
     'notification': ['알림', 'notification', 'notifications'],
+    'message': ['메시지', '메세지', 'message', 'messages'],
+    'sound': ['소리', '음소거', 'sound', 'mute'],
+    'popup': ['팝업', 'popup', 'toast', 'notification dialogue box'],
+    'dnd': ['방해 금지', '방해금지', 'do not disturb'],
     'password': ['비밀번호', '암호', 'password'],
     'join': ['접속', '참가', '참여', 'join'],
     'signin': ['로그인', 'sign in', 'login', 'log in'],
@@ -70,6 +74,7 @@ class LocalAnswerService {
     '주세요', '대해', '어떤', '되는', '하려고합니다', '기능',
     '사용', '사용법', '가능한가요', '합니다', '있는', 'the',
     'how', 'to', 'can', 'i', 'a', 'in',
+    '문의', '새', '확인하나요', '어디에서',
     'of', 'please', 'brity', '브리티',
   };
 
@@ -97,7 +102,14 @@ class LocalAnswerService {
           .replaceAll(RegExp(r'(?:을|를)?\s*찾아서'), ' ')
           .replaceAll('예약하는', '예약')
           .replaceAll(RegExp(r'초안\s*작성|계속\s*뜹니다'), ' ');
-      return <String>{query, '$prefix$titleQuery'.trim(),
+      // Symptom narratives contain many incidental words. Search the named
+      // technical features together before ranking the full narrative.
+      final features = _terms(query).where((t) =>
+          _concepts.containsKey(t) && !_generic.contains(t)).toSet();
+      final featureQuery = features.length >= 2
+          ? '$prefix${features.join(' ')}'.trim() : '';
+      return <String>{if (featureQuery.isNotEmpty) featureQuery,
+        query, '$prefix$titleQuery'.trim(),
         if (core.trim().isNotEmpty) '$prefix$core'.trim(),
         if (_needsRoomEquipment(query)) '회의실 비품'}.take(4).toList();
     }
@@ -179,7 +191,7 @@ class LocalAnswerService {
     final parsed = ManualContent.parse(entry.answer);
     final body = _normalize('${parsed.body} ${parsed.transcription}');
     return targets.every((t) => _matches(body, t)) &&
-        RegExp(r'메뉴|목록|패널|버튼|화면|menu|panel|list|button',
+        RegExp(r'메뉴|목록|패널|버튼|화면|menu|panel|list|button|options|settings',
             caseSensitive: false).hasMatch(body);
   }
 

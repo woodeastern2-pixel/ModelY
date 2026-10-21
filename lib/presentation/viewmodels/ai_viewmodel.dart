@@ -504,7 +504,7 @@ class AiViewModel extends ChangeNotifier {
         final references = _similarVocs.where((r) =>
             r.similarityScore >= 0.40 &&
             _localAnswers.isAnswerSource(r.knowledgeBase) &&
-            _localAnswers.focusedEvidence(query, r.knowledgeBase)).take(5).toList();
+            _localAnswers.focusedEvidence(query, r.knowledgeBase)).take(3).toList();
         _suppliedEvidence = List.unmodifiable(references);
         notifyListeners();
         try {
