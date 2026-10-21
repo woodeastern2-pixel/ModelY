@@ -92,9 +92,12 @@ void main() {
     final clock = Stopwatch()..start();
     try {
       await pause(800);
-      await click(find.text(cited['question'] as String));
+      // The search field contains the same text. Target the document tile,
+      // rather than the first matching Text/EditableText in the screen.
+      await click(find.widgetWithText(ExpansionTile, cited['question'] as String));
       await pause(1200);
       final bodyFinder = find.byKey(ValueKey('manual-body-${cited['id']}'));
+      await waitFor(() => bodyFinder.evaluate().isNotEmpty, 'expanded manual body');
       await tester.ensureVisible(bodyFinder);
       await pause(1000);
       final body = tester.widget<SelectableText>(bodyFinder).data!;
@@ -118,6 +121,7 @@ void main() {
         'ready_at': readyAt, 'duration': clock.elapsedMilliseconds / 1000,
       }));
     } finally {
+      await screenshot('pickup-final-state');
       recorder.stdin.writeln('q');
       await recorder.stdin.flush();
       await recorder.exitCode;
