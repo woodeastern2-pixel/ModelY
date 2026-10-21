@@ -24,6 +24,18 @@ void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   binding.framePolicy = LiveTestWidgetsFlutterBindingFramePolicy.fullyLive;
   binding.shouldPropagateDevicePointerEvents = true;
+  // This Linux recording host has no microphone or speech plugin. Expose that
+  // unavailable OS capability; text input and every demonstrated AI/data path
+  // still use the real application and real services.
+  TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+      .setMockMethodCallHandler(
+    const MethodChannel('plugin.csdcorp.com/speech_to_text'),
+    (call) async {
+      if (call.method == 'initialize' || call.method == 'has_permission') return false;
+      if (call.method == 'stop' || call.method == 'cancel') return null;
+      throw MissingPluginException('No speech capability on recording host');
+    },
+  );
   const mode = String.fromEnvironment('DEMO_MODE', defaultValue: 'llm');
   const llm = mode == 'llm';
   testWidgets('VOC Mate actual desktop scenario', (tester) async {
@@ -80,7 +92,14 @@ void main() {
       await pause(900);
     }
     Future<void> nativeFile(String path, {bool save = false}) async {
-      await pause(1200);
+      var dialogReady = false;
+      for (var attempt = 0; attempt < 240; attempt++) {
+        final dialog = await Process.run('pgrep', ['-x', 'zenity']);
+        if (dialog.exitCode == 0) { dialogReady = true; break; }
+        await pause(250);
+      }
+      if (!dialogReady) throw StateError('Native file dialog did not open');
+      await pause(700);
       await Clipboard.setData(ClipboardData(text: path));
       await Process.run('xdotool', ['key', '--clearmodifiers', 'ctrl+l']);
       await pause(250);
