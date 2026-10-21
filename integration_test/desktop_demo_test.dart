@@ -94,25 +94,41 @@ void main() {
       await pause(900);
     }
     Future<void> nativeFile(String path, {bool save = false}) async {
-      var dialogReady = false;
+      String? dialogWindow;
       for (var attempt = 0; attempt < 240; attempt++) {
-        final dialog = await Process.run('pgrep', ['-x', 'zenity']);
-        if (dialog.exitCode == 0) { dialogReady = true; break; }
+        final process = await Process.run('pgrep', ['-x', 'zenity']);
+        if (process.exitCode == 0) {
+          final pid = process.stdout.toString().trim().split('\n').last;
+          final windows = await Process.run('xdotool',
+              ['search', '--onlyvisible', '--pid', pid]);
+          if (windows.exitCode == 0 && windows.stdout.toString().trim().isNotEmpty) {
+            dialogWindow = windows.stdout.toString().trim().split('\n').last;
+            break;
+          }
+        }
         await pause(250);
       }
-      if (!dialogReady) throw StateError('Native file dialog did not open');
+      if (dialogWindow == null) throw StateError('Native file dialog did not become visible');
+      await Process.run('xdotool', ['windowactivate', '--sync', dialogWindow]);
+      await Process.run('xdotool', ['windowfocus', '--sync', dialogWindow]);
       await pause(700);
       await Clipboard.setData(ClipboardData(text: path));
       await Process.run('xdotool', ['key', '--clearmodifiers', 'ctrl+l']);
-      await pause(250);
+      await pause(300);
       await Process.run('xdotool', ['key', '--clearmodifiers', 'ctrl+a', 'ctrl+v']);
-      await pause(350);
+      await pause(500);
       await Process.run('xdotool', ['key', 'Return']);
       await pause(1000);
       if (save && !File(path).existsSync()) {
         await Process.run('xdotool', ['key', 'alt+s']);
         await pause(1000);
       }
+      for (var attempt = 0; attempt < 40; attempt++) {
+        final dialog = await Process.run('pgrep', ['-x', 'zenity']);
+        if (dialog.exitCode != 0) return;
+        await pause(250);
+      }
+      throw StateError('Native file dialog did not accept the selected path');
     }
     Future<Map<String, dynamic>> peerExport() async {
       final client = HttpClient();
