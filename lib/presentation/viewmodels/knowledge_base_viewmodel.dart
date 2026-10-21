@@ -188,6 +188,14 @@ class KnowledgeBaseViewModel extends ChangeNotifier {
     final provider = _settingsViewModel.aiProvider;
     _aiService.setProvider(provider);
 
+    if (provider == AppConstants.aiProviderBundledQwen) {
+      _aiService.configureBundledQwen(
+        temperature: _settingsViewModel.aiTemperature,
+        maxTokens: _settingsViewModel.aiMaxTokens,
+      );
+      return;
+    }
+
     if (provider == AppConstants.aiProviderOllama) {
       _aiService.configureOllama(
         _settingsViewModel.ollamaUrl,
@@ -368,4 +376,5 @@ Map<String, String> _prepareSearchBodies(List<KnowledgeBaseEntity> entries) => {
   for (final e in entries) e.id: SearchQueryExpander.normalize(
       '${e.question} ${e.answer} ${e.project ?? ''} ${e.customer ?? ''} ${e.category}'),
 };
+
 

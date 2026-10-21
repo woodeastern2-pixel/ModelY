@@ -1,0 +1,100 @@
+name: VoC Mate bundled Qwen release
+on:
+  push:
+    branches: [work/qwen-bundled-desktop]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: voc-qwen-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  quality-android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.2'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+      - name: Regression and responsive tests
+        run: |
+          python3 - <<'PY'
+          import pathlib, subprocess
+          # A dedicated recording peer intentionally waits 22 minutes. It is a
+          # recorder process, not a regression test; all other tests are run.
+          tests = [str(p) for p in sorted(pathlib.Path('test').rglob('*_test.dart'))
+                   if p.name != 'recording_peer_test.dart']
+          subprocess.run(['flutter', 'test', '--fail-fast', '--exclude-tags=golden', *tests], check=True)
+          PY
+      - name: Compare approved UI baselines
+        continue-on-error: true
+        run: flutter test test/ui_preview_golden_test.dart test/workspace_ui_preview_golden_test.dart
+      - name: Android compatibility build
+        run: flutter build apk --release
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: voc-mate-qwen-quality
+          path: |
+            pubspec.lock
+            test/failures/
+            build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: warn
+  windows:
+    needs: quality-android
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.2'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Build Windows
+        run: flutter build windows --release
+      - name: Cache verified model and runtime
+        uses: actions/cache@v4
+        with:
+          path: .qwen-build-cache
+          key: qwen3-1.7b-q8-061b54da-llama-b9380
+      - name: Include model, runtime and licenses
+        run: python tool/prepare_bundled_qwen.py build/windows/x64/runner/Release/local_ai
+      - name: Run actual model in native Windows application
+        shell: pwsh
+        run: |
+          $env:VOC_QWEN_SMOKE_ROOT = (Resolve-Path 'build/windows/x64/runner/Release/local_ai').Path
+          flutter drive --driver=test_driver/full_demo_driver.dart --target=integration_test/bundled_qwen_smoke_test.dart -d windows --profile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build offline installer
+        shell: pwsh
+        run: |
+          $compiler = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path $compiler)) { choco install innosetup --no-progress -y }
+          & $compiler '/DMyAppVersion=1.1.26' '/DMyAppBuild=28' windows/installer/AI-VOC-Assistant.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Get-ChildItem release_artifacts/windows/*.exe | ForEach-Object {
+            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
+            "$hash  $($_.Name)" | Set-Content "$($_.FullName).sha256"
+          }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: voc-mate-qwen-windows
+          compression-level: 0
+          path: |
+            release_artifacts/windows/*
+            artifacts/bundled-qwen-smoke.json
+            build/windows/x64/runner/Release/local_ai/manifest.json
+          if-no-files-found: warn

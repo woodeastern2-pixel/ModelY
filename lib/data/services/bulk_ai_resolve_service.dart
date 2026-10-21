@@ -88,7 +88,8 @@ class BulkAiResolveService {
       );
     }
 
-    final concurrency = settings.aiProvider == AppConstants.aiProviderOllama ? 2 : 3;
+    final concurrency = settings.aiProvider == AppConstants.aiProviderBundledQwen
+        ? 1 : settings.aiProvider == AppConstants.aiProviderOllama ? 2 : 3;
     final workerCount = concurrency < pending.length ? concurrency : pending.length;
     var cursor = 0;
     var completed = 0;
@@ -232,3 +233,4 @@ class BulkAiResolveService {
   String _cleanError(Object error) =>
       error.toString().replaceFirst('Bad state: ', '').replaceFirst('StateError: ', '');
 }
+

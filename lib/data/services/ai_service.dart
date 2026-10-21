@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'bundled_qwen_service.dart';
+
 import '../../core/utils/voc_category_catalog.dart';
 import '../../core/utils/user_facing_text.dart';
 import '../../core/utils/vector_utils.dart';
@@ -390,9 +392,24 @@ class AiService {
     _provider = AppConstants.aiProviderClaude;
   }
 
+  double _bundledTemperature = 0.3;
+  int _bundledMaxTokens = 512;
+
+  void configureBundledQwen({double temperature = 0.3, int maxTokens = 512}) {
+    _provider = AppConstants.aiProviderBundledQwen;
+    _bundledTemperature = temperature;
+    _bundledMaxTokens = maxTokens;
+  }
+
   void setProvider(String provider) => _provider = provider;
 
   Future<String> testConnection() async {
+    if (_provider == AppConstants.aiProviderBundledQwen) {
+      return BundledQwenService.instance.generate(
+        '한국어로 한 문장만 답하세요.', '연결이 준비되었다고 짧게 알려 주세요.',
+        temperature: 0.3, maxTokens: 64,
+      );
+    }
     final raw = await _generate(
       '당신은 AI 통신 테스트 응답기입니다. 한 문장으로만 응답하세요.',
       '연결 테스트입니다. 정상 응답 가능 여부를 짧게 알려 주세요.',
@@ -455,6 +472,9 @@ class AiService {
   }
 
   bool get isConfigured {
+    if (_provider == AppConstants.aiProviderBundledQwen) {
+      return BundledQwenService.instance.isInstalled;
+    }
     if (_provider == AppConstants.aiProviderOllama) {
       return _ollamaService != null;
     }
@@ -468,6 +488,10 @@ class AiService {
   }
 
   Future<String> _generate(String systemPrompt, String userPrompt) async {
+    if (_provider == AppConstants.aiProviderBundledQwen) {
+      return BundledQwenService.instance.generate(systemPrompt, userPrompt,
+          temperature: _bundledTemperature, maxTokens: _bundledMaxTokens);
+    }
     if (_provider == AppConstants.aiProviderGemini && _geminiService != null) {
       return await _geminiService!.generate(systemPrompt, userPrompt);
     }
@@ -877,3 +901,4 @@ ${jsonEncode(metrics)}
         .toList();
   }
 }
+

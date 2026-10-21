@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../data/services/bundled_qwen_service.dart';
 import '../../core/constants/app_constants.dart';
 import '../../domain/repositories/settings_repository.dart';
 
@@ -17,9 +18,20 @@ class SettingsViewModel extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
-  String get aiProvider =>
-      _settings[AppConstants.settingAiProvider] ??
-      AppConstants.aiProviderOllama;
+  String get aiProvider {
+    final selected = _settings[AppConstants.settingAiProvider] ??
+        AppConstants.aiProviderOllama;
+    // Choose the bundle for a fresh/default installation only. Do not change a
+    // user's explicit choice or silently replace an existing external server.
+    if (selected == AppConstants.aiProviderOllama &&
+        _settings['ai_connection_configured'] != 'true' &&
+        ollamaUrl == AppConstants.defaultOllamaUrl &&
+        ollamaModel == AppConstants.defaultOllamaModel &&
+        BundledQwenService.instance.isInstalled) {
+      return AppConstants.aiProviderBundledQwen;
+    }
+    return selected;
+  }
   double get aiTemperature =>
       double.tryParse(
         _settings[AppConstants.settingAiTemperature] ??
@@ -276,4 +288,5 @@ class SettingsViewModel extends ChangeNotifier {
     await saveSetting(AppConstants.settingCustomCategories, next.join(','));
   }
 }
+
 

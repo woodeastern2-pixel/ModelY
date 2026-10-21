@@ -50,6 +50,10 @@ class AiViewModel extends ChangeNotifier {
           ? _aiService.isConfigured
           : _settingsViewModel.ollamaUrl != AppConstants.defaultOllamaUrl ||
               _settingsViewModel.ollamaModel != AppConstants.defaultOllamaModel);
+  Duration get _generationTimeout => Duration(seconds:
+      _settingsViewModel.aiProvider == AppConstants.aiProviderBundledQwen ? 240 : 60);
+  Duration get _connectionTimeout => Duration(seconds:
+      _settingsViewModel.aiProvider == AppConstants.aiProviderBundledQwen ? 120 : 8);
   bool _checkingConnection = false;
   int _configurationRevision = 0;
   List<Object?>? _configurationValues;
@@ -144,7 +148,16 @@ class AiViewModel extends ChangeNotifier {
     final provider = _settingsViewModel.aiProvider;
     _aiService.setProvider(provider);
     _vectorSearch.setProvider(provider);
-    _vectorSearch.configureFaiss(_settingsViewModel.faissEndpoint);
+    _vectorSearch.configureFaiss(provider == AppConstants.aiProviderBundledQwen
+        ? '' : _settingsViewModel.faissEndpoint);
+
+    if (provider == AppConstants.aiProviderBundledQwen) {
+      _aiService.configureBundledQwen(
+        temperature: _settingsViewModel.aiTemperature,
+        maxTokens: _settingsViewModel.aiMaxTokens,
+      );
+      return;
+    }
 
     if (provider == AppConstants.aiProviderOllama) {
       _aiService.configureOllama(
@@ -494,7 +507,7 @@ class AiViewModel extends ChangeNotifier {
         notifyListeners();
         try {
           final result = await _aiService.generateReviewDraft(title, content, references)
-              .timeout(const Duration(seconds: 60));
+              .timeout(_generationTimeout);
           if (_disposed || revision != _configurationRevision) {
             _error = '연결 설정이 변경되었습니다. 답변을 다시 생성해 주세요.';
             return null;
@@ -581,7 +594,7 @@ class AiViewModel extends ChangeNotifier {
     try {
       if (!_aiService.isConfigured) throw StateError('인공지능 설정이 필요합니다.');
       final result = await _aiService.testConnection()
-          .timeout(const Duration(seconds: 8));
+          .timeout(_connectionTimeout);
       if (result.trim().isEmpty) throw StateError('연결 응답이 없습니다.');
       if (_disposed || revision != _configurationRevision) {
         throw StateError('연결 설정이 변경되었습니다. 다시 확인해 주세요.');
@@ -758,7 +771,7 @@ class AiViewModel extends ChangeNotifier {
         message: trimmed,
         history: _chatMessages.take(_chatMessages.length - 1).toList(),
         references: references,
-      ).timeout(const Duration(seconds: 60));
+      ).timeout(_generationTimeout);
       if (reply.trim().isEmpty) throw StateError('인공지능 응답이 없습니다.');
       if (_disposed || revision != _configurationRevision ||
           sessionId != _activeChatSessionId) return null;
@@ -1052,3 +1065,4 @@ class AiViewModel extends ChangeNotifier {
     return '${title.substring(0, 26).trim()}...';
   }
 }
+

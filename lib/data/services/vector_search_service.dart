@@ -54,6 +54,11 @@ class VectorSearchService {
   }) async {
     final allEntries = await _kbRepository.getAllEntries();
     if (allEntries.isEmpty) return [];
+    if (_provider == AppConstants.aiProviderBundledQwen) {
+      // Existing vectors may belong to a remote provider. Offline mode uses a
+      // consistent local representation and never contacts that provider.
+      return _textBasedSearch(query, allEntries, topK);
+    }
     final expandedQuery = SearchQueryExpander.expand(query);
 
     // 임베딩이 없는 항목들 임베딩 생성
@@ -165,6 +170,9 @@ class VectorSearchService {
   }
 
   Future<List<double>> _generateEmbedding(String text) async {
+    if (_provider == AppConstants.aiProviderBundledQwen) {
+      return VectorUtils.simpleTextEmbedding(text);
+    }
     if (_provider == AppConstants.aiProviderGemini && _geminiService != null) {
       return await _geminiService!.embed(text);
     }
@@ -221,3 +229,4 @@ class VectorSearchService {
     ].where((value) => value.trim().isNotEmpty).join(' ');
   }
 }
+

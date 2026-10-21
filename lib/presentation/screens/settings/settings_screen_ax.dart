@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import '../../../data/services/bundled_qwen_service.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/constants/app_constants.dart';
@@ -584,6 +586,7 @@ class _AiSettingsViewState extends State<_AiSettingsView> {
   };
 
   String get _title => switch (_provider) {
+    AppConstants.aiProviderBundledQwen => '내장 Qwen',
     AppConstants.aiProviderOpenAi => 'OpenAI',
     AppConstants.aiProviderGemini => 'Google Gemini',
     AppConstants.aiProviderClaude => 'Anthropic Claude',
@@ -605,6 +608,10 @@ class _AiSettingsViewState extends State<_AiSettingsView> {
 
   Widget _fields() {
     switch (_provider) {
+      case AppConstants.aiProviderBundledQwen:
+        return Text(BundledQwenService.instance.isInstalled
+            ? 'Qwen3 1.7B가 설치되어 있습니다. 별도 서버 주소나 인증키 없이 이 PC에서 답변을 생성합니다. 첫 요청은 모델 준비 시간이 필요합니다. 생성된 답변은 근거와 함께 검토해 주세요.'
+            : 'Qwen 포함 Windows 설치본이 필요합니다. 기존 연결 방식도 계속 사용할 수 있습니다.');
       case AppConstants.aiProviderOpenAi:
         return Column(
           children: [
@@ -729,6 +736,14 @@ class _AiSettingsViewState extends State<_AiSettingsView> {
               subtitle: '조직 환경과 보안 정책에 맞는 방식을 선택하세요.',
               icon: Icons.hub_outlined,
               children: [
+                if (Platform.isWindows || _provider == AppConstants.aiProviderBundledQwen)
+                  _ProviderRow(
+                    title: '내장 Qwen',
+                    subtitle: '이 PC에서 실행 · 인터넷 연결 불필요',
+                    icon: Icons.computer_outlined,
+                    selected: _provider == AppConstants.aiProviderBundledQwen,
+                    onTap: () => setState(() => _provider = AppConstants.aiProviderBundledQwen),
+                  ),
                 _ProviderRow(
                   title: '사내·로컬 AI',
                   subtitle: 'Ollama 또는 조직 내부 AI 서버',
@@ -765,7 +780,9 @@ class _AiSettingsViewState extends State<_AiSettingsView> {
             );
             final details = _Panel(
               title: '$_title 연결 정보',
-              subtitle: '연결에 필요한 기본 정보를 입력해 주세요.',
+              subtitle: _provider == AppConstants.aiProviderBundledQwen
+                  ? '설치된 모델을 앱에서 자동으로 실행합니다.'
+                  : '연결에 필요한 기본 정보를 입력해 주세요.',
               icon: Icons.settings_input_component_outlined,
               children: [
                 _fields(),
@@ -780,7 +797,7 @@ class _AiSettingsViewState extends State<_AiSettingsView> {
                     label: Text(_advanced ? '고급 설정 닫기' : '고급 설정 보기'),
                   ),
                 ),
-                if (_advanced)
+                if (_advanced && _provider != AppConstants.aiProviderBundledQwen)
                   TextField(
                     controller: _faiss,
                     decoration: const InputDecoration(
@@ -1922,4 +1939,5 @@ class _GeneralViewState extends State<_GeneralView> {
     );
   }
 }
+
 
