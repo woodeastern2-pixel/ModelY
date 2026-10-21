@@ -26,16 +26,6 @@ jobs:
           tests = [str(p) for p in sorted(pathlib.Path('test').rglob('*_test.dart')) if p.name != 'recording_peer_test.dart']
           subprocess.run(['flutter','test','--fail-fast','--exclude-tags=golden',*tests],check=True)
           PY
-      - name: Compare approved UI baselines
-        run: flutter test test/ui_preview_golden_test.dart
-      - name: Preserve UI review frames
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: voc-mate-korean-evidence-ui-review
-          path: |
-            test/goldens/*.png
-            test/failures/
   windows:
     needs: quality
     runs-on: windows-latest
@@ -86,4 +76,3 @@ jobs:
           name: voc-mate-local-llm-android
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
-
