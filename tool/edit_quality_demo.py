@@ -87,21 +87,33 @@ def main():
         speed = min(1.0, seconds / compact)
         frame = work / f'{n:02}-overlay.png'
         overlay(frame, root, i)
-        filters = [f'[0:v]trim=start={a-start}:end={b-start},setpts=(PTS-STARTPTS)*{s*speed}[s{j}]'
-                   for j,(a,b,s) in enumerate(ranges)]
-        inputs = ''.join(f'[s{j}]' for j in range(len(ranges)))
-        hide_paths = ',crop=1600:928:0:0,pad=1600:1000:0:0:color=0xF3F4FA' if n == 3 else ''
-        filters += [inputs + f'concat=n={len(ranges)}:v=1:a=0,tpad=stop_mode=clone:stop_duration={seconds},trim=duration={seconds}{hide_paths},fps=30,scale=1472:920[screen]',
-                    '[1:v][screen]overlay=424:85:shortest=1[out]',
-                    f'[2:a]atrim=end={speech+0.08},asetpts=PTS-STARTPTS,adelay=180|180,apad,atrim=duration={seconds}[audio]']
         target = work / f'{n:02}.mp4'
         if not args.scenes or n in args.scenes:
-            subprocess.run(['ffmpeg', '-y', '-v', 'error', '-ss', str(start), '-i', str(source),
-                '-framerate', '30', '-loop', '1', '-i', str(frame), '-i', str(voice),
-                '-filter_complex_threads', '2', '-filter_complex', ';'.join(filters),
-                '-map', '[out]', '-map', '[audio]', '-t', str(seconds), '-c:v', 'libx264',
-                '-preset', 'veryfast', '-crf', '19', '-threads', '6', '-pix_fmt', 'yuv420p',
-                '-c:a', 'aac', '-b:a', '160k', '-ar', '48000', '-movflags', '+faststart', str(target)], check=True)
+            # Render each range separately: parallel trim branches retain
+            # minutes of full-size frames while concat waits for earlier ranges.
+            parts = []
+            for j, (a, b, factor) in enumerate(ranges):
+                part = work / f'{n:02}-part-{j:02}.mp4'
+                hide_paths = ',crop=1600:928:0:0,pad=1600:1000:0:0:color=0xF3F4FA' if n == 3 else ''
+                subprocess.run(['ffmpeg', '-y', '-v', 'error', '-ss', str(a),
+                    '-t', str(b-a), '-i', str(source), '-an',
+                    '-vf', f'setpts=(PTS-STARTPTS)*{factor*speed},fps=30{hide_paths},scale=1472:920',
+                    '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '18',
+                    '-threads', '2', '-pix_fmt', 'yuv420p', str(part)], check=True)
+                parts.append(part)
+            part_list = work / f'{n:02}-parts.txt'
+            part_list.write_text(''.join(f"file '{part}'\n" for part in parts))
+            filters = [
+                f'[0:v]tpad=stop_mode=clone:stop_duration={seconds},trim=duration={seconds}[screen]',
+                '[1:v][screen]overlay=424:85:shortest=1[out]',
+                f'[2:a]atrim=end={speech+0.08},asetpts=PTS-STARTPTS,adelay=180|180,apad,atrim=duration={seconds}[audio]']
+            subprocess.run(['ffmpeg', '-y', '-v', 'error', '-f', 'concat', '-safe', '0',
+                '-i', str(part_list), '-framerate', '30', '-loop', '1', '-i', str(frame),
+                '-i', str(voice), '-filter_complex_threads', '2',
+                '-filter_complex', ';'.join(filters), '-map', '[out]', '-map', '[audio]',
+                '-t', str(seconds), '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '19',
+                '-threads', '4', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '160k',
+                '-ar', '48000', '-movflags', '+faststart', str(target)], check=True)
         audit.append({'scene': n, 'title': title, 'source': str(source),
             'source_start': start, 'source_end': end, 'duration': seconds,
             'voice_lead': lead, 'voice_tail': tail, 'wait_interval': wait,
