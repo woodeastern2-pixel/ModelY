@@ -1,291 +1,188 @@
-# AI VOC Intelligence Platform
+# VoC Mate
 
-서버 없이 로컬에서 실행 가능한 Flutter 기반 기업용 VOC 운영 플랫폼입니다.
+**고객 문의 접수부터 근거 확인, 답변 승인, 처리 이력과 내부 공유까지 연결하는 지식 기반 업무 도우미입니다.**
 
-- Frontend: Flutter + Material Design 3
-- Architecture: Clean Architecture + Repository Pattern + MVVM
-- Database: SQLite (sqflite)
-- Vector Search:
-  - 기본: 앱 내 코사인 유사도 검색
-  - 선택: FAISS 브릿지 서버 연동
-- AI Engine: Ollama / OpenAI 선택
-- Integration: JIRA REST API
-- Target: Android APK, Windows EXE
+VOC(Voice of Customer, 고객의 소리)와 매뉴얼을 함께 관리하고, AI(Artificial Intelligence, 인공지능)가 검색한 자료를 바탕으로 답변 초안을 작성합니다. 담당자는 인용된 문서와 원문을 확인한 뒤 답변을 검토·승인합니다. Windows와 Android를 지원합니다.
 
-## UI Renewal 1.1
+> **현재 구현 기준: 2026-10-21 · 앱 버전 `1.1.26+28`**  
+> 최신 기능·시연·배포 파일은 [`work/voc-mate-quality-recording`](https://github.com/woodeastern2-pixel/ModelY/tree/work/voc-mate-quality-recording) 브랜치 기준입니다. `main`에는 이 README 안내를 반영했으며, 최신 앱 소스는 위 브랜치에서 확인하거나 내려받아야 합니다.
 
-운영자가 오늘 처리할 신호를 빠르게 판단하도록 화면 구조를 새로 정리했습니다.
+[배포 파일](#배포-파일과-실행) · [모델 구성](#ai-모델-구성) · [개발 환경](#개발-환경과-빌드) · [검증 기록](#검증-상태) · [운영 문서](#운영-문서와-주요-코드)
 
-- Paperthin 원칙: 한 화면 한 헤더, 얇은 경계, 절제된 반경, 단일 인디고 강조색
-- 반응형 셸: 모바일 하단 내비게이션, 태블릿 축약 레일, 데스크톱 확장 사이드바
-- 운영 대시보드: 미처리 VOC, 해결률, AI 활용률, 우선 액션을 첫 화면에 배치
-- 접근성: 라이트/다크 테마, 44px 이상 터치 영역, 확대 글자 대응
-- 타이포그래피: Pretendard를 앱에 포함해 Android와 Windows에서 일관되게 표시
+## 주요 기능
 
-UI 변경은 10개 화면·텍스트 배율 조합의 반응형 하네스와 실제 렌더 프리뷰로 검증합니다.
+| 업무 | 제공 기능 |
+| --- | --- |
+| 운영 현황 | 문의 현황, 처리 상태와 담당 업무를 대시보드에서 확인 |
+| 문의 관리 | 고객·프로젝트·유형·담당자·처리 상태 관리, 문의 등록과 처리 이력 조회 |
+| 지식 자료 | 매뉴얼 등록·검색, 문서 본문·출처·원본 이미지 확인, PDF·DOCX·XLSX·PPTX 자료 가져오기 |
+| 답변 작성 | 관련 지식 검색, 근거를 활용한 답변 초안, 담당자 검토와 승인 |
+| 코파일럿 | 업무 질문에 대한 지식 기반 질의응답과 참고 근거 확인 |
+| 공유와 연동 | 내부망 문의·매뉴얼 공유, 동기화 실패 재시도, JIRA·Confluence·Outlook·Teams/Slack 연동 설정 |
+| 데이터 관리 | Excel 가져오기·내보내기, 백업 등 운영 기능, 외부 AI 전송 전 개인정보 패턴 마스킹 |
 
-### Release 1.1.3 (build 5)
+기본 업무 흐름은 **문의 접수 → 지식 검색 → 답변 초안 → 근거 확인 → 검토·승인 → 처리 이력·공유**입니다. 외부 업무 도구 연동은 각 서비스의 계정·권한·연결 설정이 필요합니다.
 
-- Brity Mail, Messenger, Meeting, Drive, Copilot 제품명을 한글 또는 영문으로 입력해도 같은 지식 자료를 검색합니다.
-- 지식 목록, VOC 답변 생성, AI 채팅 참조 검색에 동일한 제품명 별칭 규칙을 적용합니다.
-- 기존 설치본의 Brity 매뉴얼 검색 임베딩을 새 별칭 기준으로 다시 생성합니다.
-- NASCA DRM PDF는 빈 지식으로 등록하지 않고 DRM 해제본이 필요하다는 원인을 표시합니다.
+## 사용 기술과 역할
 
-### Release 1.1.2 (build 4)
+| 구성 | 기술 | 적용 역할 |
+| --- | --- | --- |
+| 앱 화면 | Flutter · Dart · Material 3 · Pretendard | Windows·Android 화면, 반응형 구성, 한국어 표시 |
+| 상태와 구조 | Provider · ViewModel · Repository | 화면 상태, 업무 로직, 데이터 접근 분리 |
+| 로컬 데이터 | SQLite · `sqflite` · `sqflite_common_ffi` | 문의·답변·지식·설정 저장 |
+| 지식 검색 | 앱 내부 검색 인덱스 · 키워드/개념 확장 · 벡터 검색 | 관련 문서 탐색과 답변 근거 연결; 외부 FAISS 검색 브리지는 선택 사항 |
+| 근거 기반 생성 | RAG(Retrieval-Augmented Generation, 검색 증강 생성) | 질문과 관련 자료를 함께 활용하는 답변 초안·코파일럿 |
+| 로컬 언어 모델 | Qwen3 · Ollama · llama.cpp | 시연용 모델 연결 및 Windows 내장 모델 실행 |
+| 선택형 외부 AI | OpenAI · Gemini · Claude | 사용자가 설정한 외부 API(Application Programming Interface, 프로그램 연동 인터페이스) 호출 |
+| 개발·검증·배포 | Codex · GitHub Actions | 개발 보조, 정적 분석·회귀 검사, Windows·Android 빌드 |
 
-- 내부망 VOC 동기화 설정을 데이터 관리 화면에 상시 노출
-- 실제 연결 앱에서 데이터가 수신된 경우에만 동기화 알림 표시
-- 실행 중인 앱 버전과 연결 앱 수를 사이드바에 표시
-- Windows 설치 파일과 Android APK 이름에 버전 및 빌드 번호 포함
-- ROI·비용·회수기간 등 가정 기반 지표를 제거하고 실제 운영 데이터만 표시
+## AI 모델 구성
 
-```bash
-flutter test --exclude-tags=golden
-flutter test test/ui_preview_golden_test.dart
-```
+LLM(Large Language Model, 대규모 언어 모델)은 실행 환경과 선택한 연결 방식에 따라 달라집니다.
 
-의도적으로 디자인 기준 이미지를 갱신할 때만 `--update-goldens`를 사용하고,
-모바일·태블릿·데스크톱 결과를 시각 검수한 뒤 함께 커밋합니다.
+| 방식 | 모델·구성 | 사용 범위 |
+| --- | --- | --- |
+| 로컬 지식 응답 | 앱 내부 검색·근거 조합 | LLM 연결 없이도 로컬 자료를 활용하는 응답 경로 |
+| Windows 내장 Qwen | **Qwen3-1.7B Q8_0 + llama.cpp** | Qwen 포함 배포 폴더에서 별도 Ollama 설치나 인증키 없이 실행 |
+| 최신 전체 시연 | **`qwen3:4b-instruct-2507-q4_K_M` + Ollama** | 실제 답변 초안·코파일럿 응답을 생성한 시연 모델 |
+| 외부 서비스 | OpenAI · Gemini · Claude | 설정한 모델과 인증키로 연결; 요청 데이터가 해당 서비스로 전송됨 |
 
-## 내부 자료 기반 답변 및 설치 파일
+**시연의 4B 모델과 Windows에 포함된 1.7B 모델은 서로 다른 구성입니다.** 시연 결과를 내장 모델의 동일한 성능 보장으로 해석하면 안 됩니다. Android 배포본에는 Qwen 모델을 포함하지 않습니다.
 
-- 대화와 VOC 답변 초안은 저장된 지식과 승인된 답변을 로컬에서 검색해 출처와 함께 보여줍니다. 일치하는 근거가 없으면 답변을 생성하지 않습니다.
-- Windows 설치 파일은 GitHub Actions의 **Build Windows EXE** 실행 결과에서 `AI-VOC-Assistant-v...-Setup` 아티팩트를 내려받은 뒤 ZIP을 풀어 `.exe`를 실행합니다.
-- **AI VOC Renewal Quality Gate**의 Windows ZIP은 실행 파일 묶음이며 설치용 EXE가 아닙니다.
+내장 Qwen은 첫 요청에 모델을 준비하며, 5분 동안 사용하지 않거나 앱이 종료되면 실행 프로세스를 종료합니다. 모델 파일만 약 1.83GB이고, 실행에는 추가 메모리가 필요합니다. 응답 시간은 PC 성능과 입력 길이에 따라 달라집니다. 자세한 동작은 [내장 Qwen 안내](https://github.com/woodeastern2-pixel/ModelY/blob/work/voc-mate-quality-recording/docs/bundled_qwen.md)를 참고하세요.
 
-## 1. 주요 기능 구현 상태
+## 배포 파일과 실행
 
-- VOC 등록: 고객명, 프로젝트명, 카테고리, 제목, 내용, 우선순위 저장
-- AI 신규 VOC 분석(점수 포함)
-  - 업무 관련 여부
-  - 카테고리
-  - 긴급도(Critical/High/Medium/Low)
-  - 담당 부서 추천
-  - 담당자 추천(Top 3)
-  - 중복 VOC 탐지(임베딩 기반, 85% 이상)
-  - JIRA 생성 필요 여부
-- AI 답변 추천(RAG): 유사 사례 기반 추천 답변/신뢰도/참고 목록 제공
-- 신규 VOC 등록 직후(업무 관련) AI 답변 화면 자동 진입
-- 시스템 매뉴얼 업로드 기반 지식화
-  - 지식베이스 화면에서 PDF, DOCX, XLSX, PPTX 업로드
-  - 문서 본문을 섹션 단위로 분할해 knowledge_base에 자동 적재
-  - 신규 VOC 답변 생성 시 시스템 매뉴얼 출처를 우선 참조
-- 답변 승인 프로세스: Draft 저장 후 관리자 승인, Confluence FAQ 자동 등록 시도
-- Outlook 연동: 메일 수집, 메일 기반 VOC 생성, 첨부파일 로컬 저장
-- Excel 연동(xlsx): VOC 대량 Import, VOC Export
-- Teams/Slack Webhook: 긴급 장애 알림, VOC/AI 답변 공유
-- JIRA 연동: 이슈 생성/조회/연결 테스트
-- 관리자 화면: VOC/답변/카테고리/설정 관리
-- 통합 대시보드: 중복 감소율, AI 활용률, 평균 처리시간, 담당자별 처리 현황
+2026-10-21 검증·빌드가 완료된 파일입니다. 빌드 기준 커밋은 `8e2aa4943ff221276988652e0358282da112b626`입니다.
 
-## 2. 프로젝트 구조
+| 플랫폼 | 다운로드 | 실행 방법 |
+| --- | --- | --- |
+| Windows | [Qwen 포함 배포 ZIP — 약 1.94GB](https://github.com/woodeastern2-pixel/ModelY/actions/runs/39589659800/artifacts/12342600089) | 전체 압축을 풀고 `ai_voc_assistant.exe` 실행 |
+| Android | [APK가 포함된 ZIP — 약 55MB](https://github.com/woodeastern2-pixel/ModelY/actions/runs/39589659800/artifacts/12341661087) | 압축을 풀고 `app-release.apk` 설치 |
 
-```text
-ai_voc_assistant/
-  lib/
-    core/
-      constants/
-      database/
-      theme/
-      utils/
-    domain/
-      entities/
-      repositories/
-    data/
-      datasources/
-        local/
-        remote/
-      repositories/
-      services/
-    presentation/
-      screens/
-        splash/
-        login/
-        home/
-        dashboard/
-        voc/
-        knowledge_base/
-        jira/
-        settings/
-        admin/
-      viewmodels/
-      widgets/
-    main.dart
-  assets/
-    fonts/
-    images/
-    icons/
-  scripts/
-    faiss_bridge_server.py
-    requirements-faiss.txt
-  pubspec.yaml
-```
+Windows 파일은 **폴더 단위로 실행하는 배포본**입니다. EXE(Executable, 실행 파일)만 따로 옮기지 말고 DLL(Dynamic-Link Library, 동적 연결 라이브러리), `data`, `local_ai`를 함께 유지하세요. 위 링크는 설치 마법사 형태의 Setup 파일이 아닙니다. Android APK(Android Package, 안드로이드 설치 패키지) 본체는 약 93.7MB입니다.
 
-## 3. DB 스키마
+GitHub Actions 산출물 다운로드에는 로그인이 필요할 수 있습니다. 현재 보관 만료 예정일은 **2027-01-19**이며, 이후에는 [빌드 실행 페이지](https://github.com/woodeastern2-pixel/ModelY/actions/runs/39589659800)와 후속 배포 기록을 확인해야 합니다.
 
-앱 시작 시 SQLite에 자동 생성됩니다.
+### 처음 사용하기
 
-- vocs
-  - id, title, content, category, customer, project, priority, status, created_at
-- responses
-  - id, voc_id, content, status, ai_generated, confidence_score, approved_at
-- knowledge_base
-  - id, question, answer, category, embedding, resolved_at
-- jira_links
-  - id, voc_id, jira_key, jira_status
-- settings
-  - key, value
+1. 배포 파일을 준비하고 앱을 실행합니다.
+2. **설정 → AI 설정**에서 연결 방식을 확인합니다. Qwen 포함 Windows 새 설치는 내장 Qwen을 기본으로 사용하며, 기존에 저장한 외부 연결 설정은 유지합니다.
+3. 기존 사용자가 내장형으로 전환하려면 **내장 Qwen**을 선택하고 저장·연결 확인을 실행합니다.
+4. 지식 자료를 확인하거나 업무 매뉴얼을 등록한 뒤 문의를 접수합니다.
+5. 답변 초안을 생성하고 인용 문서의 내용·버전·적용 조건을 확인한 후 검토·승인합니다.
 
-## 4. 로컬 실행
+### 시연과 같은 Ollama 모델 사용
 
-### 4.1 Flutter 준비
+Ollama를 사용하는 별도 환경에서는 아래 모델을 준비하고, 앱의 AI 설정에서 Ollama 주소와 모델명을 지정합니다. 내장 Qwen 사용자에게 필요한 설치 단계는 아닙니다.
 
 ```bash
-flutter --version
+ollama pull qwen3:4b-instruct-2507-q4_K_M
+```
+
+같은 PC에서 실행 중인 Ollama의 일반적인 주소는 `http://localhost:11434`입니다. 다른 PC 또는 Android에서 접속한다면 해당 기기의 `localhost`가 아닌 실제 모델 서버 주소를 설정해야 합니다. 최신 시연은 온도 `0.1`, 최대 출력 토큰 `640`을 사용했습니다.
+
+## 최신 전체 시연과 발표 자료
+
+최신 시연은 **LLM을 적용한 전체 시스템 영상 한 편**입니다. 실제 앱과 Qwen3 4B의 생성 결과를 사용하며, 다음 흐름을 보여 줍니다.
+
+1. 운영 현황
+2. 언어 모델 연결
+3. 지식 자료 관리
+4. 문의 접수
+5. 답변 초안 생성
+6. 근거 확인
+7. 검토와 승인
+8. 처리 이력
+9. 코파일럿 질의
+10. 내부망 공유
+11. 데이터 보호
+
+`중복 점검과 백업` 장면은 시연에서 제외했습니다. 시연 데이터와 일부 대기 구간을 줄인 편집이 포함되어 있어 영상 길이를 실제 업무 처리 시간이나 모델 응답 속도 측정값으로 사용할 수는 없습니다.
+
+| 별도 전달 자료 | 구성 |
+| --- | --- |
+| `VOC_Mate_LLM_Full_System_Demo.mp4` | 1920×1080, 약 2분 58초(178.492초), 한국어 근거 확인 반영 |
+| `VOC_Mate_발표자료_최종본.pptx` | 15장, 사용 기술 장표 추가, 최신 시연 한 편 삽입 |
+| `VOC_Mate_장표별_발표문.pdf` | 15쪽, 장표별 낭독용 원고와 전환 문장; PPT 설명문에 넣지 않고 별도 제공 |
+
+위 발표·영상 파일은 별도로 전달한 자료이며 이 저장소의 다운로드 항목으로 게시하지 않았습니다. 최종 영상의 SHA-256 해시와 편집·검증 기록은 [한국어 근거 표시 검증 문서](https://github.com/woodeastern2-pixel/ModelY/blob/work/voc-mate-quality-recording/docs/evidence-korean-validation-2026-10-21.md)에 있습니다.
+
+### 한국어 근거 표시 범위
+
+이번 시연에서 인용한 `brity-messenger-desktop-020`, `raw-messenger-desktop-22` 두 항목에 원문 대조 한국어 번역을 연결했습니다. 정확한 원문 해시가 일치할 때 한국어를 기본 표시하고, 영문 원문·출처·원본 이미지는 펼쳐 확인할 수 있습니다. 저장된 원문과 검색 입력은 유지합니다.
+
+PDF 도표에서 떨어져 나온 단독 알파벳 표식은 대응 설명을 확인할 수 있는 패턴에서 정리합니다. 일반 목록과 코드는 보존합니다. **전체 영문 매뉴얼의 번역을 완료한 것은 아닙니다.**
+
+## 개발 환경과 빌드
+
+아래 명령은 최신 작업 브랜치를 대상으로 합니다. 검증에 사용한 Flutter 버전은 **3.47.2**입니다. Windows 빌드에는 Windows와 해당 네이티브 개발 도구, Android 빌드에는 Android 개발 도구가 필요하며, 검증 워크플로는 Java 21을 사용합니다.
+
+```bash
+git clone --branch work/voc-mate-quality-recording https://github.com/woodeastern2-pixel/ModelY.git
+cd ModelY
 flutter doctor
-```
-
-### 4.2 의존성 설치
-
-```bash
 flutter pub get
+flutter devices
 ```
 
-### 4.3 플랫폼 파일 생성 (최초 1회)
-
-현재 저장소에 Flutter 플랫폼 폴더가 없다면:
+Windows에서 실행:
 
 ```bash
-flutter create . --platforms=android,windows
-```
-
-### 4.4 실행
-
-```bash
-# Windows
 flutter run -d windows
-
-# Android 디바이스/에뮬레이터
-flutter run -d android
 ```
 
-## 5. AI 설정
-
-앱의 설정 화면에서 선택:
-
-- Ollama
-  - URL 예: http://localhost:11434
-  - 모델 예: llama3.2
-- OpenAI
-  - API Key
-  - 모델 예: gpt-4o-mini
-
-## 6. FAISS 연동 (선택)
-
-기본은 앱 내부 검색으로 동작하며, 필요 시 FAISS 브릿지를 붙일 수 있습니다.
-
-### 6.1 브릿지 실행
+Android는 `flutter devices`에 표시된 실제 장치 ID로 `flutter run -d <device-id>`를 실행합니다.
 
 ```bash
-cd scripts
-python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\\Scripts\\activate
-pip install -r requirements-faiss.txt
-uvicorn faiss_bridge_server:app --host 127.0.0.1 --port 8787
-```
-
-### 6.2 앱 설정
-
-- 설정 > AI 설정 > FAISS Endpoint
-- 값: http://127.0.0.1:8787
-
-## 7. Outlook / Excel / Teams / Slack / Confluence 설정
-
-설정 > 연동 탭에서 등록:
-
-- Outlook
-  - Graph Access Token
-  - 폴더(Inbox 등)
-- Teams
-  - Incoming Webhook URL
-- Slack
-  - Incoming Webhook URL
-- Confluence
-  - URL, Space Key, Email, Token
-- Excel
-  - xlsx Import/Export 버튼 제공
-
-## 7.1 시스템 매뉴얼 업로드
-
-- 위치: 지식베이스 화면 우측 상단 업로드 아이콘
-- 권장 포맷: PDF, DOCX, XLSX, PPTX
-- 처리 방식:
-  - 문서 텍스트 추출
-  - 약 900자 단위 섹션 분할
-  - category=시스템매뉴얼로 지식베이스 등록
-  - 임베딩 생성 후 검색 인덱스 반영
-- 답변 생성 동작:
-  - 유사 후보 검색 후 시스템 매뉴얼 항목에 가중치 부여
-  - 프롬프트에 출처(시스템 매뉴얼/VOC 이력) 표시
-  - 시스템 매뉴얼 출처를 우선 참조하도록 규칙 적용
-
-참고: 구형 바이너리 포맷(doc/xls/ppt)은 직접 파싱이 어려워 OpenXML(docx/xlsx/pptx)로 저장 후 업로드를 권장합니다.
-
-## 8. JIRA 설정
-
-설정 > JIRA 설정에서 입력:
-
-- URL (예: https://yourcompany.atlassian.net)
-- Project Key
-- Email
-- API Token
-
-## 9. 빌드 가이드
-
-### 8.1 Android APK
-
-```bash
+flutter analyze
+flutter test
+flutter build windows --release
 flutter build apk --release
 ```
 
-출력:
-
-- build/app/outputs/flutter-apk/app-release.apk
-
-### 8.1.1 고정 다운로드 링크 사용
-
-항상 같은 링크로 최신 APK를 배포하려면 아래 스크립트를 사용하세요.
+Windows의 Qwen 포함 배포를 재현하려면 Windows 빌드 후 다음 명령으로 모델과 실행 엔진을 배치합니다. 이 단계에는 Python과 다운로드 가능한 네트워크 환경이 필요합니다.
 
 ```bash
-bash scripts/build_release_artifacts.sh
+python tool/prepare_bundled_qwen.py build/windows/x64/runner/Release/local_ai
 ```
 
-이 스크립트는 arm64 전용 APK로 빌드해서 용량을 줄인 뒤 아래 파일을 갱신합니다.
+스크립트는 고정된 모델·실행 엔진 파일의 해시를 검증하고 라이선스·모델 카드를 함께 배치합니다. 일반 `flutter build windows`만으로 모델 다운로드·포함이 완료되는 것은 아닙니다.
 
-- release_artifacts/ai_voc_assistant-latest.apk
-- release_artifacts/ai_voc_assistant-arm64-v8a-release.apk
+- Windows 실행 파일: `build/windows/x64/runner/Release/ai_voc_assistant.exe`
+- Android 설치 파일: `build/app/outputs/flutter-apk/app-release.apk`
+- 기여·검증 규약: [AGENTS.md](https://github.com/woodeastern2-pixel/ModelY/blob/work/voc-mate-quality-recording/AGENTS.md)
 
-고정 GitHub 다운로드 링크:
+## 검증 상태
 
-- https://github.com/woodeastern2-pixel/ModelY/raw/main/release_artifacts/ai_voc_assistant-latest.apk
+아래는 **2026-10-21 앱 소스 `c1e4d2c` 및 동일 앱 소스를 포함한 배포 빌드 `8e2aa49`의 기록**입니다. 이후 변경의 결과나 모든 업무 질문에 대한 정확도 보장을 뜻하지 않습니다.
 
-`ai_voc_assistant-latest.apk`는 기본적으로 arm64-v8a APK를 가리킵니다.
+| 항목 | 확인 결과 |
+| --- | --- |
+| 정적 분석 | 기존 진단 98건 유지, 새 진단 0건 |
+| 회귀 검사 | 225건 통과; 화면 10개 크기·텍스트 배율 조합과 내비게이션 검사 포함 |
+| 화면 추가 감사 | 추가 검사 16건 통과; 수정 전후 휴대폰·태블릿·데스크톱 이미지가 동일하고 신규 픽셀 차이 0 |
+| 기존 승인 이미지 | 대시보드 기준 이미지 3장의 기존 불일치가 남아 있으며 기준 이미지를 임의 갱신하지 않음 |
+| 배포 | Windows·Android 릴리스 빌드, 파일 존재 확인, 산출물 업로드 성공 |
+| 영상 | 실제 한국어 근거 화면 재촬영, 전체 디코딩 검사, 영문 잔상 제거 확인 |
 
-### 8.2 Windows EXE
+[검증·빌드 실행](https://github.com/woodeastern2-pixel/ModelY/actions/runs/39589659800) · [검증 상세와 남은 항목](https://github.com/woodeastern2-pixel/ModelY/blob/work/voc-mate-quality-recording/docs/evidence-korean-validation-2026-10-21.md)
 
-```bash
-flutter build windows --release
-```
+## 데이터 처리와 운영
 
-출력:
+문의·답변·지식·설정은 로컬 데이터베이스에 저장합니다. Windows 내장 Qwen은 해당 PC의 인증된 루프백 연결에서 추론하며, 외부 모델 서버가 필요하지 않습니다. Ollama는 사용자가 설정한 서버 주소에 연결합니다.
 
-- build/windows/x64/runner/Release/
+OpenAI·Gemini·Claude를 선택하면 답변 생성에 필요한 텍스트가 해당 외부 서비스로 전송됩니다. 외부 AI 요청 전 이메일·전화번호·주민등록번호 형식·카드번호 형식·일부 이름 표식을 패턴 기반으로 마스킹하며, 원본 로컬 자료는 변경하지 않습니다. 이 처리가 모든 개인정보를 탐지하거나 제거하는 것은 아닙니다.
 
-## 10. 샘플 데이터
+내부망 공유 및 JIRA·Confluence·Outlook·Teams/Slack 연동은 설정에 따른 네트워크 통신을 사용합니다. 로컬 모델 사용만으로 앱의 모든 외부 통신이 차단되는 것은 아닙니다. 생성된 답변은 근거 확인과 담당자 검토를 거쳐 사용하세요.
 
-앱 첫 실행 시 샘플 지식베이스 데이터 5건이 자동 삽입됩니다.
+## 운영 문서와 주요 코드
 
-## 11. 보안/운영 참고
+아래 링크는 최신 구현이 있는 작업 브랜치를 가리킵니다.
 
-- OpenAI API Key, JIRA Token은 SQLite settings에 저장됩니다.
-- 운영 배포 시 암호화 저장소(예: flutter_secure_storage) 적용을 권장합니다.
+- [내장 Qwen 구성·배포 재현](https://github.com/woodeastern2-pixel/ModelY/blob/work/voc-mate-quality-recording/docs/bundled_qwen.md)
+- [개인정보와 AI 데이터 처리](https://github.com/woodeastern2-pixel/ModelY/blob/work/voc-mate-quality-recording/docs/privacy_and_ai_data_policy.md)
+- [내부망 동기화 운영](https://github.com/woodeastern2-pixel/ModelY/blob/work/voc-mate-quality-recording/docs/sync-operations.md) · [배포 점검표](https://github.com/woodeastern2-pixel/ModelY/blob/work/voc-mate-quality-recording/docs/sync-rollout-checklist.md)
+- [시연 모델·응답 검증](https://github.com/woodeastern2-pixel/ModelY/blob/work/voc-mate-quality-recording/docs/demo-video-quality-validation-2026-10-21.md) · [최종 한국어 근거·영상·빌드 검증](https://github.com/woodeastern2-pixel/ModelY/blob/work/voc-mate-quality-recording/docs/evidence-korean-validation-2026-10-21.md)
+- [화면·ViewModel](https://github.com/woodeastern2-pixel/ModelY/tree/work/voc-mate-quality-recording/lib/presentation) · [업무 모델·계약](https://github.com/woodeastern2-pixel/ModelY/tree/work/voc-mate-quality-recording/lib/domain) · [저장·검색·AI·연동](https://github.com/woodeastern2-pixel/ModelY/tree/work/voc-mate-quality-recording/lib/data)
+- [회귀 검사](https://github.com/woodeastern2-pixel/ModelY/tree/work/voc-mate-quality-recording/test) · [실제 앱 통합 검사](https://github.com/woodeastern2-pixel/ModelY/tree/work/voc-mate-quality-recording/integration_test) · [GitHub Actions](https://github.com/woodeastern2-pixel/ModelY/tree/work/voc-mate-quality-recording/.github/workflows)
