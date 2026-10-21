@@ -108,14 +108,14 @@ def main():
         edited=work/f'{i+1:02}-screen.mp4'
         pieces=[]
         for j,(a,b,sp) in enumerate(ranges):
-            pieces.append(f'[0:v]trim=start={a}:end={b},setpts=(PTS-STARTPTS)*{sp*speed}[p{j}]')
+            pieces.append(f'[0:v]trim=start={a-start}:end={b-start},setpts=(PTS-STARTPTS)*{sp*speed}[p{j}]')
         joined=''.join(f'[p{j}]' for j in range(len(ranges)))
         pieces.append(joined+f'concat=n={len(ranges)}:v=1:a=0,tpad=stop_mode=clone:stop_duration={out_seconds},trim=duration={out_seconds},fps=30,scale=1472:920[screen]')
         frame=work/f'{i+1:02}-overlay.png'
         overlay(frame,root,i)
         pieces.append('[1:v][screen]overlay=424:85:shortest=1[out]')
         final=work/f'{i+1:02}.mp4'
-        run(['ffmpeg','-y','-v','error','-i',str(raw),'-framerate','30','-loop','1','-i',str(frame),'-i',str(voice),
+        run(['ffmpeg','-y','-v','error','-ss',str(start),'-i',str(raw),'-framerate','30','-loop','1','-i',str(frame),'-i',str(voice),
              '-filter_complex_threads','2','-filter_complex',';'.join(pieces)+';[2:a]adelay=700|700,apad,atrim=duration='+str(out_seconds)+'[audio]',
              '-map','[out]','-map','[audio]','-t',str(out_seconds),'-c:v','libx264','-preset','veryfast','-crf','19','-threads','6',
              '-pix_fmt','yuv420p','-c:a','aac','-b:a','160k','-ar','48000','-movflags','+faststart',str(final)])
