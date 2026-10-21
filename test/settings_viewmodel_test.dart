@@ -5,6 +5,59 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('fresh bundled choice survives connection confirmation and restart', () async {
+    final repository = _MemorySettingsRepository({});
+    final viewModel = SettingsViewModel(repository,
+        bundledQwenInstalled: () => true);
+    await viewModel.loadSettings();
+    expect(viewModel.aiProvider, AppConstants.aiProviderBundledQwen);
+    expect(repository.values[AppConstants.settingAiProvider],
+        AppConstants.aiProviderBundledQwen);
+
+    await viewModel.saveSetting('ai_connection_configured', 'true');
+    expect(viewModel.aiProvider, AppConstants.aiProviderBundledQwen);
+    viewModel.dispose();
+    final restarted = SettingsViewModel(repository,
+        bundledQwenInstalled: () => true);
+    await restarted.loadSettings();
+    expect(restarted.aiProvider, AppConstants.aiProviderBundledQwen);
+    restarted.dispose();
+  });
+
+  test('a saved external provider is not replaced by the bundle', () async {
+    final repository = _MemorySettingsRepository({
+      AppConstants.settingAiProvider: AppConstants.aiProviderOllama,
+      'ai_connection_configured': 'true',
+    });
+    final viewModel = SettingsViewModel(repository,
+        bundledQwenInstalled: () => true);
+    await viewModel.loadSettings();
+    expect(viewModel.aiProvider, AppConstants.aiProviderOllama);
+    viewModel.dispose();
+  });
+
+  test('custom legacy Ollama settings are preserved', () async {
+    final repository = _MemorySettingsRepository({
+      AppConstants.settingOllamaModel: 'user-custom-model',
+    });
+    final viewModel = SettingsViewModel(repository,
+        bundledQwenInstalled: () => true);
+    await viewModel.loadSettings();
+    expect(viewModel.aiProvider, AppConstants.aiProviderOllama);
+    expect(viewModel.ollamaModel, 'user-custom-model');
+    viewModel.dispose();
+  });
+
+  test('missing bundle preserves the ordinary installation default', () async {
+    final repository = _MemorySettingsRepository({});
+    final viewModel = SettingsViewModel(repository,
+        bundledQwenInstalled: () => false);
+    await viewModel.loadSettings();
+    expect(viewModel.aiProvider, AppConstants.aiProviderOllama);
+    expect(repository.values.containsKey(AppConstants.settingAiProvider), isFalse);
+    viewModel.dispose();
+  });
+
   test('collaboration settings preserve existing JIRA values', () async {
     final repository = _MemorySettingsRepository({
       AppConstants.settingJiraUrl: 'https://jira.example.com',
@@ -62,3 +115,4 @@ class _MemorySettingsRepository implements SettingsRepository {
     values[key] = value;
   }
 }
+

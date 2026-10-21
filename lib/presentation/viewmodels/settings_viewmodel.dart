@@ -5,12 +5,15 @@ import '../../domain/repositories/settings_repository.dart';
 
 class SettingsViewModel extends ChangeNotifier {
   final SettingsRepository _repository;
+  final bool Function() _bundledQwenInstalled;
 
   Map<String, String> _settings = {};
   bool _isLoading = false;
   String? _error;
 
-  SettingsViewModel(this._repository) {
+  SettingsViewModel(this._repository, {bool Function()? bundledQwenInstalled})
+      : _bundledQwenInstalled = bundledQwenInstalled ??
+            (() => BundledQwenService.instance.isInstalled) {
     loadSettings();
   }
 
@@ -18,20 +21,8 @@ class SettingsViewModel extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
-  String get aiProvider {
-    final selected = _settings[AppConstants.settingAiProvider] ??
-        AppConstants.aiProviderOllama;
-    // Choose the bundle for a fresh/default installation only. Do not change a
-    // user's explicit choice or silently replace an existing external server.
-    if (selected == AppConstants.aiProviderOllama &&
-        _settings['ai_connection_configured'] != 'true' &&
-        ollamaUrl == AppConstants.defaultOllamaUrl &&
-        ollamaModel == AppConstants.defaultOllamaModel &&
-        BundledQwenService.instance.isInstalled) {
-      return AppConstants.aiProviderBundledQwen;
-    }
-    return selected;
-  }
+  String get aiProvider => _settings[AppConstants.settingAiProvider] ??
+      AppConstants.aiProviderOllama;
   double get aiTemperature =>
       double.tryParse(
         _settings[AppConstants.settingAiTemperature] ??
@@ -245,6 +236,19 @@ class SettingsViewModel extends ChangeNotifier {
     notifyListeners();
     try {
       _settings = await _repository.getAllSettings();
+      // Persist the fresh-install choice before notifying consumers. Otherwise
+      // saving a successful connection could make the computed default revert
+      // to Ollama. Explicit or customized external connections stay unchanged.
+      if (aiProvider == AppConstants.aiProviderOllama &&
+          _settings['ai_connection_configured'] != 'true' &&
+          ollamaUrl == AppConstants.defaultOllamaUrl &&
+          ollamaModel == AppConstants.defaultOllamaModel &&
+          _bundledQwenInstalled()) {
+        await _repository.setValue(AppConstants.settingAiProvider,
+            AppConstants.aiProviderBundledQwen);
+        _settings[AppConstants.settingAiProvider] =
+            AppConstants.aiProviderBundledQwen;
+      }
       _error = null;
     } catch (e) {
       _error = e.toString();
