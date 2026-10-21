@@ -41,7 +41,9 @@ bool FlutterWindow::OnCreate() {
   qwen_channel_ = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
       flutter_controller_->engine()->messenger(), "voc_mate/qwen_process",
       &flutter::StandardMethodCodec::GetInstance());
-  qwen_channel_->SetMethodCallHandler([this](const auto& call, auto result) {
+  qwen_channel_->SetMethodCallHandler([this](
+      const flutter::MethodCall<flutter::EncodableValue>& call,
+      std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
     if (call.method_name() != "attach") {
       result->NotImplemented();
       return;
@@ -49,8 +51,8 @@ bool FlutterWindow::OnCreate() {
     const auto* value = call.arguments();
     int64_t pid = 0;
     if (value) {
-      if (const auto* small = std::get_if<int32_t>(value)) pid = *small;
-      if (const auto* large = std::get_if<int64_t>(value)) pid = *large;
+      if (const auto* pid32 = std::get_if<int32_t>(value)) pid = *pid32;
+      if (const auto* pid64 = std::get_if<int64_t>(value)) pid = *pid64;
     }
     bool attached = false;
     if (qwen_job_ && pid > 0 && pid <= MAXDWORD) {

@@ -22,14 +22,16 @@ jobs:
       - run: flutter pub get
       - name: Analyze
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
-      - name: Reuse verified regression only for identical application sources
+      - name: Reuse verified Dart regression only for identical tested sources
         run: |
           git fetch --no-tags --depth=1 origin 094063c4783bb0da3c19a3de6204c87386b937db
           python3 - <<'PYREG'
           import hashlib, pathlib, subprocess
           baseline = '094063c4783bb0da3c19a3de6204c87386b937db'
+          # These Flutter unit/widget tests do not compile the Windows runner.
+          # Native changes are separately compiled and exercised in windows job.
           same = subprocess.run(['git','diff','--quiet',baseline,'HEAD','--',
-              'lib','test','integration_test','windows','pubspec.yaml']).returncode == 0
+              'lib','test','integration_test','pubspec.yaml']).returncode == 0
           locked = hashlib.sha256(pathlib.Path('pubspec.lock').read_bytes()).hexdigest()
           if same and locked == '55e2d373a37a5b7a45e5ae50884b9e9c8c03bcdfe96faf0e22fdef2f1a1bcb66':
               print('214 regression/responsive tests reused from run 39558661483; identical tested sources and resolved dependencies.')
