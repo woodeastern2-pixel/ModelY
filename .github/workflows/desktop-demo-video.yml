@@ -1,7 +1,7 @@
 name: VOC Mate full system LLM recording
 on:
   push:
-    branches: [work/voc-mate-desktop-recording]
+    branches: [work/voc-mate-quality-recording]
     paths:
       - integration_test/desktop_demo_test.dart
       - test/recording_peer_test.dart
@@ -15,7 +15,7 @@ permissions:
 jobs:
   full-system-recording:
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -43,10 +43,12 @@ jobs:
       - name: Start real language model
         run: |
           curl -fsSL https://ollama.com/install.sh | sh
+          sudo systemctl stop ollama || true
+          export OLLAMA_CONTEXT_LENGTH=8192 OLLAMA_NUM_PARALLEL=1 OLLAMA_KEEP_ALIVE=60m
           nohup ollama serve > /tmp/ollama.log 2>&1 &
           for attempt in {1..30}; do curl -sf http://127.0.0.1:11434/api/tags && break; sleep 1; done
-          ollama pull qwen2.5:0.5b
-          curl -sf http://127.0.0.1:11434/api/generate -d '{"model":"qwen2.5:0.5b","prompt":"안녕하세요","stream":false,"keep_alive":"30m","options":{"num_predict":8}}'
+          ollama pull qwen3:4b-instruct-2507-q4_K_M
+          curl -sf http://127.0.0.1:11434/api/generate -d '{"model":"qwen3:4b-instruct-2507-q4_K_M","prompt":"안녕하세요","stream":false,"keep_alive":"60m","options":{"num_predict":8}}'
       - name: Record entire application with real model and peer receiver
         run: xvfb-run -a -s "-screen 0 1600x1000x24" dbus-run-session -- bash tool/record_full_system.sh
       - name: Generate Korean narration
@@ -59,15 +61,16 @@ jobs:
           from pathlib import Path
           v = json.loads(Path('artifacts/llm-verification.json').read_text())
           assert v['success'] and v['is_ai_answer'] and v['peer_received']
-          assert v['knowledge_backup_bytes'] > 1000 and v['voc_backup_bytes'] > 1000
-          assert len(list(Path('artifacts/narration').glob('*.mp3'))) == 12
+          assert v['backup_chapter_removed'] and v['approved_actual_generated_draft']
+          assert v['answer'].strip() == v['reviewed_answer'].strip()
+          assert len(list(Path('artifacts/narration').glob('*.mp3'))) == 11
           PY
           ffmpeg -v error -xerror -i artifacts/VOC_Mate_LLM_Actual.mp4 -f null -
       - name: Save actual recording and evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: voc-mate-full-system-llm
+          name: voc-mate-quality-llm-recording
           path: |
             artifacts/*.mp4
             artifacts/*.png

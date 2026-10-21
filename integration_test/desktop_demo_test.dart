@@ -38,6 +38,7 @@ void main() {
   );
   const mode = String.fromEnvironment('DEMO_MODE', defaultValue: 'llm');
   const llm = mode == 'llm';
+  const model = 'qwen3:4b-instruct-2507-q4_K_M';
   testWidgets('VOC Mate actual desktop scenario', (tester) async {
     const dir = 'artifacts';
     Directory(dir).createSync(recursive: true);
@@ -45,6 +46,7 @@ void main() {
       File('assets/fonts/Pretendard-$weight.otf').copySync('$dir/Pretendard-$weight.otf');
     }
     final marks = <Map<String, Object?>>[];
+    final fileDialogs = <Map<String, double>>[];
     final watch = Stopwatch();
     Process? recorder;
     final recordingLog = File('$dir/$mode-recording.log').openWrite();
@@ -158,9 +160,9 @@ void main() {
         AppConstants.settingAppInstanceName: '운영 담당자 A',
         AppConstants.settingVocAutoForwardEnabled: 'false',
         AppConstants.settingAiAutoAnswerOnVocRegister: 'false',
-        AppConstants.settingAiMaxTokens: '256',
+        AppConstants.settingAiMaxTokens: '640',
         AppConstants.settingAiTemperature: '0.1',
-        if (llm) AppConstants.settingOllamaModel: 'qwen2.5:0.5b',
+        if (llm) AppConstants.settingOllamaModel: model,
         if (llm) 'ai_connection_configured': 'true',
       };
       for (final entry in settings.entries) {
@@ -209,10 +211,13 @@ void main() {
       final kbVm = tester.element(find.byType(KnowledgeBaseScreen)).read<KnowledgeBaseViewModel>();
       await waitFor(() => !kbVm.isLoading, 'knowledge loaded');
       await pause(2000);
+      final fileDialogStart = watch.elapsedMilliseconds / 1000;
       await click(find.byTooltip('매뉴얼 추가'));
       await nativeFile('${Directory.current.path}/artifacts/demo-guide.docx');
       await waitFor(() => !kbVm.isImportingManual && kbVm.manualEntriesByFile.keys.any((k) => k.contains('demo-guide')), 'document import', 90);
       await pause(1200);
+      fileDialogs.add({'start': fileDialogStart, 'end': watch.elapsedMilliseconds / 1000});
+      File('$dir/file-dialogs.json').writeAsStringSync(jsonEncode(fileDialogs));
       final kbSearch = find.byWidgetPredicate((w) => w is TextField &&
           w.decoration?.hintText == '질문, 답변 또는 매뉴얼 검색');
       await paste(kbSearch, '메신저');
@@ -256,6 +261,23 @@ void main() {
       expect(aiVm.isClarificationAnswer, isFalse);
       expect(aiVm.isAiAnswer, llm);
       expect(aiVm.answerResult!.answer.trim(), isNotEmpty);
+      final actualDraft = aiVm.answerResult!;
+      final suppliedEvidence = aiVm.suppliedEvidence.map((r) => {
+        'id': r.knowledgeBase.id, 'question': r.knowledgeBase.question,
+        'answer': r.knowledgeBase.answer, 'score': r.similarityScore,
+      }).toList();
+      File('$dir/actual-ai-draft.json').writeAsStringSync(
+          const JsonEncoder.withIndent('  ').convert({
+        'model': model, 'answer': actualDraft.answer,
+        'notes': actualDraft.notes,
+        'referenced_case_ids': actualDraft.referencedCaseIds,
+        'supplied_evidence': suppliedEvidence,
+      }));
+      expect(actualDraft.answer, contains('알림'));
+      expect(actualDraft.answer.toLowerCase(), anyOf(contains('옵션'), contains('options')));
+      expect(actualDraft.answer.toLowerCase(), anyOf(contains('방해'), contains('do not disturb')));
+      expect(actualDraft.referencedCaseIds, contains('brity-messenger-desktop-020'));
+      expect(actualDraft.answer.length, greaterThan(100));
       await pause(1500);
       await mark(llm ? '실제 모델이 생성한 답변' : '모델 없이 저장 자료로 구성한 답변');
       await mark('06 근거 확인');
@@ -267,7 +289,7 @@ void main() {
       }
       await pause(1500);
       await mark('매뉴얼 출처와 안내 내용 확인');
-      // Copy the real generated result, then review and edit using the app UI.
+      // Review and approve the actual generated draft. Do not substitute a scripted answer.
       await mark('07 답변 검토와 승인');
       await click(find.byTooltip('답변 복사'));
       final copied = await Clipboard.getData(Clipboard.kTextPlain);
@@ -279,9 +301,9 @@ void main() {
       await visible(composer);
       await paste(composer, copied!.text!);
       await pause(2000);
-      const reviewedAnswer = '안녕하세요. PC 메신저에서 다음 설정을 확인해 주세요.\n\n1. 메인 화면 설정에서 전체 알림 활성화 여부를 확인합니다.\n2. 옵션 > 알림에서 새 메시지 알림 방식과 소리 설정을 확인합니다.\n3. 방해 금지 설정이 알림을 끄고 있는지 확인합니다.\n\n설정 확인 후 테스트 메시지로 알림을 확인해 주세요.\n\n참고: Brity Messenger Desktop 매뉴얼 · 설정 / 알림';
-      await paste(composer, reviewedAnswer);
-      await mark('담당자가 매뉴얼을 확인하고 답변 수정');
+      final reviewedAnswer = copied.text!;
+      expect(reviewedAnswer.trim(), actualDraft.answer.trim());
+      await mark('담당자가 매뉴얼과 실제 생성 초안을 대조');
       await click(find.ancestor(of: find.text('임시 저장'), matching: find.byWidgetPredicate((w) => w is FilledButton)));
       await waitFor(() => vocVm.responses.any((r) => r.isDraft && r.content == reviewedAnswer), 'reviewed draft stored');
       await click(find.ancestor(of: find.text('답변 승인'), matching: find.byWidgetPredicate((w) => w is TextButton)));
@@ -309,15 +331,33 @@ void main() {
           'new copilot session', 120);
       await pause(1200);
       await paste(find.byKey(const Key('copilot-message-field')),
-          '방금 처리한 메신저 PC 새 메시지 알림 문의의 최종 답변을 한국어로 세 문장 이내로 요약해 주세요.');
+          '브리티 메신저 PC 새 메시지 알림 문의의 승인된 답변에서 알림 설정 위치와 방해 금지 확인사항을 세 문장 이내로 요약해 주세요.');
+      final copilotReferences = await aiVm.resolveChatReferences(
+          '브리티 메신저 PC 새 메시지 알림 문의의 승인된 답변에서 알림 설정 위치와 방해 금지 확인사항을 세 문장 이내로 요약해 주세요.');
+      File('$dir/copilot-supplied-evidence.json').writeAsStringSync(
+          const JsonEncoder.withIndent('  ').convert(copilotReferences.map((r) => {
+        'id': r.knowledgeBase.id, 'voc_id': r.knowledgeBase.vocId,
+        'question': r.knowledgeBase.question, 'answer': r.knowledgeBase.answer,
+      }).toList()));
+      expect(copilotReferences.any((r) => r.knowledgeBase.vocId == id), isTrue);
+      await mark('코파일럿 질문 전송');
       await click(find.byKey(const Key('copilot-send')));
       await waitFor(() => !aiVm.isChatting, 'copilot model response', 110);
       expect(aiVm.chatError, isNull);
       expect(aiVm.chatMessages.any((m) => m.role == 'assistant'), isTrue);
+      await mark('코파일럿 실제 응답 확인');
       await pause(6500);
       final chatEvidence = aiVm.chatMessages.map((m) => {
         'role': m.role, 'content': m.content,
       }).toList();
+      File('$dir/actual-copilot.json').writeAsStringSync(
+          const JsonEncoder.withIndent('  ').convert(chatEvidence));
+      final actualReply = aiVm.chatMessages.lastWhere((m) => m.role == 'assistant').content;
+      expect(actualReply, contains('알림'));
+      expect(actualReply.toLowerCase(), anyOf(contains('옵션'), contains('options')));
+      expect(actualReply.toLowerCase(), anyOf(contains('방해'), contains('do not disturb')));
+      expect(actualReply, contains('브리티 메신저'));
+      expect(actualReply.length, greaterThan(70));
       await click(find.byType(BackButton));
       await mark('10 내부망 공유');
       await nav(4);
@@ -337,23 +377,8 @@ void main() {
       File('$dir/peer-export.json').writeAsStringSync(jsonEncode(received));
       expect(jsonEncode(received).contains(id), isTrue);
       await pause(5000);
-      await mark('11 중복 점검과 백업');
-      await click(find.text('기존 중복 VOC 정리'));
-      await pause(4000);
-      await click(find.text('지식자료 내보내기'));
-      final archivePath = '${Directory.current.path}/artifacts/knowledge-backup.json';
-      await nativeFile(archivePath, save: true);
-      await waitFor(() => File(archivePath).existsSync(), 'knowledge archive written', 40);
-      expect(File(archivePath).lengthSync(), greaterThan(1000));
-      await pause(3000);
-      await click(find.text('VOC 내보내기'));
-      final vocArchive = '${Directory.current.path}/artifacts/voc-backup.xlsx';
-      await nativeFile(vocArchive, save: true);
-      await waitFor(() => File(vocArchive).existsSync(), 'VOC archive written', 40);
-      await pause(3000);
-      // The export snackbar overlaps the sidebar's bottom button. Let it close.
-      await pause(6000);
-      await mark('12 데이터 보호');
+      await pause(1500);
+      await mark('11 데이터 보호');
       await click(find.byKey(const Key('desktop-privacy')));
       await waitFor(() => find.text('개인정보 및 AI 데이터 처리 안내').evaluate().isNotEmpty,
           'privacy page opened');
@@ -364,7 +389,7 @@ void main() {
       await click(find.byType(BackButton));
       await nav(0);
       await pause(3500);
-      await mark('13 시연 완료');
+      await mark('12 시연 완료');
       final storedVoc = await db.query(AppConstants.tableVocs,
           where: 'id = ?', whereArgs: [id]);
       final storedResponses = await db.query(AppConstants.tableResponses,
@@ -376,11 +401,11 @@ void main() {
           const JsonEncoder.withIndent('  ').convert({
         'success': true, 'mode': mode, 'actual_app': true,
         'input_method': 'native clipboard paste', 'paste_events': pasteEvents,
-        'model': llm ? 'qwen2.5:0.5b' : null,
+        'model': llm ? model : null,
         'is_ai_answer': true, 'answer': generatedAnswer,
         'copilot': chatEvidence, 'peer_received': true,
-        'knowledge_backup_bytes': File(archivePath).lengthSync(),
-        'voc_backup_bytes': File(vocArchive).lengthSync(),
+        'backup_chapter_removed': true,
+        'approved_actual_generated_draft': true,
         'reviewed_answer': reviewedAnswer,
         'evidence_count': aiVm.answerEvidence.length,
         'supplied_evidence_count': aiVm.suppliedEvidence.length,
