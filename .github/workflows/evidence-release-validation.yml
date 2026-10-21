@@ -1,0 +1,96 @@
+name: VoC Mate evidence release validation
+on:
+  push:
+    branches: [work/voc-mate-quality-recording]
+    paths: ['.github/workflows/evidence-release-validation.yml', 'tool/audit_evidence_ui_baseline.py']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  quality:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 4
+      - name: Require exact application source already analyzed and tested
+        run: |
+          # The analyze and 225-test regression steps passed in run 39587709496.
+          # Only the previously unrun legacy dashboard goldens failed afterward.
+          git diff --exit-code c1e4d2cee3204742a957622893c9a889515e587e HEAD -- lib test pubspec.yaml pubspec.lock assets
+      - uses: actions/checkout@v4
+        with:
+          ref: f549f6f011cd615bd388ad5d63d73fa942eea708
+          path: baseline-before-evidence
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.2'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter pub get
+        working-directory: baseline-before-evidence
+      - name: Audit pre-existing approved-image drift without updating goldens
+        run: python3 tool/audit_evidence_ui_baseline.py
+      - name: Verify changed content and required responsive profiles
+        run: flutter test test/manual_korean_evidence_test.dart test/responsive_ui_harness_test.dart
+      - name: Save baseline comparison evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: voc-mate-evidence-baseline-audit
+          path: |
+            artifacts/ui-baseline-audit/
+            test/goldens/evidence-korean-*.png
+  windows:
+    needs: quality
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.2'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter build windows --release
+      - uses: actions/cache@v4
+        with:
+          path: .qwen-build-cache
+          key: qwen3-1.7b-q8-061b54da-llama-b9380
+      - run: python tool/prepare_bundled_qwen.py build/windows/x64/runner/Release/local_ai
+      - name: Verify executable
+        shell: pwsh
+        run: |
+          if (-not (Test-Path 'build/windows/x64/runner/Release/ai_voc_assistant.exe')) { throw 'Windows executable missing' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: voc-mate-korean-evidence-windows
+          compression-level: 0
+          path: build/windows/x64/runner/Release/
+          if-no-files-found: error
+  android:
+    needs: quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.2'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter build apk --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: voc-mate-korean-evidence-android
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+
