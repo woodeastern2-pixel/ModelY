@@ -30,11 +30,6 @@ jobs:
           python3 -m pip install edge-tts
       - name: Validate recording drivers
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path('pubspec.yaml')
-          p.write_text(p.read_text().replace('dev_dependencies:\n', 'dev_dependencies:\n  integration_test:\n    sdk: flutter\n'))
-          PY
           flutter pub get
           dart format integration_test/desktop_demo_test.dart test/recording_peer_test.dart
           flutter analyze integration_test/desktop_demo_test.dart test/recording_peer_test.dart --no-fatal-infos --no-fatal-warnings
@@ -66,6 +61,11 @@ jobs:
           assert len(list(Path('artifacts/narration').glob('*.mp3'))) == 11
           PY
           ffmpeg -v error -xerror -i artifacts/VOC_Mate_LLM_Actual.mp4 -f null -
+      - name: Preserve language model diagnostics
+        if: always()
+        run: |
+          mkdir -p artifacts
+          test ! -f /tmp/ollama.log || cp /tmp/ollama.log artifacts/ollama-server.log
       - name: Save actual recording and evidence
         if: always()
         uses: actions/upload-artifact@v4
