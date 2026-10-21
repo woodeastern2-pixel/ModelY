@@ -170,7 +170,8 @@ void main() {
       await pause(700);
       await mark('01 현황 확인');
       await pause(5500);
-      await tester.drag(find.byType(Scrollable).last, const Offset(0, -420));
+      await Process.run('xdotool', ['mousemove', '1100', '650']);
+      await Process.run('xdotool', ['click', '--repeat', '3', '--delay', '180', '5']);
       await pause(4500);
       await mark('02 LLM 연결');
       await nav(4);

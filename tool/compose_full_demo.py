@@ -38,7 +38,8 @@ def overlay(out, root, stage):
     d.rectangle((0,0,399,1080),fill='#111522')
     d.text((30,38),'VoC Mate',font=font(39,True),fill='#F7F8FF')
     d.text((32,103),'전체 시스템 시연',font=font(27,True),fill='#E1E4F3')
-    d.text((32,153),'언어 모델 연결',font=font(22),fill='#ABA3FF')
+    d.text((32,146),'언어 모델 연결',font=font(22),fill='#ABA3FF')
+    d.text((32,179),'Large Language Model · 대규모 언어 모델',font=font(14),fill='#9CA3BA')
     d.line((32,203,368,203),fill='#33384A',width=2)
     for i,title in enumerate(TITLES):
         y=232+i*55

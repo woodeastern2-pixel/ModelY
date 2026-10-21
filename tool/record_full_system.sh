@@ -17,8 +17,9 @@ for attempt in {1..120}; do
   sleep 1
 done
 test -f artifacts/peer-ready
-flutter test integration_test/desktop_demo_test.dart -d linux \
-  --dart-define=DEMO_MODE=llm --reporter expanded \
+flutter drive --driver=test_driver/full_demo_driver.dart \
+  --target=integration_test/desktop_demo_test.dart -d linux --profile \
+  --dart-define=DEMO_MODE=llm \
   2>&1 | tee artifacts/full-system-driver.log
 touch artifacts/peer-stop
 wait "$peer_process"
