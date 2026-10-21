@@ -1,0 +1,82 @@
+name: Transfer built Qwen installer
+on:
+  push:
+    branches: [work/qwen-artifact-transfer]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  transfer:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: voc-mate-qwen-windows
+          run-id: 39562686968
+          github-token: ${{ github.token }}
+          path: source
+      - name: Verify and split existing installer without rebuilding
+        run: |
+          python3 - <<'PY'
+          import hashlib,json,pathlib,shutil
+          root=pathlib.Path('source')
+          exe=next(root.rglob('VoC-Mate-v1.1.26-build28-Setup.exe'))
+          expected=pathlib.Path(str(exe)+'.sha256').read_text(encoding='utf-8-sig').split()[0].lower()
+          with exe.open('rb') as f:
+              actual=hashlib.file_digest(f,'sha256').hexdigest()
+          assert actual==expected, 'Installer checksum mismatch'
+          out=pathlib.Path('parts');out.mkdir()
+          report=pathlib.Path('metadata');report.mkdir()
+          parts=[]
+          with exe.open('rb') as f:
+              while block:=f.read(400*1024*1024):
+                  name=f'installer.part{len(parts)}'
+                  path=out/name;path.write_bytes(block)
+                  parts.append({'name':name,'bytes':len(block),'sha256':hashlib.sha256(block).hexdigest()})
+          assert len(parts)==5, 'Unexpected number of installer parts'
+          (report/'transfer.json').write_text(json.dumps({
+              'filename':exe.name,'bytes':exe.stat().st_size,'sha256':actual,
+              'source_run':39562686968,'source_commit':'1a25aa879575aa85ac83bb39b953e79f18df860b',
+              'parts':parts},indent=2))
+          for name in ['bundled-qwen-smoke.json','manifest.json']:
+              shutil.copy2(next(root.rglob(name)),report/name)
+          print('Verified installer SHA-256:',actual)
+          print('Prepared',len(parts),'transfer parts; no rebuild performed')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qwen-installer-part0
+          path: parts/installer.part0
+          compression-level: 0
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qwen-installer-part1
+          path: parts/installer.part1
+          compression-level: 0
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qwen-installer-part2
+          path: parts/installer.part2
+          compression-level: 0
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qwen-installer-part3
+          path: parts/installer.part3
+          compression-level: 0
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qwen-installer-part4
+          path: parts/installer.part4
+          compression-level: 0
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qwen-installer-metadata
+          path: metadata/
+          if-no-files-found: error
