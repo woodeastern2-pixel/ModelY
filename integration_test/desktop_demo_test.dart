@@ -351,10 +351,15 @@ void main() {
       await nativeFile(vocArchive, save: true);
       await waitFor(() => File(vocArchive).existsSync(), 'VOC archive written', 40);
       await pause(3000);
+      // The export snackbar overlaps the sidebar's bottom button. Let it close.
+      await pause(6000);
       await mark('12 데이터 보호');
       await click(find.byKey(const Key('desktop-privacy')));
+      await waitFor(() => find.text('개인정보 및 AI 데이터 처리 안내').evaluate().isNotEmpty,
+          'privacy page opened');
       await pause(5000);
-      await tester.drag(find.byType(Scrollable).last, const Offset(0, -370));
+      await Process.run('xdotool', ['mousemove', '1100', '600']);
+      await Process.run('xdotool', ['click', '--repeat', '6', '--delay', '150', '5']);
       await pause(3500);
       await click(find.byType(BackButton));
       await nav(0);

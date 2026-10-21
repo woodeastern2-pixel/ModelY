@@ -12,11 +12,11 @@ CAPTIONS = [
  '모델 설정과 실제 연결 결과를 확인합니다.',
  '문서를 등록하고 검색된 자료의 원문을 확인합니다.',
  '메신저 알림 문의를 붙여넣기로 등록합니다.',
- '검색한 자료를 바탕으로 연결된 언어 모델이 초안을 생성합니다.',
+ '시연용 경량 모델의 실제 초안입니다. 담당자의 검토·수정이 필요합니다.',
  '초안 내용과 매뉴얼 근거를 함께 검토합니다.',
  '담당자가 답변을 수정·승인하고 처리 상태를 변경합니다.',
  '문의와 확정한 답변을 처리 이력으로 확인합니다.',
- '저장된 문의에 대해 질문하고 실제 모델의 답변을 확인합니다.',
+ '시연용 경량 모델의 응답입니다. 실제 처리 이력과 대조해야 합니다.',
  '수신 주소를 등록하고 문의와 매뉴얼을 전송합니다.',
  '중복 문의를 점검하고 지식과 문의 데이터를 각각 백업합니다.',
  '데이터 처리 범위와 담당자의 확인 사항을 살펴봅니다.',
@@ -63,6 +63,9 @@ def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('source_dir',type=Path)
     parser.add_argument('output',type=Path)
+    parser.add_argument('--privacy-dir',type=Path)
+    parser.add_argument('--first-scene',type=int,default=1)
+    parser.add_argument('--last-scene',type=int,default=12)
     args=parser.parse_args()
     root=args.source_dir
     work=args.output.parent/'edit_work'
@@ -70,13 +73,31 @@ def main():
     raw=root/'VOC_Mate_LLM_Actual.mp4'
     marks=json.loads((root/'llm-steps.json').read_text())
     boundaries=[m for m in marks if re.match(r'^\d{2} ',m['step'])]
-    assert len(boundaries)==13, boundaries
-    verification=json.loads((root/'llm-verification.json').read_text())
-    assert verification['success'] and verification['is_ai_answer']
+    assert len(boundaries)>=12, boundaries
+    # Let the intake scene end on the saved inquiry. The following scene then
+    # includes the real click that starts answer generation.
+    registered=next(m['seconds'] for m in marks if m['step']=='문의 등록 및 분류 결과')
+    boundaries[4]={**boundaries[4], 'seconds':min(boundaries[4]['seconds'], registered+0.2)}
+    if (root/'llm-verification.json').exists():
+        verification=json.loads((root/'llm-verification.json').read_text())
+        assert verification['success'] and verification['is_ai_answer']
+    else:
+        # The main take completed scenes 1-11, then a snackbar obstructed the
+        # privacy button. Preserve that failed test outcome in the edit audit.
+        verification=json.loads((root/'capture-audit.json').read_text())
+        assert verification['validated_main_scenes']==list(range(1,12))
+        assert verification['workflow_conclusion']=='failure'
+    paste_events=json.loads((root/'llm-paste-events.json').read_text())
     segments=[]
     audit=[]
-    for i in range(12):
-        start,end=boundaries[i]['seconds'],boundaries[i+1]['seconds']
+    for i in range(args.first_scene-1,args.last_scene):
+        source=raw
+        if i==11 and args.privacy_dir:
+            assert (args.privacy_dir/'privacy-verified.txt').exists()
+            source=args.privacy_dir/'VOC_Mate_Privacy_Actual.mp4'
+            start,end=0,duration(source)
+        else:
+            start,end=boundaries[i]['seconds'],boundaries[i+1]['seconds']
         source_seconds=end-start
         voice=root/'narration'/f'{i+1:02}.mp3'
         speech=duration(voice)
@@ -93,7 +114,7 @@ def main():
             b=next(m['seconds'] for m in marks if m['step']=='실제 모델이 생성한 답변')-1
             if b-a>5: wait_interval=(a,b)
         if i==8:
-            pastes=[p for p in verification['paste_events'] if start<=p['start']<end]
+            pastes=[p for p in paste_events if start<=p['start']<end]
             if pastes:
                 a=pastes[-1]['end']+2
                 b=end-9
@@ -115,13 +136,21 @@ def main():
         overlay(frame,root,i)
         pieces.append('[1:v][screen]overlay=424:85:shortest=1[out]')
         final=work/f'{i+1:02}.mp4'
-        run(['ffmpeg','-y','-v','error','-ss',str(start),'-i',str(raw),'-framerate','30','-loop','1','-i',str(frame),'-i',str(voice),
+        run(['ffmpeg','-y','-v','error','-ss',str(start),'-i',str(source),'-framerate','30','-loop','1','-i',str(frame),'-i',str(voice),
              '-filter_complex_threads','2','-filter_complex',';'.join(pieces)+';[2:a]adelay=700|700,apad,atrim=duration='+str(out_seconds)+'[audio]',
              '-map','[out]','-map','[audio]','-t',str(out_seconds),'-c:v','libx264','-preset','veryfast','-crf','19','-threads','6',
              '-pix_fmt','yuv420p','-c:a','aac','-b:a','160k','-ar','48000','-movflags','+faststart',str(final)])
         segments.append(final)
-        audit.append({'scene':i+1,'title':TITLES[i],'source_start':start,'source_end':end,'duration':out_seconds,'narration_seconds':speech,'wait_interval':wait_interval})
+        audit.append({'scene':i+1,'title':TITLES[i],'source':str(source),'source_start':start,'source_end':end,'duration':out_seconds,'narration_seconds':speech,'wait_interval':wait_interval})
         print(f'{i+1}/12 {TITLES[i]} {out_seconds:.1f}s',flush=True)
+    previous=work/'edit-audit.json'
+    if previous.exists():
+        old=json.loads(previous.read_text())
+        audit=sorted([x for x in old if x['scene'] not in [a['scene'] for a in audit]]+audit,key=lambda x:x['scene'])
+    previous.write_text(json.dumps(audit,ensure_ascii=False,indent=2))
+    if args.last_scene<12: return
+    segments=[work/f'{i+1:02}.mp4' for i in range(12)]
+    assert all(p.exists() for p in segments)
     manifest=work/'segments.txt'
     manifest.write_text(''.join("file '"+str(p)+"'\n" for p in segments))
     run(['ffmpeg','-y','-v','error','-f','concat','-safe','0','-i',str(manifest),'-c','copy','-movflags','+faststart',str(args.output)])
