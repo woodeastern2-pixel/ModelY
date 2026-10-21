@@ -1,18 +1,21 @@
-name: VOC Mate actual desktop recording
+name: VOC Mate full system LLM recording
 on:
   push:
     branches: [work/voc-mate-desktop-recording]
     paths:
       - integration_test/desktop_demo_test.dart
-      - tool/record_desktop.sh
+      - test/recording_peer_test.dart
+      - tool/record_full_system.sh
+      - tool/prepare_full_demo.py
+      - tool/full_demo_narration.py
       - .github/workflows/desktop-demo-video.yml
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
-  desktop-recording:
+  full-system-recording:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -20,11 +23,12 @@ jobs:
           flutter-version: '3.47.2'
           channel: stable
           cache: true
-      - name: Install native desktop and recording tools
+      - name: Prepare native recording environment
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev libsqlite3-dev xvfb openbox xdotool wmctrl ffmpeg dbus-x11 fonts-noto-cjk
-      - name: Prepare recording driver
+          sudo apt-get install -y -qq clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev libsqlite3-dev xvfb openbox xdotool wmctrl ffmpeg dbus-x11 fonts-noto-cjk zenity
+          python3 -m pip install edge-tts
+      - name: Validate recording drivers
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -32,44 +36,43 @@ jobs:
           p.write_text(p.read_text().replace('dev_dependencies:\n', 'dev_dependencies:\n  integration_test:\n    sdk: flutter\n'))
           PY
           flutter pub get
-          dart format integration_test/desktop_demo_test.dart
-          flutter analyze integration_test/desktop_demo_test.dart --no-fatal-infos --no-fatal-warnings
-      - name: Record actual application without a language model
-        id: offline
-        continue-on-error: true
-        run: xvfb-run -a -s "-screen 0 1600x1000x24" dbus-run-session -- bash tool/record_desktop.sh no-llm
-      - name: Save offline recording and verification
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: voc-mate-desktop-offline
-          path: artifacts/
-          retention-days: 7
-      - name: Start real local language model
-        if: steps.offline.outcome == 'success'
+          dart format integration_test/desktop_demo_test.dart test/recording_peer_test.dart
+          flutter analyze integration_test/desktop_demo_test.dart test/recording_peer_test.dart --no-fatal-infos --no-fatal-warnings
+          bash -n tool/record_full_system.sh
+          python3 -m py_compile tool/prepare_full_demo.py tool/full_demo_narration.py
+      - name: Start real language model
         run: |
           curl -fsSL https://ollama.com/install.sh | sh
           nohup ollama serve > /tmp/ollama.log 2>&1 &
-          for i in {1..20}; do curl -sf http://127.0.0.1:11434/api/tags && break; sleep 1; done
-          ollama pull qwen2.5:0.5b
-          curl -sf http://127.0.0.1:11434/api/generate -d '{"model":"qwen2.5:0.5b","prompt":"안녕하세요","stream":false,"keep_alive":"15m","options":{"num_predict":8}}'
-      - name: Record actual application with the language model
-        if: steps.offline.outcome == 'success'
-        run: xvfb-run -a -s "-screen 0 1600x1000x24" dbus-run-session -- bash tool/record_desktop.sh llm
-      - name: Save recordings and verification
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: voc-mate-desktop-recordings
-          path: artifacts/
-          retention-days: 7
-      - name: Require two verified scenarios
-        if: always()
+          for attempt in {1..30}; do curl -sf http://127.0.0.1:11434/api/tags && break; sleep 1; done
+          ollama pull qwen2.5:1.5b
+          curl -sf http://127.0.0.1:11434/api/generate -d '{"model":"qwen2.5:1.5b","prompt":"안녕하세요","stream":false,"keep_alive":"30m","options":{"num_predict":8}}'
+      - name: Record entire application with real model and peer receiver
+        run: xvfb-run -a -s "-screen 0 1600x1000x24" dbus-run-session -- bash tool/record_full_system.sh
+      - name: Generate Korean narration
+        run: python3 tool/full_demo_narration.py
+      - name: Check recording and stored results
         run: |
           python3 - <<'PY'
           import json
-          for mode in ('no-llm', 'llm'):
-              with open(f'artifacts/{mode}-verification.json') as f:
-                  assert json.load(f)['success'] is True
+          from pathlib import Path
+          v = json.loads(Path('artifacts/llm-verification.json').read_text())
+          assert v['success'] and v['is_ai_answer'] and v['peer_received']
+          assert v['knowledge_backup_bytes'] > 1000 and v['voc_backup_bytes'] > 1000
+          assert len(list(Path('artifacts/narration').glob('*.mp3'))) == 12
           PY
-
+          ffmpeg -v error -xerror -i artifacts/VOC_Mate_LLM_Actual.mp4 -f null -
+      - name: Save actual recording and evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: voc-mate-full-system-llm
+          path: |
+            artifacts/*.mp4
+            artifacts/*.png
+            artifacts/*.json
+            artifacts/*.log
+            artifacts/*.txt
+            artifacts/*.otf
+            artifacts/narration/
+          retention-days: 30

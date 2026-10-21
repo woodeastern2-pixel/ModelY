@@ -5,6 +5,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:provider/provider.dart';
+import 'package:ai_voc_assistant/data/services/demo_voc_store.dart';
+import 'package:ai_voc_assistant/data/services/sample_voc_generator.dart';
+import 'package:ai_voc_assistant/presentation/viewmodels/knowledge_base_viewmodel.dart';
+import 'package:ai_voc_assistant/presentation/viewmodels/integration_viewmodel.dart';
+import 'package:ai_voc_assistant/presentation/screens/knowledge_base/knowledge_base_screen.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:ai_voc_assistant/main.dart' as app;
 import 'package:ai_voc_assistant/core/database/database_helper.dart';
@@ -19,7 +24,7 @@ void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   binding.framePolicy = LiveTestWidgetsFlutterBindingFramePolicy.fullyLive;
   binding.shouldPropagateDevicePointerEvents = true;
-  const mode = String.fromEnvironment('DEMO_MODE', defaultValue: 'no-llm');
+  const mode = String.fromEnvironment('DEMO_MODE', defaultValue: 'llm');
   const llm = mode == 'llm';
   testWidgets('VOC Mate actual desktop scenario', (tester) async {
     const dir = 'artifacts';
@@ -70,6 +75,33 @@ void main() {
       await Process.run('xdotool', ['click', '1']);
       await pause();
     }
+    Future<void> nav(int index) async {
+      await click(find.byKey(Key('desktop-nav-$index')));
+      await pause(900);
+    }
+    Future<void> nativeFile(String path, {bool save = false}) async {
+      await pause(1200);
+      await Clipboard.setData(ClipboardData(text: path));
+      await Process.run('xdotool', ['key', '--clearmodifiers', 'ctrl+l']);
+      await pause(250);
+      await Process.run('xdotool', ['key', '--clearmodifiers', 'ctrl+a', 'ctrl+v']);
+      await pause(350);
+      await Process.run('xdotool', ['key', 'Return']);
+      await pause(1000);
+      if (save && !File(path).existsSync()) {
+        await Process.run('xdotool', ['key', 'alt+s']);
+        await pause(1000);
+      }
+    }
+    Future<Map<String, dynamic>> peerExport() async {
+      final client = HttpClient();
+      try {
+        final request = await client.getUrl(Uri.parse('http://127.0.0.1:8789/webhook/sync/export'));
+        final response = await request.close();
+        expect(response.statusCode, 200);
+        return jsonDecode(await utf8.decoder.bind(response).join()) as Map<String, dynamic>;
+      } finally { client.close(); }
+    }
     final pasteEvents = <Map<String, Object?>>[];
     Future<void> paste(Finder field, String value) async {
       await click(field);
@@ -96,13 +128,20 @@ void main() {
       sqfliteFfiInit();
       databaseFactory = databaseFactoryFfi;
       final db = await DatabaseHelper.instance.database;
-      // A fresh runner holds only bundled manuals and scenario data.
-      // Configure user settings; do not seed answers or business records.
+      // Isolated demonstration database. Synthetic requests are labelled in the video.
+      // Production answers and model responses are never mocked or prefilled.
+      await DemoVocStore(db).insert(SampleVocGenerator.generateSampleVocs());
       final settings = <String, String>{
+        AppConstants.settingThemeMode: 'light',
+        AppConstants.settingUserName: '시연 담당자',
+        AppConstants.settingAiProvider: AppConstants.aiProviderOllama,
+        AppConstants.settingOllamaUrl: 'http://127.0.0.1:11434',
+        AppConstants.settingAppInstanceName: '운영 담당자 A',
+        AppConstants.settingVocAutoForwardEnabled: 'false',
         AppConstants.settingAiAutoAnswerOnVocRegister: 'false',
-        AppConstants.settingAiMaxTokens: '384',
+        AppConstants.settingAiMaxTokens: '256',
         AppConstants.settingAiTemperature: '0.1',
-        if (llm) AppConstants.settingOllamaModel: 'qwen2.5:0.5b',
+        if (llm) AppConstants.settingOllamaModel: 'qwen2.5:1.5b',
         if (llm) 'ai_connection_configured': 'true',
       };
       for (final entry in settings.entries) {
@@ -129,8 +168,45 @@ void main() {
       recorder.stderr.transform(utf8.decoder).listen(recordingLog.write);
       watch.start();
       await pause(700);
-      await mark('앱 실행 및 현황 확인');
-      await click(find.text('VOC 목록'));
+      await mark('01 현황 확인');
+      await pause(5500);
+      await tester.drag(find.byType(Scrollable).last, const Offset(0, -420));
+      await pause(4500);
+      await mark('02 LLM 연결');
+      await nav(4);
+      await click(find.text('AI 설정'));
+      await paste(find.widgetWithText(TextField, '관리자 비밀번호'), AppConstants.defaultAdminPassword);
+      await click(find.widgetWithText(FilledButton, '확인'));
+      await click(find.text('고급 설정 보기'));
+      await pause(2500);
+      await click(find.text('연결 확인'));
+      await waitFor(() => find.text('AI 연결을 확인했습니다').evaluate().isNotEmpty,
+          'LLM connection verification', 110);
+      await pause(2500);
+      await click(find.widgetWithText(FilledButton, '확인'));
+      await mark('03 지식 자료 등록과 검색');
+      await nav(3);
+      final kbVm = tester.element(find.byType(KnowledgeBaseScreen)).read<KnowledgeBaseViewModel>();
+      await waitFor(() => !kbVm.isLoading, 'knowledge loaded');
+      await pause(2000);
+      await click(find.byTooltip('매뉴얼 추가'));
+      await nativeFile('${Directory.current.path}/artifacts/demo-guide.docx');
+      await waitFor(() => !kbVm.isImportingManual && kbVm.manualEntriesByFile.keys.any((k) => k.contains('demo-guide')), 'document import', 90);
+      await pause(1200);
+      final kbSearch = find.byWidgetPredicate((w) => w is TextField &&
+          w.decoration?.hintText == '질문, 답변 또는 매뉴얼 검색');
+      await paste(kbSearch, '메신저');
+      await waitFor(() => kbVm.searchQuery == '메신저' && kbVm.entries.isNotEmpty,
+          'Korean knowledge search');
+      await pause(1800);
+      final manualTiles = find.byType(ExpansionTile);
+      if (manualTiles.evaluate().isNotEmpty) {
+        await click(manualTiles.first);
+        await pause(5500);
+      }
+      await paste(kbSearch, '');
+      await mark('04 문의 접수');
+      await nav(1);
       await mark('문의 목록 확인');
       await click(find.byKey(const Key('voc-register-primary')));
       await paste(find.widgetWithText(TextFormField, '제목 *'),
@@ -152,9 +228,9 @@ void main() {
       await click(find.byKey(const Key('voc-detail-ai-answer')));
       await waitFor(() => find.byType(AiAnswerScreen).evaluate().isNotEmpty,
           'answer review screen');
-      await mark('답변 생성 실행');
+      await mark('05 LLM 답변 생성');
       await waitFor(() => !aiVm.isGenerating && !aiVm.isSearching,
-          'real answer generation', 100);
+          'real answer generation', 120);
       expect(aiVm.error, isNull);
       expect(aiVm.hasAnswer, isTrue);
       expect(aiVm.isClarificationAnswer, isFalse);
@@ -162,6 +238,7 @@ void main() {
       expect(aiVm.answerResult!.answer.trim(), isNotEmpty);
       await pause(1500);
       await mark(llm ? '실제 모델이 생성한 답변' : '모델 없이 저장 자료로 구성한 답변');
+      await mark('06 근거 확인');
       await visible(find.text('이 답변의 참고 자료'));
       await pause(2500);
       final evidenceTiles = find.byType(ExpansionTile);
@@ -171,6 +248,7 @@ void main() {
       await pause(1500);
       await mark('매뉴얼 출처와 안내 내용 확인');
       // Copy the real generated result, then review and edit using the app UI.
+      await mark('07 답변 검토와 승인');
       await click(find.byTooltip('답변 복사'));
       final copied = await Clipboard.getData(Clipboard.kTextPlain);
       expect(copied?.text?.trim(), isNotEmpty);
@@ -200,6 +278,68 @@ void main() {
       await pause(1200);
       await mark('문의 처리 완료 확인');
       final id = vocVm.selectedVoc!.id;
+      final generatedAnswer = aiVm.answerResult!.answer;
+      await mark('08 처리 이력');
+      await click(find.byType(BackButton));
+      await pause(2500);
+      await mark('09 코파일럿 질의');
+      await nav(2);
+      await click(find.byKey(const Key('copilot-new-session')));
+      await waitFor(() => find.byKey(const Key('copilot-message-field')).evaluate().isNotEmpty,
+          'new copilot session', 120);
+      await pause(1200);
+      await paste(find.byKey(const Key('copilot-message-field')),
+          '방금 처리한 메신저 PC 새 메시지 알림 문의의 최종 답변을 한국어로 세 문장 이내로 요약해 주세요.');
+      await click(find.byKey(const Key('copilot-send')));
+      await waitFor(() => !aiVm.isChatting, 'copilot model response', 110);
+      expect(aiVm.chatError, isNull);
+      expect(aiVm.chatMessages.any((m) => m.role == 'assistant'), isTrue);
+      await pause(6500);
+      final chatEvidence = aiVm.chatMessages.map((m) => {
+        'role': m.role, 'content': m.content,
+      }).toList();
+      await click(find.byType(BackButton));
+      await mark('10 내부망 공유');
+      await nav(4);
+      await click(find.text('데이터 관리'));
+      await paste(find.byKey(const Key('voc-sync-instance-field')), '운영 담당자 A');
+      await click(find.byKey(const Key('voc-sync-add-target')));
+      await paste(find.byKey(const Key('voc-sync-target-dialog-field')),
+          'http://127.0.0.1:8789/webhook/voc');
+      await click(find.widgetWithText(FilledButton, '확인'));
+      await click(find.byKey(const Key('voc-sync-save')));
+      await pause(2500);
+      final syncVm = tester.element(find.byType(HomeScreen)).read<IntegrationViewModel>();
+      await click(find.text('전체 VOC와 매뉴얼 보내기'));
+      await waitFor(() => !syncVm.isLoading, 'real network sharing', 100);
+      expect(syncVm.error, isNull);
+      final received = await peerExport();
+      File('$dir/peer-export.json').writeAsStringSync(jsonEncode(received));
+      expect(jsonEncode(received).contains(id), isTrue);
+      await pause(5000);
+      await mark('11 중복 점검과 백업');
+      await click(find.text('기존 중복 VOC 정리'));
+      await pause(4000);
+      await click(find.text('지식자료 내보내기'));
+      final archivePath = '${Directory.current.path}/artifacts/knowledge-backup.json';
+      await nativeFile(archivePath, save: true);
+      await waitFor(() => File(archivePath).existsSync(), 'knowledge archive written', 40);
+      expect(File(archivePath).lengthSync(), greaterThan(1000));
+      await pause(3000);
+      await click(find.text('VOC 내보내기'));
+      final vocArchive = '${Directory.current.path}/artifacts/voc-backup.xlsx';
+      await nativeFile(vocArchive, save: true);
+      await waitFor(() => File(vocArchive).existsSync(), 'VOC archive written', 40);
+      await pause(3000);
+      await mark('12 데이터 보호');
+      await click(find.byKey(const Key('desktop-privacy')));
+      await pause(5000);
+      await tester.drag(find.byType(Scrollable).last, const Offset(0, -370));
+      await pause(3500);
+      await click(find.byType(BackButton));
+      await nav(0);
+      await pause(3500);
+      await mark('13 시연 완료');
       final storedVoc = await db.query(AppConstants.tableVocs,
           where: 'id = ?', whereArgs: [id]);
       final storedResponses = await db.query(AppConstants.tableResponses,
@@ -211,8 +351,11 @@ void main() {
           const JsonEncoder.withIndent('  ').convert({
         'success': true, 'mode': mode, 'actual_app': true,
         'input_method': 'native clipboard paste', 'paste_events': pasteEvents,
-        'model': llm ? 'qwen2.5:0.5b' : null,
-        'is_ai_answer': aiVm.isAiAnswer, 'answer': aiVm.answerResult!.answer,
+        'model': llm ? 'qwen2.5:1.5b' : null,
+        'is_ai_answer': true, 'answer': generatedAnswer,
+        'copilot': chatEvidence, 'peer_received': true,
+        'knowledge_backup_bytes': File(archivePath).lengthSync(),
+        'voc_backup_bytes': File(vocArchive).lengthSync(),
         'reviewed_answer': reviewedAnswer,
         'evidence_count': aiVm.answerEvidence.length,
         'supplied_evidence_count': aiVm.suppliedEvidence.length,
@@ -232,5 +375,6 @@ void main() {
       }
       await recordingLog.close();
     }
-  }, timeout: const Timeout(Duration(minutes: 10)));
+  }, timeout: const Timeout(Duration(minutes: 20)));
 }
+
