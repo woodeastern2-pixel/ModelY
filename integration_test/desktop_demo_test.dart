@@ -141,7 +141,7 @@ void main() {
         AppConstants.settingAiAutoAnswerOnVocRegister: 'false',
         AppConstants.settingAiMaxTokens: '256',
         AppConstants.settingAiTemperature: '0.1',
-        if (llm) AppConstants.settingOllamaModel: 'qwen2.5:1.5b',
+        if (llm) AppConstants.settingOllamaModel: 'qwen2.5:0.5b',
         if (llm) 'ai_connection_configured': 'true',
       };
       for (final entry in settings.entries) {
@@ -352,7 +352,7 @@ void main() {
           const JsonEncoder.withIndent('  ').convert({
         'success': true, 'mode': mode, 'actual_app': true,
         'input_method': 'native clipboard paste', 'paste_events': pasteEvents,
-        'model': llm ? 'qwen2.5:1.5b' : null,
+        'model': llm ? 'qwen2.5:0.5b' : null,
         'is_ai_answer': true, 'answer': generatedAnswer,
         'copilot': chatEvidence, 'peer_received': true,
         'knowledge_backup_bytes': File(archivePath).lengthSync(),
