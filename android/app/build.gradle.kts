@@ -38,3 +38,9 @@ android {
 flutter {
     source = "../.."
 }
+
+// Keep built-in Kotlin and Java bytecode targets aligned on every build host.
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile>().configureEach {
+    compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+}
+

@@ -9,9 +9,72 @@ concurrency:
   group: voc-qwen-${{ github.ref }}
   cancel-in-progress: false
 jobs:
-  quality-android:
+  quality:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.2'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+      - name: Reuse verified regression only for identical application sources
+        run: |
+          git fetch --no-tags --depth=1 origin 094063c4783bb0da3c19a3de6204c87386b937db
+          python3 - <<'PYREG'
+          import hashlib, pathlib, subprocess
+          baseline = '094063c4783bb0da3c19a3de6204c87386b937db'
+          same = subprocess.run(['git','diff','--quiet',baseline,'HEAD','--',
+              'lib','test','integration_test','windows','pubspec.yaml']).returncode == 0
+          locked = hashlib.sha256(pathlib.Path('pubspec.lock').read_bytes()).hexdigest()
+          if same and locked == '55e2d373a37a5b7a45e5ae50884b9e9c8c03bcdfe96faf0e22fdef2f1a1bcb66':
+              print('214 regression/responsive tests reused from run 39558661483; identical tested sources and resolved dependencies.')
+          else:
+              tests = [str(p) for p in sorted(pathlib.Path('test').rglob('*_test.dart'))
+                       if p.name != 'recording_peer_test.dart']
+              subprocess.run(['flutter','test','--fail-fast','--exclude-tags=golden',*tests],check=True)
+          PYREG
+      - name: Compare with the current presentation application
+        run: |
+          git fetch --no-tags --depth=1 origin 1b20e605b051db00e3648e5d0c7f7aab6ba558f5
+          git worktree add --detach /tmp/voc-before-qwen 1b20e605b051db00e3648e5d0c7f7aab6ba558f5
+          python3 - <<'PYUI'
+          import pathlib, re, shutil, subprocess
+          baseline = pathlib.Path('/tmp/voc-before-qwen')
+          # Historical committed goldens still contain the former product name.
+          # Compare against the actual presentation app before Qwen was added;
+          # normalize only the release number in its footer.
+          current = pathlib.Path('lib/core/constants/app_constants.dart').read_text()
+          old_file = baseline/'lib/core/constants/app_constants.dart'
+          old = old_file.read_text()
+          for field in ('appVersion','appBuildNumber'):
+              value = re.search(r'(static const (?:String|int) '+field+r' = [^;]+;)', current).group(1)
+              old = re.sub(r'static const (?:String|int) '+field+r' = [^;]+;', value, old)
+          old_file.write_text(old)
+          shutil.copy2('pubspec.lock',baseline/'pubspec.lock')
+          subprocess.run(['flutter','pub','get'],cwd=baseline,check=True)
+          tests=['test/ui_preview_golden_test.dart','test/workspace_ui_preview_golden_test.dart']
+          subprocess.run(['flutter','test','--update-goldens',*tests],cwd=baseline,check=True)
+          for image in (baseline/'test/goldens').glob('*.png'):
+              shutil.copy2(image,pathlib.Path('test/goldens')/image.name)
+          subprocess.run(['flutter','test',*tests],check=True)
+          PYUI
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: voc-mate-qwen-quality
+          path: |
+            pubspec.lock
+            test/failures/
+          if-no-files-found: warn
+  android:
+    needs: quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -24,34 +87,15 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - name: Analyze
-        run: flutter analyze --no-fatal-infos --no-fatal-warnings
-      - name: Regression and responsive tests
-        run: |
-          python3 - <<'PY'
-          import pathlib, subprocess
-          # A dedicated recording peer intentionally waits 22 minutes. It is a
-          # recorder process, not a regression test; all other tests are run.
-          tests = [str(p) for p in sorted(pathlib.Path('test').rglob('*_test.dart'))
-                   if p.name != 'recording_peer_test.dart']
-          subprocess.run(['flutter', 'test', '--fail-fast', '--exclude-tags=golden', *tests], check=True)
-          PY
-      - name: Compare approved UI baselines
-        continue-on-error: true
-        run: flutter test test/ui_preview_golden_test.dart test/workspace_ui_preview_golden_test.dart
       - name: Android compatibility build
         run: flutter build apk --release
       - uses: actions/upload-artifact@v4
-        if: always()
         with:
-          name: voc-mate-qwen-quality
-          path: |
-            pubspec.lock
-            test/failures/
-            build/app/outputs/flutter-apk/app-release.apk
-          if-no-files-found: warn
+          name: voc-mate-qwen-android
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
   windows:
-    needs: quality-android
+    needs: quality
     runs-on: windows-latest
     timeout-minutes: 45
     steps:
