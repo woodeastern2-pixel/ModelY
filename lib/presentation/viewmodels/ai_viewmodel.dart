@@ -501,10 +501,13 @@ class AiViewModel extends ChangeNotifier {
         return null;
       }
       if (requestAi) {
-        final references = _similarVocs.where((r) =>
+        final eligible = _similarVocs.where((r) =>
             r.similarityScore >= 0.40 &&
             _localAnswers.isAnswerSource(r.knowledgeBase) &&
-            _localAnswers.focusedEvidence(query, r.knowledgeBase)).take(3).toList();
+            _localAnswers.focusedEvidence(query, r.knowledgeBase)).toList();
+        final hasStrongEvidence = eligible.any((r) => r.similarityScore >= 0.70);
+        final references = eligible.where((r) =>
+            r.similarityScore >= (hasStrongEvidence ? 0.50 : 0.40)).take(3).toList();
         _suppliedEvidence = List.unmodifiable(references);
         notifyListeners();
         try {
@@ -930,7 +933,11 @@ class AiViewModel extends ChangeNotifier {
     final candidates = entries.where((entry) =>
         (excludeVocId == null || entry.vocId != excludeVocId) &&
         (includeRegisteredQuestions || _localAnswers.isAnswerSource(entry)));
-    if (includeRegisteredQuestions || !query.contains('\n')) {
+    if (includeRegisteredQuestions) {
+      return _localAnswers.rankChatReferences(query, candidates,
+          preferredVocIds: preferredVocIds);
+    }
+    if (!query.contains('\n')) {
       return _localAnswers.rank(query, candidates,
           preferredVocIds: preferredVocIds);
     }

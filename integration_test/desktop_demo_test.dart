@@ -303,6 +303,8 @@ void main() {
       expect(actualDraft.answer.toLowerCase(), anyOf(contains('방해'), contains('do not disturb')));
       expect(actualDraft.referencedCaseIds, contains('brity-messenger-desktop-020'));
       expect(actualDraft.answer.length, greaterThan(100));
+      expect(actualDraft.answer, isNot(contains('재시작')));
+      expect(actualDraft.answer, isNot(contains('재설치')));
       await pause(1500);
       await mark(llm ? '실제 모델이 생성한 답변' : '모델 없이 저장 자료로 구성한 답변');
       await mark('06 근거 확인');

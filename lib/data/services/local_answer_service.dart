@@ -321,6 +321,28 @@ class LocalAnswerService {
       ],
   ];
 
+  /// Approval-summary requests name a stored answer before the formatting
+  /// instruction. Search that subject among approved records only; words
+  /// such as "three sentences" must not dilute the evidence query.
+  List<SimilarVocResult> rankChatReferences(
+    String query,
+    Iterable<KnowledgeBaseEntity> entries, {
+    List<String> preferredVocIds = const [],
+  }) {
+    final approval = RegExp(r'승인(?:된|한)?\s*(?:답변|응답)').firstMatch(query);
+    if (approval == null) {
+      return rank(query, entries, preferredVocIds: preferredVocIds);
+    }
+    final subject = query.substring(0, approval.start)
+        .replaceFirst(RegExp(r'의\s*$'), '').trim();
+    final search = subject.isNotEmpty ? subject : query.substring(approval.end)
+        .replaceAll(RegExp(r'(?:한|두|세|네|\d+)\s*(?:문장|줄)(?:\s*이내)?(?:로)?'), ' ')
+        .replaceAll(RegExp(r'요약(?:해)?|정리(?:해)?|알려|주세요|해\s*주세요'), ' ').trim();
+    return rank(search, entries.where((entry) =>
+        entry.id.startsWith('approved-voc-')),
+        preferredVocIds: preferredVocIds, limit: 3);
+  }
+
   List<SimilarVocResult> rank(
     String query,
     Iterable<KnowledgeBaseEntity> entries, {
