@@ -2,16 +2,16 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/database/database_helper.dart';
-import '../../core/utils/voc_category_catalog.dart';
 import '../../data/services/connectors/default_connector_registry.dart';
 import '../../data/services/excel_service.dart';
 import '../../data/services/in_app_sync_receiver_service.dart';
 import '../../data/services/webhook_service.dart';
+import '../../data/services/peer_sync_service.dart';
+import '../../data/services/voc_identity_store.dart';
 import '../../core/utils/vector_utils.dart';
 import '../../domain/entities/response_entity.dart';
 import '../../domain/entities/voc_entity.dart';
@@ -42,6 +42,35 @@ class IntegrationViewModel extends ChangeNotifier {
   final List<_SyncRetryTask> _syncRetryQueue = [];
   bool _retryQueueRestored = false;
   Timer? _inboundEventPoller;
+  Timer? _dedupTimer;
+  bool _dedupRunning = false;
+  bool _disposed = false;
+
+  @override
+  void notifyListeners() {
+    if (!_disposed) super.notifyListeners();
+  }
+
+  Future<int> reconcileDuplicateVocs() async {
+    if (_dedupRunning || _disposed) return 0;
+    _dedupRunning = true;
+    try {
+      final db = await DatabaseHelper.instance.database;
+      final count = await VocIdentityStore.reconcile(db);
+      final candidates = await VocIdentityStore.duplicateCandidates(db);
+      _success = '자동 중복 정리 $count건 · 확인할 중복 후보 ${candidates.length}묶음';
+      if (count > 0 && !_disposed) {
+        _onInboundSyncEvent?.call('중복 VOC $count건을 정리했습니다.');
+      }
+      return count;
+    } catch (e) {
+      _error = '중복 자료 점검을 완료하지 못했습니다: $e';
+      notifyListeners();
+      return 0;
+    } finally {
+      _dedupRunning = false;
+    }
+  }
   int _lastSeenSyncEventSeq = 0;
   bool _inAppReceiverRunning = false;
   String? _inAppReceiverLastError;
@@ -82,6 +111,8 @@ class IntegrationViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
+    _dedupTimer?.cancel();
     _inboundEventPoller?.cancel();
     _settingsViewModel.removeListener(_restoreRetryQueueIfReady);
     super.dispose();
@@ -155,7 +186,8 @@ class IntegrationViewModel extends ChangeNotifier {
           vocNumber: vocNumber,
         );
 
-        final key = _duplicateKeyByText(title, content);
+        final key = _duplicateKeyByText(title, content,
+            _requiredText(row['고객명'] ?? row['customer'], fallback: '미입력'), project);
         final existing = existingMap[key];
         final shouldOverwrite =
             existing != null && duplicateStrategy == 'overwrite';
@@ -341,10 +373,13 @@ class IntegrationViewModel extends ChangeNotifier {
   }
 
   String _duplicateKey(VocEntity voc) =>
-      _duplicateKeyByText(voc.title, voc.content);
+      _duplicateKeyByText(voc.title, voc.content, voc.customer, voc.project);
 
-  String _duplicateKeyByText(String title, String content) =>
-      '${title.trim().toLowerCase()}|${content.trim().toLowerCase()}';
+  String _duplicateKeyByText(String title, String content,
+      String customer, String project) => VocIdentityStore.fingerprint({
+        'title': title, 'content': content,
+        'customer': customer, 'project': project,
+      });
 
   String? _optionalText(dynamic value) {
     final text = value?.toString().trim() ?? '';
@@ -572,6 +607,8 @@ class IntegrationViewModel extends ChangeNotifier {
       'source_app': _settingsViewModel.appInstanceName,
       'voc': {
         'id': voc.id,
+        'source_ref': voc.sourceRef,
+        'source': voc.source,
         'title': voc.title,
         'content': voc.content,
         'category': voc.category,
@@ -647,6 +684,8 @@ class IntegrationViewModel extends ChangeNotifier {
       'source_app': _settingsViewModel.appInstanceName,
       'voc': {
         'id': voc.id,
+        'source_ref': voc.sourceRef,
+        'source': voc.source,
         'title': voc.title,
         'content': voc.content,
         'category': voc.category,
@@ -808,131 +847,15 @@ class IntegrationViewModel extends ChangeNotifier {
   }
 
   Future<int> pullVocFromPeerApps() async {
+    if (_isLoading) return 0;
     _start();
     try {
-      final targets = _settingsViewModel.vocForwardWebhookTargets;
-      if (targets.isEmpty) {
-        _error = 'VOC를 가져올 대상 URL이 없습니다.';
-        return 0;
-      }
-
-      final existingVocs = await _vocRepository.getAllVocs();
-      final existingKeys = {
-        for (final voc in existingVocs) _duplicateKey(voc),
-      };
-      final incomingKeys = <String>{};
-
-      final authHeaders = _syncAuthHeaders();
-      var successTargets = 0;
-      var imported = 0;
-      var duplicateSkipped = 0;
-      var remoteTotal = 0;
-      final failedTargets = <String>[];
-
-      for (final target in targets) {
-        final exportTarget = _toVocExportEndpoint(target);
-        _syncCurrentTarget = exportTarget;
-        notifyListeners();
-        try {
-          final payload = await _webhook.getJsonForMap(
-            url: exportTarget,
-            headers: authHeaders,
-          );
-          successTargets += 1;
-
-          final sourceApp =
-              payload['source_app']?.toString().trim().isNotEmpty == true
-                  ? payload['source_app'].toString().trim()
-                  : 'unknown-app';
-          final snapshot = payload['snapshot'] is Map
-              ? Map<String, dynamic>.from(payload['snapshot'] as Map)
-              : const <String, dynamic>{};
-          final vocs = (snapshot['vocs'] as List?) ?? const [];
-
-          for (final item in vocs) {
-            if (item is! Map) {
-              continue;
-            }
-            final row = Map<String, dynamic>.from(item);
-            final titleRaw = row['title']?.toString().trim() ?? '';
-            final contentRaw = row['content']?.toString().trim() ?? '';
-            final title = titleRaw.isEmpty ? '제목없음' : titleRaw;
-            final content = contentRaw.isEmpty ? '내용 없음' : contentRaw;
-
-            final key = _duplicateKeyByText(title, content);
-            remoteTotal += 1;
-            if (existingKeys.contains(key) || incomingKeys.contains(key)) {
-              duplicateSkipped += 1;
-              continue;
-            }
-
-            final createdAt =
-                DateTime.tryParse(row['created_at']?.toString() ?? '');
-            final updatedAt =
-                DateTime.tryParse(row['updated_at']?.toString() ?? '');
-            final now = DateTime.now();
-            final normalizedCategory = VocCategoryCatalog.normalize(
-              row['category']?.toString(),
-              title: title,
-              content: content,
-              aiCategory: row['ai_category']?.toString(),
-              tags: row['tags']?.toString(),
-            );
-
-            final voc = VocEntity(
-              id: _uuid.v4(),
-              title: title,
-              content: content,
-              category: normalizedCategory,
-              tags: _optionalText(row['tags']),
-              customer: _requiredText(row['customer'], fallback: '미입력'),
-              project: _requiredText(row['project'], fallback: '미입력'),
-              priority: _excel.normalizePriority(
-                  row['priority'] ?? AppConstants.priorityMedium),
-              status: _normalizeVocStatus(row['status']?.toString()),
-              aiCategory: _optionalText(row['ai_category']),
-              urgency: _optionalText(row['urgency']),
-              businessType: _optionalText(row['business_type']),
-              department: _optionalText(row['department']),
-              assignee: _optionalText(row['assignee']),
-              source: 'peer-pull',
-              sourceRef: '$sourceApp:${row['id'] ?? key}',
-              createdAt: createdAt ?? now,
-              updatedAt: updatedAt ?? now,
-            );
-
-            await _vocRepository.createVoc(voc);
-            existingKeys.add(key);
-            incomingKeys.add(key);
-            imported += 1;
-          }
-
-          _appendSyncLog(
-              '상대 앱 VOC 가져오기 성공: $exportTarget (${vocs.length}건 확인)');
-        } catch (e) {
-          failedTargets.add(exportTarget);
-          _appendSyncLog('상대 앱 VOC 가져오기 실패: $exportTarget / $e');
-        }
-      }
-
-      _syncCurrentTarget = null;
-
-      if (failedTargets.isNotEmpty) {
-        _lastSyncErrorDetails = _buildSyncFailureDetails(
-          title: '상대 앱 VOC 가져오기 실패 상세',
-          targets: failedTargets,
-        );
-        _error =
-            '연결된 앱의 VOC를 일부 가져오지 못했습니다. 성공 $successTargets곳 · 실패 ${failedTargets.length}곳 · 전체 $remoteTotal개 · 중복 제외 $duplicateSkipped개 · 반영 $imported개';
-      } else {
-        _lastSyncErrorDetails = null;
-        _success =
-            '연결된 앱에서 VOC를 가져왔습니다. 앱 $successTargets곳 · 전체 $remoteTotal개 · 중복 제외 $duplicateSkipped개 · 반영 $imported개';
-      }
-
-      return imported;
+      final result = await PeerSyncService(_settingsViewModel).pullAllVocs();
+      _success = '연결된 앱 VOC: 신규 ${result.created}건 · 변경 ${result.updated}건 · '
+          '중복 제외 ${result.skipped}건 · 기존 중복 정리 ${result.merged}건';
+      if (result.failedApps > 0) _error = '일부 앱 가져오기 실패: ${result.failedApps}곳';
+      return result.applied;
     } catch (e) {
-      _syncCurrentTarget = null;
       _error = '연결된 앱에서 VOC를 가져오지 못했습니다: $e';
       return 0;
     } finally {
@@ -941,183 +864,20 @@ class IntegrationViewModel extends ChangeNotifier {
   }
 
   Future<int> bootstrapFromPeerApps() async {
-    if (_isBootstrapping) {
-      return 0;
-    }
-
+    if (_isBootstrapping) return 0;
     _isBootstrapping = true;
-    _bootstrapStatus = '초기 동기화 준비 중...';
+    _error = null;
     notifyListeners();
-
     try {
-      final targets = _settingsViewModel.vocForwardWebhookTargets;
-      if (targets.isEmpty) {
-        _bootstrapStatus = '초기 동기화 대상 앱이 없습니다.';
-        notifyListeners();
-        return 0;
-      }
-
-      final db = await DatabaseHelper.instance.database;
-      final existingVocs = await _vocRepository.getAllVocs();
-      final existingVocKeys = {
-        for (final voc in existingVocs) _duplicateKey(voc),
-      };
-
-      final existingManuals = await db.query(
-        AppConstants.tableKnowledgeBase,
-        columns: ['question', 'answer'],
-        where: 'category = ? OR project = ?',
-        whereArgs: const ['시스템매뉴얼', 'manual-upload'],
-      );
-      final existingManualKeys = {
-        for (final row in existingManuals)
-          _manualKey(
-            row['question']?.toString() ?? '',
-            row['answer']?.toString() ?? '',
-          ),
-      };
-
-      final authHeaders = _syncAuthHeaders();
-      var importedVocs = 0;
-      var importedManuals = 0;
-      var duplicateSkips = 0;
-      final failedTargets = <String>[];
-
-      for (final target in targets) {
-        final exportTarget = _toVocExportEndpoint(target);
-        _bootstrapStatus = '초기 동기화 중: $exportTarget';
-        notifyListeners();
-
-        try {
-          final payload = await _webhook.getJsonForMap(
-            url: exportTarget,
-            headers: authHeaders,
-          );
-
-          final snapshot = payload['snapshot'] is Map
-              ? Map<String, dynamic>.from(payload['snapshot'] as Map)
-              : const <String, dynamic>{};
-
-          final vocs = (snapshot['vocs'] as List?) ?? const [];
-          final manuals = (snapshot['manuals'] as List?) ?? const [];
-
-          for (final item in vocs) {
-            if (item is! Map) continue;
-            final row = Map<String, dynamic>.from(item);
-            final title = (row['title']?.toString().trim().isNotEmpty == true)
-                ? row['title'].toString().trim()
-                : '제목없음';
-            final content =
-                (row['content']?.toString().trim().isNotEmpty == true)
-                    ? row['content'].toString().trim()
-                    : '내용 없음';
-            final key = _duplicateKeyByText(title, content);
-            if (existingVocKeys.contains(key)) {
-              duplicateSkips += 1;
-              continue;
-            }
-
-            final now = DateTime.now();
-            final normalizedCategory = VocCategoryCatalog.normalize(
-              row['category']?.toString(),
-              title: title,
-              content: content,
-              aiCategory: row['ai_category']?.toString(),
-              tags: row['tags']?.toString(),
-            );
-
-            await _vocRepository.createVoc(
-              VocEntity(
-                id: _uuid.v4(),
-                title: title,
-                content: content,
-                category: normalizedCategory,
-                tags: row['tags']?.toString(),
-                customer: _requiredText(row['customer'], fallback: '미입력'),
-                project: _requiredText(row['project'], fallback: '미입력'),
-                priority: _excel.normalizePriority(
-                    row['priority'] ?? AppConstants.priorityMedium),
-                status: _normalizeVocStatus(row['status']?.toString()),
-                aiCategory: row['ai_category']?.toString(),
-                urgency: row['urgency']?.toString(),
-                businessType: row['business_type']?.toString(),
-                department: row['department']?.toString(),
-                assignee: row['assignee']?.toString(),
-                source: 'peer-bootstrap',
-                sourceRef:
-                    '${payload['source_app'] ?? 'peer'}:${row['id'] ?? key}',
-                createdAt: now,
-                updatedAt: now,
-              ),
-            );
-            existingVocKeys.add(key);
-            importedVocs += 1;
-          }
-
-          for (final item in manuals) {
-            if (item is! Map) continue;
-            final row = Map<String, dynamic>.from(item);
-            final question = row['question']?.toString().trim() ?? '';
-            final answer = row['answer']?.toString().trim() ?? '';
-            if (question.isEmpty || answer.isEmpty) continue;
-
-            final key = _manualKey(question, answer);
-            if (existingManualKeys.contains(key)) {
-              duplicateSkips += 1;
-              continue;
-            }
-
-            final now = DateTime.now();
-            final id = _uuid.v4();
-            await db.insert(
-              AppConstants.tableKnowledgeBase,
-              {
-                'id': id,
-                'question': question,
-                'answer': answer,
-                'category': row['category']?.toString() ?? '시스템매뉴얼',
-                'customer': row['customer']?.toString(),
-                'project': row['project']?.toString() ?? 'manual-upload',
-                'voc_id': row['voc_id']?.toString(),
-                'embedding': row['embedding']?.toString() ??
-                    jsonEncode(
-                        VectorUtils.simpleTextEmbedding('$question $answer')),
-                'resolved_at':
-                    row['resolved_at']?.toString() ?? now.toIso8601String(),
-                'created_at':
-                    row['created_at']?.toString() ?? now.toIso8601String(),
-              },
-              conflictAlgorithm: ConflictAlgorithm.replace,
-            );
-            existingManualKeys.add(key);
-            importedManuals += 1;
-          }
-
-          _appendSyncLog(
-              '초기 동기화 성공: $exportTarget (VOC ${vocs.length}건 / 매뉴얼 ${manuals.length}건)');
-        } catch (e) {
-          failedTargets.add(exportTarget);
-          _appendSyncLog('초기 동기화 실패: $exportTarget / $e');
-        }
-      }
-
-      await _vocRepository.getAllVocs();
-      if (failedTargets.isEmpty) {
-        _bootstrapStatus =
-            '초기 동기화를 완료했습니다. VOC $importedVocs개 · 매뉴얼 $importedManuals개 · 중복 제외 $duplicateSkips개';
-        _success = _bootstrapStatus;
-      } else {
-        _bootstrapStatus =
-            '초기 동기화를 일부 완료하지 못했습니다. 성공 ${targets.length - failedTargets.length}곳 · 실패 ${failedTargets.length}곳';
-        _error = _bootstrapStatus;
-      }
-
-      notifyListeners();
-      return importedVocs + importedManuals;
+      final result = await PeerSyncService(_settingsViewModel).bootstrap();
+      _bootstrapStatus = '초기 동기화: VOC 신규 ${result.vocCreated}건 · '
+          '변경 ${result.vocUpdated}건 · 중복 제외 ${result.vocSkipped}건 · '
+          '기존 중복 정리 ${result.merged}건 · 지식 자료 신규 ${result.manualCreated}건';
+      _success = _bootstrapStatus;
+      if (result.failedApps > 0) _error = '일부 앱 동기화 실패: ${result.failedApps}곳';
+      return result.vocCreated + result.vocUpdated + result.manualCreated;
     } catch (e) {
-      _bootstrapStatus = '초기 동기화를 완료하지 못했습니다: $e';
-      _error = _bootstrapStatus;
-      notifyListeners();
+      _error = '초기 동기화를 완료하지 못했습니다: $e';
       return 0;
     } finally {
       _isBootstrapping = false;
@@ -1369,47 +1129,6 @@ class IntegrationViewModel extends ChangeNotifier {
     return '$trimmed/webhook/voc';
   }
 
-  String _toVocExportEndpoint(String target) {
-    final trimmed = target.trim();
-    if (trimmed.endsWith('/health')) {
-      return '${trimmed.substring(0, trimmed.length - '/health'.length)}/webhook/sync/export';
-    }
-    if (trimmed.endsWith('/webhook/sync/export') ||
-        trimmed.endsWith('/webhook/voc/export')) {
-      return trimmed;
-    }
-    if (trimmed.endsWith('/webhook/voc')) {
-      return '${trimmed.substring(0, trimmed.length - '/webhook/voc'.length)}/webhook/sync/export';
-    }
-    if (trimmed.endsWith('/webhook/sync/full')) {
-      return '${trimmed.substring(0, trimmed.length - '/webhook/sync/full'.length)}/webhook/sync/export';
-    }
-    if (trimmed.endsWith('/webhook/sync')) {
-      return '$trimmed/export';
-    }
-    if (trimmed.endsWith('/')) {
-      return '${trimmed}webhook/sync/export';
-    }
-    return '$trimmed/webhook/sync/export';
-  }
-
-  String _manualKey(String question, String answer) {
-    return '${question.trim().toLowerCase()}|${answer.trim().toLowerCase()}';
-  }
-
-  String _normalizeVocStatus(String? rawStatus) {
-    final value = (rawStatus ?? '').trim().toUpperCase();
-    switch (value) {
-      case AppConstants.vocStatusOpen:
-      case AppConstants.vocStatusInProgress:
-      case AppConstants.vocStatusResolved:
-      case AppConstants.vocStatusRejected:
-        return value;
-      default:
-        return AppConstants.vocStatusOpen;
-    }
-  }
-
   Future<String?> publishApprovedToConfluence({
     required VocEntity voc,
     required String approvedAnswer,
@@ -1467,6 +1186,8 @@ class IntegrationViewModel extends ChangeNotifier {
   }
 
   void _startInboundSyncEventWatcher() {
+    _dedupTimer = Timer.periodic(const Duration(minutes: 10),
+        (_) => unawaited(reconcileDuplicateVocs()));
     unawaited(_initializeInboundSyncEventCursor());
     _inboundEventPoller = Timer.periodic(
       const Duration(seconds: 3),

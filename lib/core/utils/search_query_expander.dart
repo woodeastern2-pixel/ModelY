@@ -125,6 +125,21 @@ class SearchQueryExpander {
     return hits / totalConcepts;
   }
 
+  /// Compile once per query; callers can reuse already-normalized bodies.
+  static SearchQueryMatcher compile(String query) {
+    final normalized = normalize(query);
+    final groups = _aliasGroups.where((g) => _containsAnyAlias(normalized, g)).toList();
+    final groupedTokens = groups.expand((g) => g).expand(_tokenize).toSet();
+    final plain = _tokenize(normalized).where((t) => !groupedTokens.contains(t) &&
+        !groups.any((g) => _containsAnyAlias(t, g))).toSet();
+    final patterns = groups.map((g) => g.map((alias) {
+      final value = normalize(alias);
+      return RegExp(RegExp(r'[가-힣]').hasMatch(value) ? RegExp.escape(value)
+          : '(^|\\s)${RegExp.escape(value)}(?=\\s|\$|[가-힣])');
+    }).toList()).toList();
+    return SearchQueryMatcher(plain.toList(), patterns);
+  }
+
   static bool matches(String query, String corpus) =>
       matchRatio(query, corpus) >= 1.0;
 
@@ -157,4 +172,15 @@ class SearchQueryExpander {
         .map((token) => token.trim())
         .where((token) => token.length >= 2);
   }
+}
+
+
+class SearchQueryMatcher {
+  final List<String> terms;
+  final List<List<RegExp>> groups;
+  const SearchQueryMatcher(this.terms, this.groups);
+  bool matchesNormalized(String body) =>
+      (terms.isNotEmpty || groups.isNotEmpty) &&
+      terms.every(body.contains) &&
+      groups.every((g) => g.any((p) => p.hasMatch(body)));
 }

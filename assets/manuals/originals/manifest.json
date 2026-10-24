@@ -1,0 +1,148 @@
+[
+  {
+    "id": "drive-faq",
+    "sha256": "7baa46fb47888b5f733f56eca9085ad5f17604db5793341a1434b708b1112d21",
+    "filename": "BW_drive_FAQ.docx",
+    "blocks": 217,
+    "paragraphs": 209,
+    "tables": 8,
+    "images": 0,
+    "textCharacters": 15742,
+    "files": [
+      "drive-faq-000.json",
+      "drive-faq-001.json"
+    ]
+  },
+  {
+    "id": "drive",
+    "sha256": "94656fd9a8e93674730a37354d7629284c21ac8d445f26f1bff26ebb158f63ff",
+    "filename": "BW_drive_매뉴얼.docx",
+    "blocks": 1130,
+    "paragraphs": 893,
+    "tables": 6,
+    "images": 293,
+    "textCharacters": 40539,
+    "files": [
+      "drive-000.json",
+      "drive-001.json",
+      "drive-002.json",
+      "drive-003.json",
+      "drive-004.json",
+      "drive-005.json",
+      "drive-006.json",
+      "drive-007.json",
+      "drive-008.json",
+      "drive-009.json",
+      "drive-010.json"
+    ]
+  },
+  {
+    "id": "survey",
+    "sha256": "1fe5af2e162c002ab6c6fffde0cf47fd24cb907986b39c6ebfa4c448306704b6",
+    "filename": "BW_설문.docx",
+    "blocks": 272,
+    "paragraphs": 272,
+    "tables": 0,
+    "images": 0,
+    "textCharacters": 5071,
+    "files": [
+      "survey-000.json"
+    ]
+  },
+  {
+    "id": "works-1",
+    "sha256": "9d470c9d77f8e946575eec119078da52db4a41b07e92e2df2445f8bfb2e2d62a",
+    "filename": "brityworks_매뉴얼1.docx",
+    "blocks": 1475,
+    "paragraphs": 1236,
+    "tables": 29,
+    "images": 454,
+    "textCharacters": 56515,
+    "files": [
+      "works-1-000.json",
+      "works-1-001.json",
+      "works-1-002.json",
+      "works-1-003.json",
+      "works-1-004.json",
+      "works-1-005.json",
+      "works-1-006.json",
+      "works-1-007.json",
+      "works-1-008.json",
+      "works-1-009.json",
+      "works-1-010.json",
+      "works-1-011.json",
+      "works-1-012.json"
+    ]
+  },
+  {
+    "id": "works-2",
+    "sha256": "17ca6a3a42eb28b472dd187fc9c9c97b5becfd62c8aa3f03dfba456a0cba53ce",
+    "filename": "brityworks_매뉴얼2(1).docx",
+    "blocks": 823,
+    "paragraphs": 689,
+    "tables": 9,
+    "images": 358,
+    "textCharacters": 27595,
+    "files": [
+      "works-2-000.json",
+      "works-2-001.json",
+      "works-2-002.json",
+      "works-2-003.json",
+      "works-2-004.json",
+      "works-2-005.json",
+      "works-2-006.json",
+      "works-2-007.json"
+    ]
+  },
+  {
+    "id": "works-3",
+    "sha256": "5c3868ec67c55d420cf1e80ca598534b70403fec5a3319de54cf852c784305f1",
+    "filename": "brityworks_매뉴얼3.docx",
+    "blocks": 713,
+    "paragraphs": 619,
+    "tables": 21,
+    "images": 193,
+    "textCharacters": 28620,
+    "files": [
+      "works-3-000.json",
+      "works-3-001.json",
+      "works-3-002.json",
+      "works-3-003.json",
+      "works-3-004.json",
+      "works-3-005.json",
+      "works-3-006.json"
+    ]
+  },
+  {
+    "id": "messenger-desktop",
+    "filename": "messenger-desktop.pdf (2020)",
+    "blocks": 28,
+    "files": [
+      "messenger-desktop-000.json"
+    ]
+  },
+  {
+    "id": "messenger-mobile",
+    "filename": "messenger-mobile.pdf (2020)",
+    "blocks": 41,
+    "files": [
+      "messenger-mobile-000.json"
+    ]
+  },
+  {
+    "id": "mail-web",
+    "filename": "New Brity Mail 공식 웹 원문",
+    "blocks": 1195,
+    "files": [
+      "mail-web-000.json",
+      "mail-web-001.json",
+      "mail-web-002.json",
+      "mail-web-003.json",
+      "mail-web-004.json",
+      "mail-web-005.json",
+      "mail-web-006.json",
+      "mail-web-007.json",
+      "mail-web-008.json"
+    ]
+  }
+]

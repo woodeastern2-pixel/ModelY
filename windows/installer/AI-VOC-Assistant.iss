@@ -1,4 +1,4 @@
-#define MyAppName "AI VOC Assistant"
+#define MyAppName "VoC Mate"
 #ifndef MyAppVersion
   #define MyAppVersion "1.1.3"
 #endif
@@ -7,15 +7,16 @@
 #endif
 #define MyAppPublisher "Easternwood"
 #define MyAppExeName "ai_voc_assistant.exe"
-#define MyArtifactName "AI-VOC-Assistant-v" + MyAppVersion + "-build" + MyAppBuild + "-Setup"
+#define MyArtifactName "VoC-Mate-v" + MyAppVersion + "-build" + MyAppBuild + "-Setup"
 
 [Setup]
+SetupIconFile=..\runner\resources\app_icon.ico
 AppId={{C4268CC0-4815-49EE-B2DA-9A7364B2706E}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 DefaultDirName={autopf}\AI VOC Assistant
-DefaultGroupName=AI VOC Assistant
+DefaultGroupName=VoC Mate
 DisableProgramGroupPage=yes
 OutputDir=..\..\release_artifacts\windows
 OutputBaseFilename={#MyArtifactName}
@@ -41,8 +42,13 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Source: "..\..\build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\AI VOC Assistant"; Filename: "{app}\{#MyAppExeName}"
-Name: "{autodesktop}\AI VOC Assistant"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+Name: "{group}\VoC Mate"; Filename: "{app}\{#MyAppExeName}"
+Name: "{autodesktop}\VoC Mate"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,AI VOC Assistant}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,VoC Mate}"; Flags: nowait postinstall skipifsilent
+
+
+[InstallDelete]
+Type: files; Name: "{autodesktop}\AI VOC Assistant.lnk"
+Type: files; Name: "{userprograms}\AI VOC Assistant\AI VOC Assistant.lnk"

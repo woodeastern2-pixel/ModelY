@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../../domain/entities/knowledge_base_entity.dart';
 import '../../viewmodels/knowledge_base_viewmodel.dart';
+import '../../widgets/manual_content_view.dart';
 
 class KnowledgeBaseScreen extends StatelessWidget {
   const KnowledgeBaseScreen({super.key});
@@ -43,7 +44,7 @@ class KnowledgeBaseScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      '매뉴얼을 분석하고 있습니다. ${vm.manualImportProcessedSections}/${vm.manualImportTotalSections == 0 ? '?' : vm.manualImportTotalSections}개 구간 처리 · 질문 ${vm.manualImportGeneratedEntries}개 생성',
+                      '매뉴얼을 분석하고 있습니다. ${vm.manualImportProcessedSections}/${vm.manualImportTotalSections == 0 ? '?' : vm.manualImportTotalSections}개 구간 처리 · 원문 ${vm.manualImportGeneratedEntries}개 보존',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                     if ((vm.manualImportCurrentFile ?? '').isNotEmpty)
@@ -76,7 +77,7 @@ class KnowledgeBaseScreen extends StatelessWidget {
                         ),
                         itemCount: vm.entries.length,
                         itemBuilder: (_, i) =>
-                            _KbCard(entry: vm.entries[i], vm: vm),
+                            _KbCard(key: ValueKey(vm.entries[i].id), entry: vm.entries[i], vm: vm),
                       ),
                     ),
             ),
@@ -193,12 +194,6 @@ class _ProductFilter extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
       child: Row(
         children: [
-          FilterChip(
-            label: const Text('모든 제품', style: TextStyle(fontSize: 12)),
-            selected: vm.filterProduct.isEmpty,
-            onSelected: (_) => vm.setProductFilter(''),
-            visualDensity: VisualDensity.compact,
-          ),
           ...vm.products.map(
             (product) => Padding(
               padding: const EdgeInsets.only(left: 6),
@@ -282,6 +277,23 @@ class _SearchBarState extends State<_SearchBar> {
   final _controller = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    _controller.text = widget.vm.searchQuery;
+  }
+
+  @override
+  void didUpdateWidget(covariant _SearchBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_controller.text != widget.vm.searchQuery) {
+      _controller.value = TextEditingValue(
+        text: widget.vm.searchQuery,
+        selection: TextSelection.collapsed(offset: widget.vm.searchQuery.length),
+      );
+    }
+  }
+
+  @override
   void dispose() {
     _controller.dispose();
     super.dispose();
@@ -301,13 +313,17 @@ class _SearchBarState extends State<_SearchBar> {
                   icon: const Icon(Icons.clear),
                   onPressed: () {
                     _controller.clear();
+                    setState(() {});
                     widget.vm.setSearch('');
                   },
                 )
               : null,
           isDense: true,
         ),
-        onChanged: widget.vm.setSearch,
+        onChanged: (value) {
+          setState(() {});
+          widget.vm.setSearch(value);
+        },
       ),
     );
   }
@@ -326,7 +342,7 @@ class _CategoryFilter extends StatelessWidget {
         children: [
           FilterChip(
             label: const Text('전체', style: TextStyle(fontSize: 12)),
-            selected: vm.filterCategory.isEmpty,
+            selected: vm.isAllSelected,
             onSelected: (_) => vm.setFilter(''),
             visualDensity: VisualDensity.compact,
           ),
@@ -399,7 +415,7 @@ class _ManualUploadManagerState extends State<_ManualUploadManager> {
                       ),
                     ),
                     Text(
-                      '문서 $fileCount개 · 질문 $totalSections개',
+                      '출처 $fileCount개 · 지식 항목 $totalSections개',
                       style: Theme.of(context).textTheme.labelSmall,
                     ),
                     const SizedBox(width: 4),
@@ -413,7 +429,7 @@ class _ManualUploadManagerState extends State<_ManualUploadManager> {
             ),
             const SizedBox(height: 6),
             const Text(
-              '문서를 선택하면 해당 매뉴얼에서 생성된 질문만 볼 수 있습니다.',
+              '원문과 기존 지식 항목의 본문 전체를 검색합니다. 항목 수는 답변 가능한 질문 수가 아닙니다.',
               style: TextStyle(fontSize: 12, color: Colors.grey),
             ),
             const SizedBox(height: 8),
@@ -421,12 +437,6 @@ class _ManualUploadManagerState extends State<_ManualUploadManager> {
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  FilterChip(
-                    label: const Text('전체 문서', style: TextStyle(fontSize: 12)),
-                    selected: selectedFile.isEmpty,
-                    onSelected: (_) => widget.vm.setManualFileFilter(''),
-                    visualDensity: VisualDensity.compact,
-                  ),
                   ...grouped.entries.map(
                     (entry) => Padding(
                       padding: const EdgeInsets.only(left: 6),
@@ -458,7 +468,7 @@ class _ManualUploadManagerState extends State<_ManualUploadManager> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   subtitle: Text(
-                    '생성된 질문 ${entry.value}개',
+                    '지식 항목 ${entry.value}개',
                     style: const TextStyle(fontSize: 12),
                   ),
                   trailing: IconButton(
@@ -516,7 +526,7 @@ class _ManualUploadManagerState extends State<_ManualUploadManager> {
 class _KbCard extends StatelessWidget {
   final KnowledgeBaseEntity entry;
   final KnowledgeBaseViewModel vm;
-  const _KbCard({required this.entry, required this.vm});
+  const _KbCard({super.key, required this.entry, required this.vm});
 
   @override
   Widget build(BuildContext context) {
@@ -595,17 +605,14 @@ class _KbCard extends StatelessWidget {
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  entry.answer,
-                  style: const TextStyle(fontSize: 13, height: 1.5),
-                ),
+                ManualContentView(content: entry.answer, entryId: entry.id),
                 const SizedBox(height: 8),
                 Row(
                   children: [
                     if (entry.embedding != null)
                       const Chip(
                         label: Text(
-                          'AI 검색 준비 완료',
+                          '본문 검색 가능',
                           style: TextStyle(fontSize: 10),
                         ),
                         visualDensity: VisualDensity.compact,
@@ -677,3 +684,5 @@ class _EmptyState extends StatelessWidget {
     );
   }
 }
+
+

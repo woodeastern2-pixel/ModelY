@@ -111,7 +111,15 @@ class _AiChatListScreenState extends State<_AiChatListScreen> {
   }
 
   Future<void> _createNewSession([VocCopilotQuickAction? initialAction]) async {
-    final sessionId = await context.read<AiViewModel>().createChatSession();
+    final vm = context.read<AiViewModel>();
+    if (!await vm.checkCopilotConnection()) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text(AiViewModel.copilotUnavailable)),
+      );
+      return;
+    }
+    final sessionId = await vm.createChatSession();
     if (!mounted) return;
     await Navigator.push(
       context,
@@ -165,7 +173,7 @@ class _AiChatListScreenState extends State<_AiChatListScreen> {
                             eyebrow: 'VOC COPILOT',
                             title: '저장된 VOC에 대해 질문해 보세요.',
                             description:
-                                'VOC와 지식 자료를 바탕으로 우선순위, 반복 문의, 보고서 요약을 정리합니다.',
+                                context.watch<AiViewModel?>()?.copilotStatusMessage ?? AiViewModel.copilotUnavailable,
                             icon: Icons.auto_awesome_rounded,
                             metrics: [
                               WorkspaceMetric(
@@ -192,7 +200,7 @@ class _AiChatListScreenState extends State<_AiChatListScreen> {
                                   foregroundColor: AppPalette.ink,
                                 ),
                                 icon: const Icon(Icons.add_comment_outlined),
-                                label: const Text('새 대화 시작'),
+                                label: const Text('연결 확인 후 새 대화'),
                               ),
                             ],
                           ),
@@ -271,7 +279,7 @@ class _ChatSessionEmptyState extends StatelessWidget {
             FilledButton.icon(
               onPressed: onStart,
               icon: const Icon(Icons.add_comment_outlined),
-              label: const Text('새 대화 시작'),
+              label: const Text('연결 확인 후 새 대화'),
             ),
           ],
         ),
@@ -562,8 +570,9 @@ class _AiChatConversationScreenState extends State<_AiChatConversationScreen> {
       _focusNode.requestFocus();
       return;
     }
-    _controller.clear();
-    await context.read<AiViewModel>().sendChatMessage(message);
+    final reply = await context.read<AiViewModel>().sendChatMessage(message);
+    if (!mounted) return;
+    if (reply != null) _controller.clear();
     _scrollToBottom();
     _focusNode.requestFocus();
   }
@@ -638,6 +647,20 @@ class _AiChatConversationScreenState extends State<_AiChatConversationScreen> {
           body: Column(
             key: const Key('copilot-conversation'),
             children: [
+              Material(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.sm),
+                  child: Row(children: [
+                    Expanded(child: Text(vm.copilotStatusMessage)),
+                    TextButton(
+                      onPressed: vm.isCheckingConnection || vm.isChatting
+                          ? null : () => vm.checkCopilotConnection(),
+                      child: Text(vm.isCheckingConnection ? '확인 중' : '연결 확인'),
+                    ),
+                  ]),
+                ),
+              ),
               if (vm.chatError != null)
                 Container(
                   width: double.infinity,
@@ -758,7 +781,7 @@ class _AiChatConversationScreenState extends State<_AiChatConversationScreen> {
                               maxLines: 5,
                               textInputAction: TextInputAction.send,
                               onSubmitted: (_) {
-                                if (!vm.isChatting) _send();
+                                if (!vm.isChatting && vm.isAiConnected) _send();
                               },
                               decoration: const InputDecoration(
                                 hintText: '이 VOC 데이터에서 무엇을 확인할까요?',
@@ -778,7 +801,7 @@ class _AiChatConversationScreenState extends State<_AiChatConversationScreen> {
                           const SizedBox(width: AppSpacing.xs),
                           IconButton.filled(
                             key: const Key('copilot-send'),
-                            onPressed: vm.isChatting ? null : _send,
+                            onPressed: vm.isChatting || !vm.isAiConnected ? null : _send,
                             tooltip: '질문 보내기',
                             icon: vm.isChatting
                                 ? const SizedBox(
@@ -960,3 +983,4 @@ class _CopilotConversationEmptyState extends StatelessWidget {
     );
   }
 }
+

@@ -145,7 +145,7 @@ class _VocRegisterScreenState extends State<VocRegisterScreen> {
       autoAnswer: settingsVm.aiAutoAnswerOnVocRegister,
     ));
 
-    setState(() => _isSaving = false);
+    // Keep the submission locked until this route is disposed.
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => VocDetailScreen(vocId: voc.id)),
     );

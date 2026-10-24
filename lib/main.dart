@@ -100,14 +100,18 @@ class VocAssistantApp extends StatelessWidget {
           create: (ctx) => IntegrationViewModel(
             vocRepo,
             ctx.read<SettingsViewModel>(),
-            onInboundSyncEvent: _showInboundSyncSnackBar,
+            onInboundSyncEvent: (message) {
+              _showInboundSyncSnackBar(message);
+              ctx.read<VocViewModel>().loadVocs();
+              ctx.read<DashboardViewModel>().loadDashboard();
+            },
           ),
         ),
       ],
       child: Consumer<SettingsViewModel>(
         builder: (context, settingsVm, _) {
           return MaterialApp(
-            title: 'AI VOC Assistant',
+            title: 'VoC Mate',
             debugShowCheckedModeBanner: false,
             scaffoldMessengerKey: _messengerKey,
             theme: AppTheme.lightTheme,
@@ -172,3 +176,4 @@ class _SelectableAppContentState extends State<_SelectableAppContent> {
     return Overlay(initialEntries: [_entry]);
   }
 }
+

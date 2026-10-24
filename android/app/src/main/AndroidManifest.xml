@@ -5,7 +5,7 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
 
     <application
-        android:label="ai_voc_assistant"
+        android:label="VoC Mate"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="true"
@@ -51,3 +51,4 @@
         </intent>
     </queries>
 </manifest>
+

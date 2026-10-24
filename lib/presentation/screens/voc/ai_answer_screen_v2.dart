@@ -10,6 +10,8 @@ import '../../viewmodels/ai_viewmodel.dart';
 import '../../viewmodels/integration_viewmodel.dart';
 import '../../viewmodels/voc_viewmodel.dart';
 import '../../widgets/workspace_ui.dart';
+import '../../widgets/manual_content_view.dart';
+import '../../widgets/manual_image_gallery.dart';
 
 class AiAnswerScreen extends StatefulWidget {
   const AiAnswerScreen({
@@ -53,15 +55,23 @@ class _AiAnswerScreenState extends State<AiAnswerScreen> {
     super.dispose();
   }
 
-  Future<void> _runPipeline() async {
+  Future<void> _runPipeline({bool useLocal = false}) async {
     final vm = context.read<AiViewModel>();
-    await vm.searchSimilarVocs('${widget.vocTitle} ${widget.vocContent}');
-    final result = await vm.generateAnswer(widget.vocTitle, widget.vocContent);
+    setState(() => _answer = '');
+    final result = await vm.generateAnswer(widget.vocTitle, widget.vocContent,
+        excludeVocId: widget.vocId, useLocal: useLocal);
     if (!mounted) return;
     setState(() {
       _answer = result?.answer ?? '';
       if (_selectedCase >= vm.similarVocs.length) _selectedCase = 0;
     });
+  }
+
+  Future<void> _searchOnly() async {
+    final vm = context.read<AiViewModel>();
+    await vm.searchSimilarVocs('${widget.vocTitle}\n${widget.vocContent}',
+        excludeVocId: widget.vocId);
+    if (mounted) setState(() => _selectedCase = 0);
   }
 
   Future<void> _copy(String text, String message) async {
@@ -75,7 +85,10 @@ class _AiAnswerScreenState extends State<AiAnswerScreen> {
 
   Future<void> _adopt() async {
     final answer = _answer.trim();
-    if (answer.isEmpty || _adopting) return;
+    if (answer.isEmpty || _adopting ||
+        !context.read<AiViewModel>().hasAnswer ||
+        context.read<AiViewModel>().isClarificationAnswer ||
+        context.read<AiViewModel>().isGenerating) return;
     setState(() => _adopting = true);
     final aiVm = context.read<AiViewModel>();
     final vocVm = context.read<VocViewModel>();
@@ -84,7 +97,7 @@ class _AiAnswerScreenState extends State<AiAnswerScreen> {
         vocId: widget.vocId,
         content: answer,
         confidence: aiVm.answerResult?.confidence,
-        referencedVocIds: aiVm.similarVocs
+        referencedVocIds: aiVm.answerEvidence
             .map((item) => item.knowledgeBase.vocId)
             .whereType<String>()
             .toList(),
@@ -147,7 +160,7 @@ class _AiAnswerScreenState extends State<AiAnswerScreen> {
         final desktop = constraints.maxWidth >= 1050;
         return Scaffold(
           backgroundColor: context.visualColors.canvas,
-          appBar: AppBar(title: const Text('자료 기반 답변 초안')),
+          appBar: AppBar(title: const Text('문의 답변 검토')),
           body: Consumer<AiViewModel>(
             builder: (context, vm, _) {
               return SingleChildScrollView(
@@ -190,15 +203,21 @@ class _AiAnswerScreenState extends State<AiAnswerScreen> {
                           actions: [
                             FilledButton.icon(
                               key: const Key('ai-answer-regenerate'),
+                              onPressed: vm.isSearching || vm.isGenerating ? null : _runPipeline,
+                              icon: const Icon(Icons.auto_awesome_outlined),
+                              label: const Text('답변 다시 생성'),
+                            ),
+                            FilledButton.icon(
+                              key: const Key('ai-answer-search'),
                               onPressed: vm.isSearching || vm.isGenerating
                                   ? null
-                                  : _runPipeline,
+                                  : _searchOnly,
                               style: FilledButton.styleFrom(
                                 backgroundColor: Colors.white,
                                 foregroundColor: AppPalette.ink,
                               ),
                               icon: const Icon(Icons.refresh_rounded),
-                              label: const Text('참고 자료 다시 찾기'),
+                              label: const Text('자료 다시 검색'),
                             ),
                           ],
                         ),
@@ -223,6 +242,7 @@ class _AiAnswerScreenState extends State<AiAnswerScreen> {
                                   answer: _answer,
                                   selectedCase: _selectedCase,
                                   onRegenerate: _runPipeline,
+                                  onLocalDraft: () => _runPipeline(useLocal: true),
                                   onCopy: () =>
                                       _copy(_answer, '자료 기반 답변 초안을 복사했습니다.'),
                                   onAdopt: _adopting ? null : _adopt,
@@ -250,6 +270,7 @@ class _AiAnswerScreenState extends State<AiAnswerScreen> {
                             answer: _answer,
                             selectedCase: _selectedCase,
                             onRegenerate: _runPipeline,
+                                  onLocalDraft: () => _runPipeline(useLocal: true),
                             onCopy: () => _copy(_answer, '자료 기반 답변 초안을 복사했습니다.'),
                             onAdopt: _adopting ? null : _adopt,
                             adopting: _adopting,
@@ -292,8 +313,8 @@ class _CaseNavigator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _Panel(
-      title: '참고한 유사 사례',
-      subtitle: '답변 초안 작성에 참고한 VOC와 지식 자료입니다.',
+      title: '검색된 참고 자료',
+      subtitle: '관련 자료 후보입니다. AI가 실제로 인용한 자료와는 다를 수 있습니다.',
       icon: Icons.manage_search_outlined,
       child: vm.isSearching
           ? const Padding(
@@ -395,6 +416,7 @@ class _AnswerWorkspace extends StatelessWidget {
     required this.answer,
     required this.selectedCase,
     required this.onRegenerate,
+    required this.onLocalDraft,
     required this.onCopy,
     required this.onAdopt,
     required this.adopting,
@@ -409,6 +431,7 @@ class _AnswerWorkspace extends StatelessWidget {
   final String answer;
   final int selectedCase;
   final VoidCallback onRegenerate;
+  final VoidCallback onLocalDraft;
   final VoidCallback onCopy;
   final VoidCallback? onAdopt;
   final bool adopting;
@@ -429,33 +452,43 @@ class _AnswerWorkspace extends StatelessWidget {
     return Column(
       children: [
         _Panel(
-          title: '자료 기반 답변 초안',
-          subtitle: '답변을 승인하기 전에 사실관계와 안내 절차를 확인해 주세요.',
+          title: vm.isClarificationAnswer ? '추가 확인 안내'
+              : vm.isAiAnswer || (vm.isGenerating && vm.isRequestingAi)
+                  ? 'AI 답변 초안' : '저장 자료 기반 답변 초안',
+          subtitle: vm.isClarificationAnswer
+              ? '해결 방법을 확인하지 못했습니다. 아래 안내는 복사할 수 있지만 해결 답변으로 승인하거나 지식 자료에 등록할 수 없습니다.'
+              : '답변을 승인하기 전에 사실관계와 안내 절차를 확인해 주세요.',
           icon: Icons.auto_awesome_outlined,
           trailing: Wrap(
             spacing: 4,
             children: [
-              if (vm.answerResult != null)
+              if (vm.isAiAnswer)
+                const Chip(label: Text('AI 초안 · 담당자 확인 필요'))
+              else if (vm.isClarificationAnswer)
+                const Chip(label: Text('추가 확인용 초안'))
+              else if (vm.hasPartialAnswer)
+                const Chip(label: Text('일부 근거 · 추가 확인 필요'))
+              else if (vm.answerResult != null)
                 _ScoreBadge(score: vm.answerResult!.confidence),
               IconButton(
-                  onPressed: answer.trim().isEmpty ? null : onCopy,
+                  onPressed: !vm.hasAnswer || vm.isGenerating || answer.trim().isEmpty ? null : onCopy,
                   tooltip: '답변 복사',
                   icon: const Icon(Icons.copy_outlined)),
               IconButton(
-                  onPressed: vm.isGenerating ? null : onRegenerate,
-                  tooltip: '다시 만들기',
+                  onPressed: vm.isGenerating || vm.isSearching ? null : onRegenerate,
+                  tooltip: '답변 다시 생성',
                   icon: const Icon(Icons.refresh)),
             ],
           ),
           child: vm.isGenerating
-              ? const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 38),
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 38),
                   child: Center(
                     child: Column(
                       children: [
-                        CircularProgressIndicator(),
-                        SizedBox(height: 12),
-                        Text('참고 자료를 바탕으로 답변 초안을 만들고 있습니다.'),
+                        const CircularProgressIndicator(),
+                        const SizedBox(height: 12),
+                        Text(vm.generationStatus),
                       ],
                     ),
                   ),
@@ -474,6 +507,9 @@ class _AnswerWorkspace extends StatelessWidget {
                               .bodyLarge
                               ?.copyWith(height: 1.65),
                         ),
+                        if (vm.hasAnswer)
+                          for (final reference in vm.answerEvidence)
+                            ManualImageGallery(entryId: reference.knowledgeBase.id),
                         if (vm.answerResult?.notes.trim().isNotEmpty ==
                             true) ...[
                           const SizedBox(height: 12),
@@ -485,7 +521,7 @@ class _AnswerWorkspace extends StatelessWidget {
                         Align(
                           alignment: Alignment.centerRight,
                           child: FilledButton.icon(
-                            onPressed: answer.trim().isEmpty ? null : onAdopt,
+                            onPressed: !vm.hasAnswer || vm.isClarificationAnswer || vm.isGenerating || answer.trim().isEmpty ? null : onAdopt,
                             icon: adopting
                                 ? const SizedBox(
                                     width: 16,
@@ -500,9 +536,48 @@ class _AnswerWorkspace extends StatelessWidget {
                     ),
         ),
         const SizedBox(height: 14),
-        if (selected != null) _SelectedEvidence(item: selected),
+        if (vm.searchError != null) _NoteBox(text: vm.searchError!),
+        if (!vm.isGenerating && vm.hasAiConfiguration)
+          TextButton.icon(
+            onPressed: vm.isSearching ? null : onLocalDraft,
+            icon: const Icon(Icons.description_outlined),
+            label: const Text('저장 자료로 초안 만들기'),
+          ),
+        _Panel(
+          title: '이 답변의 참고 자료',
+          icon: Icons.fact_check_outlined,
+          subtitle: 'AI 제공 자료와 인용 확인 자료를 구분합니다.',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(vm.isGenerating ? '답변 생성 중입니다. 검색된 자료는 아래에서 확인할 수 있습니다.'
+                  : !vm.hasAnswer ? '아직 생성된 답변이 없습니다.'
+                  : vm.answerEvidence.isEmpty
+                      ? '인용이 확인된 자료가 없습니다. 검색된 자료를 답변의 근거로 단정하지 마세요.'
+                      : '인용 확인 자료 ${vm.answerEvidence.length}건'),
+              if (vm.isAiAnswer)
+                Text('AI에 제공한 자료 ${vm.suppliedEvidence.length}건'),
+              for (final item in vm.answerEvidence)
+                Material(color: Colors.transparent,
+                  child: ExpansionTile(title: Text(item.knowledgeBase.question),
+                    children: [_SelectedEvidence(item: item, status: '답변 인용 확인')])),
+              for (final item in vm.suppliedEvidence.where((r) =>
+                  !vm.answerEvidence.any((e) => e.knowledgeBase.id == r.knowledgeBase.id)))
+                Material(color: Colors.transparent,
+                  child: ExpansionTile(title: Text(item.knowledgeBase.question),
+                    subtitle: const Text('AI에 제공 · 인용 미확인'),
+                    children: [_SelectedEvidence(item: item, status: 'AI에 제공 · 인용 미확인')])),
+            ],
+          ),
+        ),
+        if (selected != null) ...[
+          const SizedBox(height: 14),
+          _SelectedEvidence(item: selected, status:
+              vm.answerEvidence.any((r) => r.knowledgeBase.id == selected.knowledgeBase.id)
+                  ? '답변 인용 확인' : '검색된 자료 · 답변 인용 미확인'),
+        ],
         const SizedBox(height: 14),
-        _FeedbackPanel(
+        if (vm.hasAnswer && !vm.isGenerating && !vm.isClarificationAnswer) _FeedbackPanel(
           type: feedbackType,
           controller: feedbackController,
           saving: feedbackSaving,
@@ -515,8 +590,9 @@ class _AnswerWorkspace extends StatelessWidget {
 }
 
 class _SelectedEvidence extends StatelessWidget {
-  const _SelectedEvidence({required this.item});
+  const _SelectedEvidence({required this.item, required this.status});
   final SimilarVocResult item;
+  final String status;
 
   @override
   Widget build(BuildContext context) {
@@ -529,7 +605,7 @@ class _SelectedEvidence extends StatelessWidget {
         kb.question.contains('매뉴얼 섹션');
     final code = VocDisplayUtils.codeFromProject(kb.project);
     return _Panel(
-      title: '이 답변의 참고 자료',
+      title: status,
       subtitle: manual
           ? '시스템 매뉴얼'
           : '${code.isEmpty ? 'VOC 이력' : code} · 유사도 ${(item.similarityScore * 100).toStringAsFixed(1)}%',
@@ -540,8 +616,7 @@ class _SelectedEvidence extends StatelessWidget {
           Text(kb.question,
               style: const TextStyle(fontWeight: FontWeight.w800)),
           const SizedBox(height: 10),
-          SelectableText(UserFacingText.fromAi(kb.answer),
-              style: const TextStyle(height: 1.55)),
+          ManualContentView(content: UserFacingText.fromAi(kb.answer), entryId: kb.id),
           const SizedBox(height: 10),
           Wrap(
             spacing: 12,
@@ -648,14 +723,26 @@ class _Panel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return WorkspacePanel(
-      title: title,
-      description: subtitle,
-      icon: icon,
-      trailing: trailing,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      child: child,
-    );
+    return LayoutBuilder(builder: (context, constraints) {
+      final stackedActions = trailing != null && constraints.maxWidth < 600;
+      return WorkspacePanel(
+        title: title,
+        description: subtitle,
+        icon: icon,
+        trailing: stackedActions ? null : trailing,
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: stackedActions
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Align(alignment: Alignment.centerRight, child: trailing!),
+                  const SizedBox(height: AppSpacing.sm),
+                  child,
+                ],
+              )
+            : child,
+      );
+    });
   }
 }
 
@@ -683,7 +770,7 @@ class _ScoreBadge extends StatelessWidget {
         color: bg,
         borderRadius: BorderRadius.circular(AppRadii.small),
       ),
-      child: Text('$pct%',
+      child: Text('검색 일치 $pct%',
           style:
               TextStyle(color: fg, fontSize: 12, fontWeight: FontWeight.w800)),
     );
@@ -739,3 +826,4 @@ class _NoteBox extends StatelessWidget {
     );
   }
 }
+

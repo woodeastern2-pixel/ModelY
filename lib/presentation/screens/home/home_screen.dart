@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../widgets/voc_mate_logo.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/constants/app_constants.dart';
@@ -402,11 +403,7 @@ class _BrandMark extends StatelessWidget {
               color: AppPalette.indigo,
               borderRadius: BorderRadius.circular(AppRadii.control),
             ),
-            child: const Icon(
-              Icons.graphic_eq_rounded,
-              color: Colors.white,
-              size: 24,
-            ),
+            child: const VocMateLogo(size: 42),
           ),
           if (expanded) ...[
             const SizedBox(width: AppSpacing.sm),
@@ -415,7 +412,7 @@ class _BrandMark extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'AI VOC',
+                    'VoC Mate',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           color: visual.onNavigation,
                           fontWeight: FontWeight.w800,
@@ -423,7 +420,7 @@ class _BrandMark extends StatelessWidget {
                         ),
                   ),
                   Text(
-                    'OPERATIONS',
+                    '문의 응대 도우미',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
                           color: visual.navigationMuted,
                           letterSpacing: 1.1,
@@ -631,3 +628,4 @@ class _NavItem {
   final String label;
   final String mobileLabel;
 }
+
