@@ -26,11 +26,12 @@ void main() {
         id:row['id'],question:row['question'],answer:row['answer'],category:'시스템매뉴얼',
         customer:row['sourceName'],project:row['project'],
         createdAt:DateTime(2026),resolvedAt:DateTime(2026)),similarityScore:1)];
+      final ai = AiService()..configureBundledQwen();
       final clock = Stopwatch()..start();
-      final raw = await service.generate(AiPrompts.reviewDraftSystem,
+      final raw = await service.generate(ai.reviewDraftSystemPrompt,
         AiPrompts.answerGenerationUser('메신저 알림 설정',
           '메시지 알림과 알림음은 어디에서 설정하나요?',evidence),maxTokens:512);
-      final result=AiService().parseReviewDraft(raw,evidence);
+      final result=ai.parseReviewDraft(raw,evidence);
       results.add({'case':'korean_notification_original','answer':result.answer,
         'sources':result.referencedCaseIds,'elapsed_ms':clock.elapsedMilliseconds});
       expect(result.answer,contains('알림'));
@@ -47,6 +48,9 @@ void main() {
       results.add({'case': 'unsupported_policy', 'answer': unknown});
       expect(unknown, contains('확인할 수 없'));
       expect(RegExp(r'\d+\s*일').hasMatch(unknown), isFalse);
+    } catch (error) {
+      results.add({'case': 'native_model_failure', 'error': error.toString()});
+      rethrow;
     } finally {
       await service.stop();
       final report = File('artifacts/bundled-qwen-smoke.json');
