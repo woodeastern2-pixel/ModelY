@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'manual_content.dart';
+import 'manual_language_policy.dart';
 import 'offline_answer_composer.dart';
 import 'offline_query_plan.dart';
 
@@ -10,6 +11,32 @@ import '../../domain/entities/knowledge_base_entity.dart';
 /// Scores express evidence coverage, not a probability of correctness.
 class LocalAnswerService {
   final _versionQueries = <String, List<String>>{};
+  static final _termCache = <String, List<String>>{};
+  static final _scopeCache = <String, List<String>>{};
+  static final _prepared = Expando<_PreparedManual>();
+  static final _contents = Expando<bool>();
+  static final _locations = Expando<Map<String,bool>>();
+
+  bool _matchPrepared(_PreparedManual prepared, String corpus, String term) {
+    final matches=prepared.matches.putIfAbsent(corpus,()=>{});
+    if (matches.length >= 64) matches.remove(matches.keys.first);
+    return matches.putIfAbsent(term,()=>_matches(corpus,term));
+  }
+
+  /// Serializable search material is prepared once in the indexing isolate.
+  static Map<String,dynamic> prepareData(String title, String body, String? project) {
+    final service=LocalAnswerService();
+    return {'corpus':service._normalize('$title $body'),
+      'scope':service._normalize('${project ?? ''} $title'),
+      'title':service._normalize(title),'titleTerms':service._terms(title),
+      'windows':service._windows(body).map(service._normalize).toList()};
+  }
+
+  void prepare(KnowledgeBaseEntity entry, {Map<String,dynamic>? data}) {
+    _prepared[entry] = _PreparedManual.fromData(data ?? prepareData(entry.question,entry.answer,entry.project));
+  }
+  _PreparedManual _prepare(KnowledgeBaseEntity e) => _prepared[e] ??=
+      _PreparedManual.fromData(prepareData(e.question,e.answer,e.project));
   static const noEvidence =
       '현재 등록된 자료에서 이 질문에 직접 답할 근거를 찾지 못했습니다. 담당자에게 확인해 주세요.';
 
@@ -27,9 +54,9 @@ class LocalAnswerService {
     'register': ['등록', 'register', 'registration'],
     'notification': ['알림', 'notification', 'notifications'],
     'message': ['메시지', '메세지', 'message', 'messages'],
-    'sound': ['소리', '음소거', 'sound', 'mute'],
-    'popup': ['팝업', 'popup', 'toast', 'notification dialogue box'],
-    'dnd': ['방해 금지', '방해금지', 'do not disturb'],
+    'sound': ['소리', '알림음', '음소거', 'sound', 'mute'],
+    'popup': ['팝업', '알림창', 'popup', 'toast', 'notification dialogue box'],
+    'dnd': ['방해 금지', '방해금지', '다른 용무', '다른용무', 'do not disturb'],
     'password': ['비밀번호', '암호', 'password'],
     'join': ['접속', '참가', '참여', 'join'],
     'signin': ['로그인', 'sign in', 'login', 'log in'],
@@ -52,6 +79,9 @@ class LocalAnswerService {
     'folder': ['폴더', 'folder', 'folders'],
     'edit': ['편집', '수정', 'edit', 'editing'],
     'cancel': ['취소', 'cancel'],
+    'recall': ['회수', '보낸 거 취소', '보낸거 취소', '보낸 메시지 취소', '발신 취소', 'recall'],
+    'reservation': ['예약', '미리 보내', '나중에 보내', '시간 맞춰 보내'],
+    'bookmark': ['북마크', '중요 표시', '나중에 찾', '즐겨찾기 메시지'],
     'limit': ['제한', '최대', 'limit', 'maximum'],
     'conversation': ['대화기록', '대화 기록', '대화내역', '대화 내역', 'conversation data', 'chat history'],
     'contact': ['연락처', 'contact', 'contacts'],
@@ -144,6 +174,11 @@ class LocalAnswerService {
   }
 
   List<String> _queryScope(String query) {
+    if (_scopeCache.length >= 256) _scopeCache.remove(_scopeCache.keys.first);
+    return _scopeCache.putIfAbsent(query, () => _computeQueryScope(query));
+  }
+
+  List<String> _computeQueryScope(String query) {
     final terms = _terms(query);
     final currentTerms = _terms(OfflineQueryPlan.from(query).request);
     var products = currentTerms.where(_products.contains).toList();
@@ -178,7 +213,7 @@ class LocalAnswerService {
         return false;
       }
     }
-    final scope = _normalize('${entry.project ?? ''} ${entry.question}');
+    final scope = _prepare(entry).scope;
     for (final group in [_products, {'desktop', 'mobile'}]) {
       final requested = _queryScope(query).where(group.contains).toSet();
       final known = group.where((t) => _matches(scope, t)).toSet();
@@ -218,6 +253,12 @@ class LocalAnswerService {
   }
 
   bool hasNavigationLocation(String query, KnowledgeBaseEntity entry) {
+    final values=_locations[entry] ??= {};
+    if(values.length >= 16) values.remove(values.keys.first);
+    return values.putIfAbsent(query,()=>_computeNavigationLocation(query,entry));
+  }
+
+  bool _computeNavigationLocation(String query, KnowledgeBaseEntity entry) {
     final plan = OfflineQueryPlan.from(query);
     if (!plan.navigation || plan.parts.length > 1) return false;
     final targets = _navigationTargets(query);
@@ -339,7 +380,7 @@ class LocalAnswerService {
         .replaceAll(RegExp(r'(?:한|두|세|네|\d+)\s*(?:문장|줄)(?:\s*이내)?(?:로)?'), ' ')
         .replaceAll(RegExp(r'요약(?:해)?|정리(?:해)?|알려|주세요|해\s*주세요'), ' ').trim();
     return rank(search, entries.where((entry) =>
-        entry.id.startsWith('approved-voc-')),
+        (entry.id.startsWith('approved-voc-') || entry.id.startsWith('approved-index-'))),
         preferredVocIds: preferredVocIds, limit: 3);
   }
 
@@ -351,22 +392,24 @@ class LocalAnswerService {
   }) {
     final terms = _terms(query);
     if (terms.isEmpty || limit <= 0) return const [];
-    final docs = entries.where((e) => e.answer.trim().isNotEmpty).toList();
-    final corpora = docs.map((e) => _normalize('${e.question} ${e.answer}')).toList();
+    final docs = entries.where((e) => e.answer.trim().isNotEmpty && !ManualLanguagePolicy.excludedEntry(e)).toList();
+    final preparedDocs = docs.map(_prepare).toList();
+    final corpora = preparedDocs.map((d)=>d.corpus).toList();
     final weights = <String, double>{};
     for (final term in terms) {
-      final df = corpora.where((body) => _matches(body, term)).length;
+      final df = preparedDocs.where((d) => _matchPrepared(d, d.corpus, term)).length;
       weights[term] = (1 + math.log(1 + docs.length / (1 + df))) *
           (_generic.contains(term) ? 0.45 : 1.0);
     }
     final ranked = <SimilarVocResult>[];
     for (var i = 0; i < docs.length; i++) {
       final entry = docs[i];
+      final prepared = preparedDocs[i];
       if (!versionCompatible(query, entry) || _looksLikeContents(entry)) continue;
       final preferred = entry.vocId != null && preferredVocIds.contains(entry.vocId);
-      final scope = _normalize('${entry.project ?? ''} ${entry.question}');
+      final scope = _prepare(entry).scope;
       final requestedPlatform = terms.where((t) => t == 'desktop' || t == 'mobile').toSet();
-      final knownPlatform = {'desktop', 'mobile'}.where((t) => _matches(scope, t)).toSet();
+      final knownPlatform = {'desktop', 'mobile'}.where((t) => _matchPrepared(prepared, scope, t)).toSet();
       if (requestedPlatform.length == 1 && knownPlatform.length == 1 &&
           !requestedPlatform.any(knownPlatform.contains)) continue;
       final requestedProducts = _queryScope(query).where(_products.contains);
@@ -375,11 +418,11 @@ class LocalAnswerService {
           !requestedProducts.any(knownProducts.contains)) {
         continue;
       }
-      final windows = _windows(entry.answer);
+      final windows = prepared.windows;
       var best = 0.0;
       for (final window in windows) {
-        final body = _normalize(window);
-        final title = _normalize(entry.question);
+        final body = window;
+        final title = prepared.title;
         var matched = 0.0;
         var total = 0.0;
         var bodyHits = 0;
@@ -387,13 +430,13 @@ class LocalAnswerService {
         for (final term in terms) {
           final weight = weights[term]!;
           total += weight;
-          if (_matches(body, term)) {
+          if (_matchPrepared(prepared, body, term)) {
             matched += weight;
             bodyHits++;
             if (!_generic.contains(term)) specificBodyHits++;
-          } else if (_matches(title, term) ||
-              (_products.contains(term) && _matches(scope, term))) {
-            matched += weight * 0.65;
+          } else if (_matchPrepared(prepared, title, term) ||
+              (_products.contains(term) && _matchPrepared(prepared, scope, term))) {
+            matched += weight * (_products.contains(term) ? 1.0 : 0.65);
           }
         }
         // Prevent a title-only or product-only result becoming an answer.
@@ -404,7 +447,7 @@ class LocalAnswerService {
       // Pinned VOCs remain available to AI as context, but cannot manufacture
       // evidence for the offline answer path (isAnswerSource filters them).
       if (entry.id.startsWith('registered-voc-')) {
-        final contextHits = terms.where((t) => _matches(corpora[i], t)).length;
+        final contextHits = terms.where((t) => _matchPrepared(prepared, corpora[i], t)).length;
         best = math.max(best, 0.65 * contextHits / terms.length);
       }
       final score = preferred ? math.max(best, 0.95) : best;
@@ -427,7 +470,8 @@ class LocalAnswerService {
           (!terms.contains('shortcut') && _matches(_normalize(e.question), 'shortcut')) ? 1 : 0;
       final support = supportingOnly(a.knowledgeBase).compareTo(supportingOnly(b.knowledgeBase));
       if (support != 0) return support;
-      if (RegExp(r'어떻게|방법|절차|등록').hasMatch(query)) {
+      if (RegExp(r'어떻게|방법|절차|등록').hasMatch(query) ||
+          terms.any(const {'recall','reservation','restore','delete','signin','settings'}.contains)) {
         bool instruction(KnowledgeBaseEntity e) => RegExp(
             r'클릭하|선택하|입력하|누르|선택합|입력합|클릭합|클릭한|선택한|입력한')
             .hasMatch(ManualContent.parse(e.answer).body);
@@ -438,7 +482,7 @@ class LocalAnswerService {
       // Equal coverage is common for broad sections. Prefer a question about
       // the requested operation over menus that merely mention it in passing.
       double focus(KnowledgeBaseEntity e) {
-        final titleTerms = _terms(e.question).toSet();
+        final titleTerms = _prepare(e).titleTerms;
         final hits = terms.where(titleTerms.contains).length;
         return hits / math.max(1, terms.length) +
             hits / math.max(1, titleTerms.length);
@@ -450,7 +494,10 @@ class LocalAnswerService {
     return ranked.take(limit).toList();
   }
 
-  bool _looksLikeContents(KnowledgeBaseEntity entry) {
+  bool _looksLikeContents(KnowledgeBaseEntity entry) =>
+      _contents[entry] ??= _computeContents(entry);
+
+  bool _computeContents(KnowledgeBaseEntity entry) {
     if (entry.category != '시스템매뉴얼') return false;
     final parsed = ManualContent.parse(entry.answer);
     if (parsed.transcription.isNotEmpty) return false;
@@ -469,7 +516,7 @@ class LocalAnswerService {
   }
 
   bool isAnswerSource(KnowledgeBaseEntity entry) =>
-      !entry.id.startsWith('registered-voc-') && entry.answer.trim().isNotEmpty &&
+      !entry.id.startsWith('registered-voc-') && !ManualLanguagePolicy.excludedEntry(entry) && entry.answer.trim().isNotEmpty &&
       !entry.answer.contains('현재 확인된 자료만으로는 정확한 해결 절차나 지원 조건을 확정하기 어려워') &&
       RegExp(r'답할 근거가 부족합니다').allMatches(entry.answer).length < 2;
 
@@ -488,7 +535,7 @@ class LocalAnswerService {
     final plan = OfflineQueryPlan.from(query);
     if (plan.parts.length > 1) {
       final selected = <String, SimilarVocResult>{};
-      for (final part in plan.parts.take(3)) {
+      for (final part in plan.parts.take(8)) {
         final matches = rank(part, usable.map((r) => r.knowledgeBase));
         if (matches.isNotEmpty && matches.first.similarityScore >= 0.68) {
           selected[matches.first.knowledgeBase.id] = matches.first;
@@ -669,6 +716,11 @@ class LocalAnswerService {
   String _normalize(String text) => SearchQueryExpander.normalize(text);
 
   List<String> _terms(String query) {
+    if (_termCache.length >= 512) _termCache.remove(_termCache.keys.first);
+    return _termCache.putIfAbsent(query, () => _computeTerms(query));
+  }
+
+  List<String> _computeTerms(String query) {
     var remaining = _normalize(OfflineQueryPlan.searchText(query)).replaceAll(RegExp(r'원문 구간 \d+'), ' ')
         .replaceAll(RegExp(r'해야\s*하나요|해야\s*하나|할\s*수\s*있나요|알려\s*주세요'), ' ');
     final result = <String>{};
@@ -703,4 +755,16 @@ class LocalAnswerService {
     if (aliases != null) return aliases.any((a) => _pattern(a).hasMatch(corpus));
     return corpus.contains(term) || corpus.replaceAll(' ', '').contains(term);
   }
+}
+
+class _PreparedManual {
+  final String corpus, scope, title;
+  final Set<String> titleTerms;
+  final List<String> windows;
+  final matches = <String,Map<String,bool>>{};
+  _PreparedManual(this.corpus,this.scope,this.title,this.titleTerms,this.windows);
+  factory _PreparedManual.fromData(Map<String,dynamic> data) => _PreparedManual(
+      data['corpus'] as String,data['scope'] as String,data['title'] as String,
+      (data['titleTerms'] as List).cast<String>().toSet(),
+      (data['windows'] as List).cast<String>());
 }

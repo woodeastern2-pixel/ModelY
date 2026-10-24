@@ -106,7 +106,7 @@ void main() {
       expect(tester.takeException(), isNull);
       await _capture(tester, key, 'connected-note-draft-${dark ? "dark" : "light"}');
     });
-    testWidgets('reported attendee navigation uses indexed corpus and states missing location (${dark ? "dark" : "light"})', (tester) async {
+    testWidgets('removed English attendee source produces clarification while Korean queries remain grounded (${dark ? "dark" : "light"})', (tester) async {
       tester.view.physicalSize = const Size(1440, 1400);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
@@ -144,11 +144,11 @@ void main() {
       await tester.pumpAndSettle();
       expect(vm.isAiConnected, isFalse);
       expect(vm.hasAnswer, isTrue);
-      expect(vm.similarVocs, isNotEmpty);
-      expect(vm.answerResult!.answer, contains('확인되지 않은 부분'));
-      expect(vm.answerResult!.answer, contains('확인된 관련 설명'));
-      expect(vm.hasPartialAnswer, isTrue);
-      expect(find.text('일부 근거 · 추가 확인 필요'), findsOneWidget);
+      expect(vm.answerEvidence, isEmpty);
+      expect(vm.isClarificationAnswer, isTrue);
+      expect(vm.answerResult!.answer, contains('정확한 해결 절차나 지원 조건을 확정하기 어려워'));
+      expect(vm.answerResult!.answer, isNot(contains('화면 하단')));
+      expect(find.text('추가 확인용 초안'), findsOneWidget);
       expect(find.text('100%'), findsNothing);
       expect(find.textContaining('찾지 못했습니다'), findsNothing);
       expect(tester.takeException(), isNull);
@@ -232,7 +232,7 @@ void main() {
             vocContent: '일정 등록 되려면 어떻게 해야하나요?',
             category: '기타', customer: '', project: '')))));
       await tester.pumpAndSettle();
-      expect(entries.length, 1008);
+      expect(entries.length, 800);
       expect(vm.isAiConnected, isFalse);
       expect(vm.hasAnswer, isTrue);
       expect(vm.answerResult!.answer, contains('다음 순서로 진행해 주세요.'));

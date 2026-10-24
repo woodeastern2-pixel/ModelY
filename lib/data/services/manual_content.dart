@@ -1,4 +1,3 @@
-import 'reviewed_manual_translation.dart';
 
 /// Separates machine transcription from the authored manual explanation.
 /// The stored source stays unchanged and remains searchable.
@@ -11,11 +10,10 @@ class ManualContent {
   /// Presentation only: retrieval and the stored source are not rewritten.
   factory ManualContent.forDisplay(String text, {required String entryId}) {
     final parsed = ManualContent.parse(text);
-    final translated = ReviewedManualTranslation.forSource(entryId, text);
     return ManualContent(
-      translated ?? cleanDiagramLabels(parsed.body),
+      cleanDiagramLabels(parsed.body),
       parsed.transcription,
-      original: translated == null ? '' : cleanDiagramLabels(parsed.body),
+      original: '',
     );
   }
 

@@ -6,10 +6,16 @@ import '../datasources/local/knowledge_base_local_datasource.dart';
 import '../../domain/entities/knowledge_base_entity.dart';
 import '../../domain/repositories/knowledge_base_repository.dart';
 
-class KnowledgeBaseRepositoryImpl implements KnowledgeBaseRepository, IndexedKnowledgeRepository {
+class KnowledgeBaseRepositoryImpl implements KnowledgeBaseRepository, IndexedKnowledgeRepository, IndexedChatKnowledgeRepository {
   final KnowledgeBaseLocalDatasource _localDatasource;
 
   KnowledgeBaseRepositoryImpl(this._localDatasource);
+
+  @override
+  Future<List<SimilarVocResult>> searchChat(String query,
+      {List<String> preferredVocIds = const []}) async =>
+      OfflineSearchStore.forDatabase(await DatabaseHelper.instance.database)
+          .search(query, includeRegisteredQuestions: true, preferredVocIds: preferredVocIds);
 
   @override
   Future<List<SimilarVocResult>> searchOffline(String query, {String? excludeVocId}) async =>

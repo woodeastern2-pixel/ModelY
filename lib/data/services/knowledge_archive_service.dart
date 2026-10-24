@@ -7,6 +7,7 @@ import 'package:crypto/crypto.dart';
 import 'package:sqflite/sqflite.dart';
 import 'bundled_manual_service.dart';
 import 'portable_manual_media.dart';
+import 'manual_language_policy.dart';
 
 class KnowledgeRestoreResult {
   final int added, skipped, conflicts, documents, images;
@@ -32,7 +33,8 @@ class KnowledgeArchiveService {
       'entries': await txn.query('knowledge_base', orderBy: 'id'),
       'documents': await txn.query('original_documents', orderBy: 'id'),
     });
-    final entries = (snapshot['entries'] as List).cast<Map<String, dynamic>>();
+    final entries = (snapshot['entries'] as List).cast<Map<String, dynamic>>()
+        .where((row) => !ManualLanguagePolicy.excludedRow(row)).toList();
     final documents = (snapshot['documents'] as List).cast<Map<String, dynamic>>();
     final links = <String, List<Map<String, dynamic>>>{};
     final media = <String, String>{};
@@ -57,6 +59,10 @@ class KnowledgeArchiveService {
     final originals = <Map<String, dynamic>>[];
     for (final row in documents) {
       final doc = jsonDecode(row['content'] as String) as Map<String, dynamic>;
+      if (ManualLanguagePolicy.excludedDocument(doc)) {
+        originalFiles.remove(doc['id']);
+        continue;
+      }
       originals.add(doc);
       for (final block in doc['blocks'] as List) {
         addMedia((block['images'] as List? ?? [])
@@ -88,6 +94,12 @@ class KnowledgeArchiveService {
   Future<KnowledgeRestoreResult> importData(Uint8List bytes) async {
     if (bytes.length > maxBytes) throw const FormatException('지식 백업은 300MB까지 지원합니다.');
     final payload = await Isolate.run(() => _validate(bytes));
+    // Reject the whole archive before writing anything; never silently restore
+    // English manuals or their FAQ/media under newly generated identifiers.
+    if ((payload['entries'] as List).any((r) => ManualLanguagePolicy.excludedRow(Map<String, dynamic>.from(r as Map))) ||
+        (payload['documents'] as List).any((r) => ManualLanguagePolicy.excludedDocument(Map<String, dynamic>.from(r as Map)))) {
+      throw const FormatException('영어 매뉴얼이 포함된 백업은 복원할 수 없습니다. 한국어 자료만 포함한 백업을 사용해 주세요.');
+    }
     // Reject corrupt image payloads before committing any restored data.
     for (final encoded in (payload['media'] as Map).values) {
       final codec = await ui.instantiateImageCodec(base64Decode(encoded as String));

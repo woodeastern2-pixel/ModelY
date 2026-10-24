@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'manual_media_store.dart';
+import 'manual_language_policy.dart';
+import 'manual_sectioner.dart';
 
 import 'package:archive/archive.dart';
 import 'package:crypto/crypto.dart';
@@ -105,6 +107,10 @@ class ManualDocumentImportService {
           warnings.add('$fileName: 텍스트·표와 Word의 삽입 이미지를 보존합니다. 이미지 속 글자 자동 인식과 PDF 이미지 추출은 지원하지 않습니다.');
         }
 
+        if (ManualLanguagePolicy.retiredSource('', fileName) || ManualLanguagePolicy.englishDocument(normalized)) {
+          warnings.add('$fileName: 영어 매뉴얼은 제외했습니다. 한국어 원문을 사용해 주세요.');
+          continue;
+        }
         if (normalized.trim().isEmpty) {
           warnings.add('$fileName: 텍스트 추출 결과가 비어 있어 건너뜀');
           continue;
@@ -384,7 +390,10 @@ class ManualDocumentImportService {
           final images = imagesOf(node);
           if (images.isNotEmpty) parts.add(images);
         } else {
-          final text = [textOf(node), imagesOf(node)].where((s) => s.isNotEmpty).join('\n');
+          final styledHeading = node.descendants.whereType<XmlElement>().any((e) =>
+              e.name.local == 'pStyle' && e.attributes.any((a) => a.name.local == 'val' &&
+                  RegExp(r'heading|제목', caseSensitive: false).hasMatch(a.value)));
+          final text = [styledHeading ? '[제목] ${textOf(node)}' : textOf(node), imagesOf(node)].where((s) => s.isNotEmpty).join('\n');
           if (text.trim().isNotEmpty) parts.add(text);
         }
       }
@@ -459,32 +468,8 @@ class ManualDocumentImportService {
         .trim();
   }
 
-  List<_ManualSection> _buildSections(String input) {
-    const maxChars = 2400;
-    final paragraphs = input.split(RegExp(r'\n\s*\n'))
-        .map((e) => e.trim()).where((e) => e.isNotEmpty);
-    final result = <_ManualSection>[];
-    final buffer = <String>[];
-    var length = 0;
-    String? heading;
-    void flush() {
-      if (buffer.isEmpty) return;
-      result.add(_ManualSection(heading: heading, body: buffer.join('\n\n')));
-      buffer.clear();
-      length = 0;
-    }
-    for (final paragraph in paragraphs) {
-      final isPage = paragraph.startsWith('[페이지 ');
-      if (isPage) flush();
-      if (length + paragraph.length > maxChars) flush();
-      if (buffer.isEmpty) heading = paragraph.split('\n').first;
-      // Keep a whole paragraph/table even if it exceeds the target size.
-      buffer.add(paragraph);
-      length += paragraph.length;
-    }
-    flush();
-    return result;
-  }
+  List<_ManualSection> _buildSections(String input) => ManualSectioner.split(input)
+      .map((section) => _ManualSection(heading: section.heading, body: section.body)).toList();
 
   String _buildQuestion(String fileName, int index, _ManualSection section) {
     final headline = _headline(section);

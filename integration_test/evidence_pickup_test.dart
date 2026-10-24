@@ -11,13 +11,12 @@ import 'package:ai_voc_assistant/main.dart' as app;
 import 'package:ai_voc_assistant/core/database/database_helper.dart';
 import 'package:ai_voc_assistant/core/constants/app_constants.dart';
 import 'package:ai_voc_assistant/data/services/manual_content.dart';
-import 'package:ai_voc_assistant/data/services/reviewed_manual_translation.dart';
+import 'package:ai_voc_assistant/data/services/bundled_manual_service.dart';
 import 'package:ai_voc_assistant/presentation/screens/home/home_screen.dart';
 import 'package:ai_voc_assistant/presentation/screens/knowledge_base/knowledge_base_screen.dart';
 import 'package:ai_voc_assistant/presentation/viewmodels/knowledge_base_viewmodel.dart';
 
-/// Pickup of the real knowledge screen, opening the exact manual cited by the
-/// previously recorded model response. No inference is simulated or replaced.
+/// Opens the bundled Korean original in the real knowledge screen.
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   binding.framePolicy = LiveTestWidgetsFlutterBindingFramePolicy.fullyLive;
@@ -58,13 +57,12 @@ void main() {
       'key': AppConstants.settingThemeMode, 'value': 'light',
       'updated_at': DateTime.now().toIso8601String(),
     }, conflictAlgorithm: ConflictAlgorithm.replace);
-    final fixture = jsonDecode(File('test/fixtures/recorded-notification-evidence.json')
-        .readAsStringSync()) as Map<String, dynamic>;
-    final cited = (fixture['supplied_evidence'] as List).first as Map<String, dynamic>;
+    final pack = await BundledManualService.load();
+    final cited = (pack['entries'] as List).cast<Map<String, dynamic>>()
+        .singleWhere((e) => e['id'] == 'manual-pack-works-3-0671');
     final rows = await db.query(AppConstants.tableKnowledgeBase,
         where: 'id = ?', whereArgs: [cited['id']]);
     expect(rows.single['answer'], cited['answer']);
-    expect((fixture['referenced_case_ids'] as List), contains(cited['id']));
 
     app.main();
     await waitFor(() => find.byType(HomeScreen).evaluate().isNotEmpty, 'startup');
@@ -101,7 +99,8 @@ void main() {
       await tester.ensureVisible(bodyFinder);
       await pause(1000);
       final body = tester.widget<SelectableText>(bodyFinder).data!;
-      expect(body, ReviewedManualTranslation.notification);
+      expect(body, contains('메인 메뉴의 환경설정을 클릭하세요'));
+      expect(body, contains('VIP/키워드/나를 언급한 메시지 알림은 받습니다'));
       expect(RegExp(r'^\s*[a-z]\s*$', multiLine: true).hasMatch(body), isFalse);
       expect(find.textContaining('Check to mute sounds'), findsNothing);
       final readyAt = clock.elapsedMilliseconds / 1000;
@@ -112,12 +111,11 @@ void main() {
       File('artifacts/evidence-verification.json').writeAsStringSync(
           const JsonEncoder.withIndent('  ').convert({
         'success': true, 'source_id': cited['id'],
-        'source_matches_recorded_citation': true, 'korean_default': true,
-        'original_collapsed': true, 'detached_labels_absent': true,
+        'source_matches_bundled_korean_original': true, 'korean_default': true,
+        'english_original_absent': true, 'detached_labels_absent': true,
         'screen': 'production KnowledgeBaseScreen and shared ManualContentView',
         'pickup_only': true, 'new_model_inference': false,
-        'prior_model': fixture['model'], 'prior_answer': fixture['answer'],
-        'displayed_body': body, 'original_retained': parsed.original.contains('[출처]'),
+        'displayed_body': body, 'original_retained': parsed.body.contains('[출처]'),
         'ready_at': readyAt, 'duration': clock.elapsedMilliseconds / 1000,
       }));
     } finally {

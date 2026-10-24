@@ -277,7 +277,7 @@ void main() {
         'id': r.knowledgeBase.id, 'question': r.knowledgeBase.question,
         'answer': r.knowledgeBase.answer, 'score': r.similarityScore,
       }).toList()));
-      expect(aiVm.suppliedEvidence.any((r) => r.knowledgeBase.id == 'brity-messenger-desktop-020'), isTrue);
+      expect(aiVm.suppliedEvidence.any((r) => r.knowledgeBase.question.contains('11.2알림 설정하기')), isTrue);
 
       await waitFor(() => !aiVm.isGenerating && !aiVm.isSearching,
           'real answer generation', 950);
@@ -299,9 +299,10 @@ void main() {
         'supplied_evidence': suppliedEvidence,
       }));
       expect(actualDraft.answer, contains('알림'));
-      expect(actualDraft.answer.toLowerCase(), anyOf(contains('옵션'), contains('options')));
-      expect(actualDraft.answer.toLowerCase(), anyOf(contains('방해'), contains('do not disturb')));
-      expect(actualDraft.referencedCaseIds, contains('brity-messenger-desktop-020'));
+      expect(actualDraft.answer.toLowerCase(), contains('환경설정'));
+      expect(actualDraft.answer.toLowerCase(), contains('다른 용무'));
+      expect(actualDraft.referencedCaseIds, isNotEmpty);
+      expect(actualDraft.referencedCaseIds.every((id) => aiVm.suppliedEvidence.any((r) => r.knowledgeBase.id == id)), isTrue);
       expect(actualDraft.answer.length, greaterThan(100));
       expect(actualDraft.answer, isNot(contains('재시작')));
       expect(actualDraft.answer, isNot(contains('재설치')));
@@ -381,8 +382,8 @@ void main() {
           const JsonEncoder.withIndent('  ').convert(chatEvidence));
       final actualReply = aiVm.chatMessages.lastWhere((m) => m.role == 'assistant').content;
       expect(actualReply, contains('알림'));
-      expect(actualReply.toLowerCase(), anyOf(contains('옵션'), contains('options')));
-      expect(actualReply.toLowerCase(), anyOf(contains('방해'), contains('do not disturb')));
+      expect(actualReply.toLowerCase(), contains('환경설정'));
+      expect(actualReply.toLowerCase(), contains('다른 용무'));
       expect(actualReply, contains('브리티 메신저'));
       expect(actualReply.length, greaterThan(70));
       await click(find.byType(BackButton));

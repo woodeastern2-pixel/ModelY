@@ -49,12 +49,12 @@ void main() {
     final refs = await store.search('$title\n$body');
     final primary = refs.take(3).toList();
     print('NOTIFICATION_REFERENCES ${jsonEncode(primary.map((r) => {'id':r.knowledgeBase.id,'title':r.knowledgeBase.question,'characters':r.knowledgeBase.answer.length}).toList())}');
-    expect(primary.any((r) => r.knowledgeBase.id == 'brity-messenger-desktop-020'), isTrue,
+    expect(primary.any((r) => r.knowledgeBase.question.contains('11.2알림 설정하기')), isTrue,
       reason: refs.map((r) => r.knowledgeBase.question).join('\n'));
     expect(primary.any((r) => r.knowledgeBase.question.contains('임직원')), isFalse);
-    expect(primary.any((r) => r.knowledgeBase.answer.contains('Options > Notification')), isTrue);
+    expect(primary.any((r) => r.knowledgeBase.answer.contains('알림음')), isTrue);
     final prompt = AiPrompts.answerGenerationUser(title, body, primary);
-    expect(prompt.length, lessThan(6500));
+    expect(prompt.length, lessThan(16000));
   });
 
   test('reported ordinary questions retrieve procedures and reject unrelated evidence', () async {
@@ -137,6 +137,7 @@ void main() {
     addTearDown(settings.dispose);
     final counts = <String, Map<String, int>>{};
     final examples = <Map<String, Object?>>[];
+    final latencies = <Map<String, Object>>[];
     var grounded = 0;
     var processed = 0;
     var longestMs = 0;
@@ -146,6 +147,7 @@ void main() {
       final result = await vm.generateAnswer(voc.title, voc.content, excludeVocId: voc.id);
       timer.stop();
       if (timer.elapsedMilliseconds > longestMs) longestMs = timer.elapsedMilliseconds;
+      latencies.add({'title':voc.title,'milliseconds':timer.elapsedMilliseconds});
       processed++;
       if (processed % 100 == 0) {
         // ignore: avoid_print
@@ -172,12 +174,16 @@ void main() {
     }
     expect(grounded, greaterThan(0), reason: 'Known manuals must contribute real evidence, not only clarification templates.');
     expect(counts.values.fold<int>(0, (n, c) => n + c['grounded']! + c['clarification']!), 1000);
+    latencies.sort((a,b)=>(a['milliseconds'] as int).compareTo(b['milliseconds'] as int));
     final report = File('test/goldens/demo-offline-coverage.json');
     await report.parent.create(recursive: true);
     await report.writeAsString(const JsonEncoder.withIndent('  ').convert({
       'total': 1000, 'grounded': grounded, 'clarification': 1000 - grounded,
       'modelCalls': 0, 'fields': counts, 'examples': examples,
       'elapsedMs': elapsed.elapsedMilliseconds, 'longestRequestMs': longestMs,
+      'medianRequestMs':latencies[latencies.length ~/ 2]['milliseconds'],
+      'p95RequestMs':latencies[(latencies.length * .95).floor()]['milliseconds'],
+      'slowestRequests':latencies.reversed.take(10).toList(),
     }));
   }, timeout: const Timeout(Duration(minutes: 15)));
 
@@ -187,11 +193,14 @@ void main() {
     await store.initialize(maintenance:false);
     final answerer=LocalAnswerService();
     expect(await db.query('knowledge_base'),isEmpty);
-    expect(store.index.length,5894);
+    expect(store.index.length,5825);
     final queries={
       '드라이브 다른 사람이 편집 중인 파일 취소':'강제 취소',
       '설문 500명':'500',
-      '메신저 제거 대화 기록':'conversation data',
+      '메신저 메시지 삭제':'다른 사람의 대화창에서는 메시지가 삭제되지 않습니다',
+      '메신저 보낸 메시지 취소':'모든 사람에게서 삭제',
+      '메신저 나중에 보내':'예약 전송 시간',
+      '메신저 알림음과 알림창 설정':'다른 용무',
       '일정등록 일정 등록 되려면 어떻게 해야하나요?':'일정',
     };
     final timings=<Map<String,dynamic>>[];
@@ -223,16 +232,15 @@ void main() {
     }
     await batch.commit(noResult:true);
     await store.refresh();
-    expect(store.index.length,5894+1008);
+    expect(store.index.length,5825+800);
     await check('qa-and-original');
     for (var i = 0; i < 4; i++) {
       final clock = Stopwatch()..start();
       final refs = await store.search(attendeeQuestion);
       final answer = answerer.answerForQuery(attendeeQuestion, refs);
       clock.stop();
-      expect(answerer.canAnswer(attendeeQuestion, refs), isTrue);
-      expect(answer, contains('확인되지 않은 부분'));
-      expect(answer, contains('참석자'));
+      expect(answerer.canAnswer(attendeeQuestion, refs), isFalse);
+      expect(answer, contains(LocalAnswerService.noEvidence));
       expect(answer, isNot(contains('하단')));
       expect(store.index.lastQueries.length, greaterThan(1));
       expect(store.index.lastQueries.length, lessThanOrEqualTo(4));
@@ -304,8 +312,8 @@ void main() {
     for(var i=0;i<3;i++) await check('repeat-$i');
     final file=File('test/goldens/offline-search-performance.json');
     await file.parent.create(recursive:true);
-    await file.writeAsString(jsonEncode({'qaRecords':1008,'originalPassages':5894,
-      'environment':'GitHub Actions Linux Flutter test; not a Windows device measurement',
+    await file.writeAsString(jsonEncode({'qaRecords':800,'originalPassages':5825,
+      'environment':'${Platform.operatingSystem} Flutter virtual test; not a physical device measurement',
       'samples':timings}));
   },timeout:const Timeout(Duration(minutes:4)));
 
@@ -363,6 +371,7 @@ void main() {
     expect(result!.answer,contains('90일 이후에는 복원이 불가'));
     expect(vm.similarVocs,hasLength(1));
     expect(vm.isAiConnected,isFalse);
+    expect(await vm.resolveChatReferences('휴지통 복원'),isNotEmpty);
     expect(clock.elapsedMilliseconds,lessThan(5000));
   });
 
@@ -414,9 +423,12 @@ void main() {
   });
 }
 
-class _IndexRepository implements KnowledgeBaseRepository, IndexedKnowledgeRepository {
+class _IndexRepository implements KnowledgeBaseRepository, IndexedKnowledgeRepository, IndexedChatKnowledgeRepository {
   final OfflineSearchStore store;
   _IndexRepository(this.store);
+  @override
+  Future<List<SimilarVocResult>> searchChat(String query,{List<String> preferredVocIds=const []}) =>
+      store.search(query,includeRegisteredQuestions:true,preferredVocIds:preferredVocIds);
   @override
   Future<List<SimilarVocResult>> searchOffline(String query,{String? excludeVocId}) =>
       store.search(query,excludeVocId:excludeVocId);

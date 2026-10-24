@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../../services/manual_language_policy.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/database/database_helper.dart';
 import '../../../domain/entities/knowledge_base_entity.dart';
@@ -14,7 +15,7 @@ class KnowledgeBaseLocalDatasource {
       AppConstants.tableKnowledgeBase,
       orderBy: 'created_at DESC',
     );
-    return maps.map(_mapToEntity).toList();
+    return maps.map(_mapToEntity).where((e) => !ManualLanguagePolicy.excludedEntry(e)).toList();
   }
 
   Future<KnowledgeBaseEntity?> getEntryById(String id) async {
@@ -26,7 +27,8 @@ class KnowledgeBaseLocalDatasource {
       limit: 1,
     );
     if (maps.isEmpty) return null;
-    return _mapToEntity(maps.first);
+    final entry = _mapToEntity(maps.first);
+    return ManualLanguagePolicy.excludedEntry(entry) ? null : entry;
   }
 
   Future<List<KnowledgeBaseEntity>> getEntriesByCategory(String category) async {
@@ -37,16 +39,22 @@ class KnowledgeBaseLocalDatasource {
       whereArgs: [category],
       orderBy: 'created_at DESC',
     );
-    return maps.map(_mapToEntity).toList();
+    return maps.map(_mapToEntity).where((e) => !ManualLanguagePolicy.excludedEntry(e)).toList();
   }
 
   Future<KnowledgeBaseEntity> insertEntry(KnowledgeBaseEntity entry) async {
+    if (ManualLanguagePolicy.excludedEntry(entry)) {
+      throw const FormatException('영어 매뉴얼은 등록하지 않습니다. 한국어 자료를 사용해 주세요.');
+    }
     final db = await _dbHelper.database;
     await db.insert(AppConstants.tableKnowledgeBase, _entityToMap(entry));
     return entry;
   }
 
   Future<KnowledgeBaseEntity> updateEntry(KnowledgeBaseEntity entry) async {
+    if (ManualLanguagePolicy.excludedEntry(entry)) {
+      throw const FormatException('영어 매뉴얼은 등록하지 않습니다. 한국어 자료를 사용해 주세요.');
+    }
     final db = await _dbHelper.database;
     await db.update(
       AppConstants.tableKnowledgeBase,
@@ -82,7 +90,7 @@ class KnowledgeBaseLocalDatasource {
       AppConstants.tableKnowledgeBase,
       where: 'embedding IS NOT NULL',
     );
-    return maps.map(_mapToEntity).toList();
+    return maps.map(_mapToEntity).where((e) => !ManualLanguagePolicy.excludedEntry(e)).toList();
   }
 
   Future<int> getTotalCount() async {

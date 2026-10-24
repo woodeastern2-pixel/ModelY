@@ -13,6 +13,9 @@ import 'original_media_registry.dart';
 import 'manual_media_store.dart';
 import 'manual_content.dart';
 import 'bundled_manual_service.dart';
+import 'manual_language_policy.dart';
+import 'manual_sectioner.dart';
+import 'local_answer_service.dart';
 
 class OfflineSearchStore {
   final Database db;
@@ -41,7 +44,16 @@ class OfflineSearchStore {
       }
     }
     final installed = await db.query('offline_meta', where: 'key = ?', whereArgs: ['version']);
-    if (installed.isEmpty) {
+    await _purgeRetiredManuals();
+    if (installed.isEmpty || installed.first['value'] != '2') {
+      index.clear();
+      _contexts.clear();
+      _sourceSections.clear();
+      await db.delete('offline_records');
+      for (final row in await db.query('original_documents')) {
+        await installOriginal(jsonDecode(row['content'] as String) as Map<String,dynamic>,
+            originalPath: row['original_path'] as String?);
+      }
       if (bundled) {
         final manifest = jsonDecode(await rootBundle.loadString('assets/manuals/originals/manifest.json')) as List;
         for (final doc in manifest) {
@@ -55,7 +67,7 @@ class OfflineSearchStore {
       await db.execute("INSERT OR IGNORE INTO offline_dirty(kind,id) SELECT 'kb',id FROM knowledge_base");
       await db.execute("INSERT OR IGNORE INTO offline_dirty(kind,id) SELECT 'voc',id FROM vocs");
       await refresh();
-      await db.insert('offline_meta', {'key':'version','value':'1'});
+      await db.insert('offline_meta', {'key':'version','value':'2'}, conflictAlgorithm: ConflictAlgorithm.replace);
     } else {
       for (final row in await db.query('offline_records')) {
         _load(jsonDecode(row['record'] as String) as Map<String, dynamic>,
@@ -69,6 +81,29 @@ class OfflineSearchStore {
     await restorePendingOriginals();
     if (maintenance) _timer ??= Timer.periodic(const Duration(seconds: 1), (_) {
       if (db.isOpen) { unawaited(refresh().catchError((Object _) {})); } else { _timer?.cancel(); }
+    });
+  }
+
+
+  Future<void> _purgeRetiredManuals() async {
+    // Transactional upgrade; user inquiries and approved response history survive.
+    await db.transaction((txn) async {
+      for (final row in await txn.query('knowledge_base')) {
+        if (ManualLanguagePolicy.excludedRow(row)) {
+          await txn.delete('knowledge_base', where:'id = ?', whereArgs:[row['id']]);
+          await txn.delete('offline_records', where:'id = ?', whereArgs:[row['id']]);
+        }
+      }
+      for (final row in await txn.query('original_documents')) {
+        final document=jsonDecode(row['content'] as String) as Map<String,dynamic>;
+        if (!ManualLanguagePolicy.excludedDocument(document)) continue;
+        for (final block in document['blocks'] as List) {
+          await txn.delete('offline_records',where:'id = ?',whereArgs:[block['id']]);
+        }
+        await txn.delete('original_documents',where:'id = ?',whereArgs:[row['id']]);
+        final tables=await txn.rawQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='knowledge_original_files'");
+        if(tables.isNotEmpty) await txn.delete('knowledge_original_files',where:'document_id = ?',whereArgs:[row['id']]);
+      }
     });
   }
 
@@ -91,7 +126,7 @@ class OfflineSearchStore {
     index.put(KnowledgeBaseEntity(id:r['id'] as String, question:r['title'] as String,
       answer:r['body'] as String, category:r['category'] as String? ?? '시스템매뉴얼',
       customer:r['source'] as String?, project:r['project'] as String?, vocId:r['vocId'] as String?,
-      createdAt:now, resolvedAt:now), keys:tokens);
+      createdAt:now, resolvedAt:now), keys:tokens, preparedData:r['searchData'] as Map<String,dynamic>?);
     if (r['images'] is List) {
       OriginalMediaRegistry.images[r['id'] as String] = (r['images'] as List)
           .map((e) => Map<String,dynamic>.from(e as Map)).toList();
@@ -102,7 +137,8 @@ class OfflineSearchStore {
     // Tokenization runs away from the interface. It is done on document/data
     // changes, never as a whole-corpus operation in the answer path.
     final encoded = await Isolate.run(() => rows.map((r) => <String,dynamic>{
-      'row':r, 'tokens':OfflineSearchIndex.keysFor('${r['title']} ${r['body']}').toList(),
+      'row':{...r,'searchData':LocalAnswerService.prepareData(r['title'] as String,r['body'] as String,r['project'] as String?)},
+      'tokens':OfflineSearchIndex.keysFor('${r['title']} ${r['body']}').toList(),
     }).toList());
     final batch = db.batch();
     for (final item in encoded) {
@@ -142,6 +178,7 @@ class OfflineSearchStore {
   }
 
   Future<void> installOriginal(Map<String,dynamic> document, {String? originalPath}) async {
+    if (ManualLanguagePolicy.excludedDocument(document)) return;
     final id = document['id'] as String;
     final blocks = (document['blocks'] as List).cast<Map<String,dynamic>>();
     final rows = <Map<String,dynamic>>[];
@@ -162,7 +199,7 @@ class OfflineSearchStore {
       // OCR contributes searchable evidence, explicitly labelled as unverified.
       final body='$text${ocr.isEmpty ? '' : '\n\n[이미지에서 읽은 글자: 원본 대조 필요]\n$ocr'}\n\n[출처] ${document['filename']} · 원문 구간 ${block['ordinal']}';
       rows.add({'id':block['id'],'title':'${block['title']} · 원문 구간 ${block['ordinal']}',
-        'body':body,'source':'${document['filename']} · 원문 ${document['sha256'].toString().substring(0,8)}','project':document['project'],
+        'body':body,'source':'${document['filename']} · 원문 ${document['sha256'].toString().substring(0,8)}','project':block['project'] ?? document['project'],
         'documentId':id,'images':images.values.toList()});
     }
     await _putMany(rows);
@@ -173,22 +210,25 @@ class OfflineSearchStore {
 
   Future<void> preserveOriginal({required String fileName, required String fingerprint,
     required Uint8List bytes, required String extractedText, required Map<String,Uint8List> images}) async {
+    if (ManualLanguagePolicy.retiredSource('', fileName) || ManualLanguagePolicy.englishDocument(extractedText)) {
+      throw const FormatException('영어 매뉴얼은 등록하지 않습니다. 한국어 매뉴얼을 사용해 주세요.');
+    }
     final root=directory ?? Directory(p.join((await getApplicationSupportDirectory()).path,'original_manuals'));
     await root.create(recursive:true);
     final file=File(p.join(root.path,'$fingerprint${p.extension(fileName)}'));
     if(!await file.exists()) await file.writeAsBytes(bytes,flush:true);
     await ManualMediaStore(directory:directory == null ? null : Directory(p.join(root.path,'media'))).save('manual-source-$fingerprint',images);
-    final paragraphs=extractedText.split(RegExp(r'\n\s*\n')).where((s)=>s.trim().isNotEmpty).toList();
     final blocks=<Map<String,dynamic>>[];
-    var section=0;
-    var sectionLength=0;
-    for(var i=0;i<paragraphs.length;i++) {
-      final ids=RegExp(r'\[manual-image:([a-z0-9-]+)\]').allMatches(paragraphs[i]).map((m)=>m.group(1)!);
-      if(sectionLength+paragraphs[i].length>2400 || paragraphs[i].startsWith('[페이지 ')) {section++;sectionLength=0;}
-      sectionLength+=paragraphs[i].length;
-      blocks.add({'id':'raw-$fingerprint-$i','title':fileName,'ordinal':i,'section':section,
-        'text':paragraphs[i].replaceAll(RegExp(r'\[manual-image:[a-z0-9-]+\]'),''),
-        'ocr':'','images':[for(final id in ids) {'id':id,'kind':'imported'}]});
+    final sections=ManualSectioner.split(extractedText);
+    var ordinal=0;
+    for(var section=0;section<sections.length;section++) {
+      for(final paragraph in sections[section].body.split(RegExp(r'\n\s*\n'))) {
+        final ids=RegExp(r'\[manual-image:([a-z0-9-]+)\]').allMatches(paragraph).map((m)=>m.group(1)!);
+        blocks.add({'id':'raw-$fingerprint-${ordinal++}','title':sections[section].heading,
+          'ordinal':ordinal,'section':section,
+          'text':paragraph.replaceAll(RegExp(r'\[manual-image:[a-z0-9-]+\]'),''),
+          'ocr':'','images':[for(final id in ids) {'id':id,'kind':'imported'}]});
+      }
     }
     await installOriginal({'id':fingerprint,'filename':fileName,'sha256':fingerprint,
       'project':'manual-upload','blocks':blocks},originalPath:file.path);
@@ -206,16 +246,29 @@ class OfflineSearchStore {
           final rows=await db.query('knowledge_base',where:'id = ?',whereArgs:[id]);
           index.remove(id); await db.delete('offline_records',where:'id = ?',whereArgs:[id]);
           if(rows.isNotEmpty) { final r=rows.first;
+            if (ManualLanguagePolicy.excludedRow(r)) {
+              await db.delete('knowledge_base', where:'id = ?', whereArgs:[id]);
+              continue;
+            }
             records.add({'id':id,'title':r['question'],'body':r['answer'],'category':r['category'],
               'source':r['customer'],'project':r['project'],'vocId':r['voc_id']});
           }
         } else {
+          final pendingKey='registered-voc-$id';
+          index.remove(pendingKey); await db.delete('offline_records',where:'id = ?',whereArgs:[pendingKey]);
           final key='approved-index-$id';
           index.remove(key); await db.delete('offline_records',where:'id = ?',whereArgs:[key]);
           final rows=await db.rawQuery("SELECT v.title,v.content,v.category,v.customer,v.project,r.content AS answer FROM vocs v JOIN responses r ON r.voc_id=v.id WHERE v.id=? AND r.status='APPROVED' ORDER BY r.updated_at DESC LIMIT 1",[id]);
           if(rows.isNotEmpty) {final r=rows.first;
             records.add({'id':key,'title':'${r['title']} ${r['content']}','body':r['answer'],
               'category':r['category'],'source':r['customer'],'project':r['project'],'vocId':id});
+          } else {
+            final vocs=await db.query('vocs',where:'id = ?',whereArgs:[id]);
+            if(vocs.isNotEmpty) { final v=vocs.first;
+              records.add({'id':pendingKey,'title':'${v['title']} ${v['content']}',
+                'body':'등록된 VOC 상태: ${v['status'] ?? '미확인'}\n내용: ${v['content']}',
+                'category':v['category'],'source':v['customer'],'project':v['project'],'vocId':id});
+            }
           }
         }
       }
@@ -229,7 +282,8 @@ class OfflineSearchStore {
     } catch (_) { rethrow; }
   }
 
-  Future<List<SimilarVocResult>> search(String query,{String? excludeVocId}) async {
+  Future<List<SimilarVocResult>> search(String query,{String? excludeVocId,
+      bool includeRegisteredQuestions = false, List<String> preferredVocIds = const []}) async {
     // Registration and background maintenance prepare the index. A bulk update
     // must not become a multi-second full rebuild inside an answer request.
     final pending=Sqflite.firstIntValue(await db.rawQuery('SELECT count(*) FROM offline_dirty')) ?? 0;
@@ -239,7 +293,8 @@ class OfflineSearchStore {
     }
     if(_updating!=null) await _updating!.timeout(const Duration(seconds:2));
     await refresh().timeout(const Duration(seconds:2));
-    final matches=index.search(query,excludeVocId:excludeVocId);
+    final matches=index.search(query,excludeVocId:excludeVocId,
+        includeRegisteredQuestions:includeRegisteredQuestions, preferredVocIds:preferredVocIds);
     final expanded=matches.map((r) {
       final e=r.knowledgeBase;
       final context=_contexts[e.id];

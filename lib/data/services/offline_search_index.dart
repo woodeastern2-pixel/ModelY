@@ -1,6 +1,7 @@
 import '../../domain/entities/knowledge_base_entity.dart';
 import 'local_answer_service.dart';
 import '../../core/utils/search_query_expander.dart';
+import 'manual_language_policy.dart';
 
 /// Inverted index. Each of at most four passes ranks up to 128 candidates,
 /// never by opening documents or normalizing every stored body.
@@ -13,6 +14,8 @@ class OfflineSearchIndex {
   List<String> lastQueries = [];
   int get length => _rows.length;
 
+  void clear() { _rows.clear(); _keys.clear(); _postings.clear(); }
+
   static Set<String> keysFor(String text) {
     final compact = SearchQueryExpander.normalize(text).replaceAll(' ', '');
     return {
@@ -21,13 +24,17 @@ class OfflineSearchIndex {
     };
   }
 
-  void put(KnowledgeBaseEntity entry, {Iterable<String>? keys}) {
+  void put(KnowledgeBaseEntity entry, {Iterable<String>? keys, Map<String,dynamic>? preparedData}) {
     remove(entry.id);
+    if (ManualLanguagePolicy.excludedEntry(entry)) return;
+    if (preparedData != null) {
+      LocalAnswerService().prepare(entry,data:preparedData);
+    }
     _rows[entry.id] = entry;
     final text = '${entry.question} ${entry.answer}';
     // Cached bigrams stay valid when new bilingual feature aliases are added.
     final tokens = keys == null ? keysFor(text) : <String>{
-      ...keys, ...LocalAnswerService().conceptKeys(text),
+      ...keys, if (preparedData == null) ...LocalAnswerService().conceptKeys(text),
     };
     _keys[entry.id] = tokens;
     for (final token in tokens) {
@@ -44,7 +51,8 @@ class OfflineSearchIndex {
     }
   }
 
-  List<SimilarVocResult> search(String query, {String? excludeVocId}) {
+  List<SimilarVocResult> search(String query, {String? excludeVocId,
+      bool includeRegisteredQuestions = false, List<String> preferredVocIds = const []}) {
     final service = LocalAnswerService();
     lastCandidates = 0;
     lastTotalCandidates = 0;
@@ -52,9 +60,13 @@ class OfflineSearchIndex {
     final found = <String, SimilarVocResult>{};
     for (final variant in service.retrievalQueries(query)) {
       lastQueries.add(variant);
-      final matches = _searchOnce(variant, constraintQuery: query, excludeVocId: excludeVocId);
+      final matches = _searchOnce(variant, constraintQuery: query, excludeVocId: excludeVocId,
+          includeRegisteredQuestions: includeRegisteredQuestions, preferredVocIds: preferredVocIds);
       for (final match in matches) {
-        if (!service.focusedEvidence(query, match.knowledgeBase)) continue;
+        if (!(includeRegisteredQuestions && match.knowledgeBase.vocId != null) &&
+            !service.focusedEvidence(query, match.knowledgeBase)) {
+          continue;
+        }
         final id = match.knowledgeBase.id;
         if (!found.containsKey(id) || match.similarityScore > found[id]!.similarityScore) {
           found[id] = match;
@@ -83,7 +95,8 @@ class OfflineSearchIndex {
     return ranked.take(16).toList();
   }
 
-  List<SimilarVocResult> _searchOnce(String query, {required String constraintQuery, String? excludeVocId}) {
+  List<SimilarVocResult> _searchOnce(String query, {required String constraintQuery, String? excludeVocId,
+      bool includeRegisteredQuestions = false, List<String> preferredVocIds = const []}) {
     final service = LocalAnswerService();
     final groups = service.queryIndexKeys(query);
     final hits = <String, double>{};
@@ -99,15 +112,27 @@ class OfflineSearchIndex {
     }
     final ids = hits.keys.where((id) =>
         (excludeVocId == null || _rows[id]!.vocId != excludeVocId) &&
+        (includeRegisteredQuestions || !id.startsWith('registered-voc-')) &&
         service.versionCompatible(constraintQuery, _rows[id]!)).toList()
       ..sort((a, b) { final score = hits[b]!.compareTo(hits[a]!); return score != 0 ? score : a.compareTo(b); });
     // Reserve candidates for BOTH routes even if one has many high matches.
     final qa = _diverse(ids.where((id) => !id.startsWith('raw-')));
     final raw = _diverse(ids.where((id) => id.startsWith('raw-')));
     final candidates = [...qa, ...raw].map((id) => _rows[id]!).toList();
+    if (includeRegisteredQuestions && preferredVocIds.isNotEmpty) {
+      for (final id in preferredVocIds.take(8)) {
+        final row = _rows['approved-index-$id'] ?? _rows['registered-voc-$id'];
+        if (row != null && !candidates.any((e) => e.id == row.id)) {
+          if (candidates.length >= 128) candidates.removeLast();
+          candidates.add(row);
+        }
+      }
+    }
     if (candidates.length > lastCandidates) lastCandidates = candidates.length;
     lastTotalCandidates += candidates.length;
-    final ranked = service.rank(query, candidates, limit: 128);
+    final ranked = includeRegisteredQuestions
+        ? service.rankChatReferences(query, candidates, preferredVocIds: preferredVocIds)
+        : service.rank(query, candidates, limit: 128);
     final byId = {for (final result in ranked) result.knowledgeBase.id: result};
     return _diverse(byId.keys, limit: 16, perSection: 2)
         .map((id) => byId[id]!).toList();

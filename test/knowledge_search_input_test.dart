@@ -28,7 +28,7 @@ void main() {
       }
     }
   });
-  testWidgets('typing over 1008 full bodies stays local and filters once after a pause', (tester) async {
+  testWidgets('typing over 800 full bodies stays local and filters once after a pause', (tester) async {
     tester.view.physicalSize = const Size(412, 915);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -48,7 +48,7 @@ void main() {
     addTearDown(vm.dispose);
     addTearDown(settings.dispose);
 
-    expect(vm.entries.length,1008);
+    expect(vm.entries.length,800);
     final boundary = GlobalKey();
     await tester.pumpWidget(ChangeNotifierProvider.value(value:vm,
       child:MaterialApp(theme:AppTheme.lightTheme, home:RepaintBoundary(key:boundary, child:const KnowledgeBaseScreen()))));
@@ -86,12 +86,12 @@ void main() {
     vm.setSearch('미팅');
     vm.setSearch('');
     await tester.pump(const Duration(milliseconds:250));
-    expect(vm.entries.length,1007);
+    expect(vm.entries.length,entries.length - 1);
     expect(tester.takeException(),isNull);
     await tester.runAsync(() async {
       final file=File('test/goldens/knowledge-input-performance.json');
       await file.parent.create(recursive:true);
-      await file.writeAsString(jsonEncode({'entries':1008,'typingAndPumpMilliseconds':costs,
+      await file.writeAsString(jsonEncode({'entries':800,'typingAndPumpMilliseconds':costs,
         'filterAndPumpMilliseconds':watch.elapsedMicroseconds/1000,
         'debounceMilliseconds':180,'environment':'Linux Flutter widget test; not device frame timings'}));
     });

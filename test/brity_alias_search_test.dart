@@ -1,14 +1,19 @@
 import 'package:ai_voc_assistant/core/utils/search_query_expander.dart';
 import 'package:ai_voc_assistant/core/utils/vector_utils.dart';
 import 'package:ai_voc_assistant/data/seeds/brity_suite_manual_seed.dart';
+import 'package:ai_voc_assistant/data/services/bundled_manual_service.dart';
 import 'package:ai_voc_assistant/data/services/vector_search_service.dart';
 import 'package:ai_voc_assistant/domain/entities/knowledge_base_entity.dart';
 import 'package:ai_voc_assistant/domain/repositories/knowledge_base_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('Korean product names retrieve English-named Brity manuals', () async {
-    final entries = BritySuiteManualSeed.entries.map((seed) {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  test('Korean product names retrieve the retained Korean manuals', () async {
+    final pack = await BundledManualService.load();
+    final rows = [...BritySuiteManualSeed.entries, ...(pack['entries'] as List)];
+    final entries = rows.map((raw) {
+      final seed = Map<String, dynamic>.from(raw as Map);
       final question = seed['question']!;
       final answer = seed['answer']!;
       final searchable = [
@@ -34,10 +39,10 @@ void main() {
     final service = VectorSearchService(_MemoryKnowledgeRepository(entries));
 
     final cases = {
-      '미팅 화면 공유': 'Brity Meeting',
+      '메신저 미팅 사용': 'Brity Messenger',
       '메신저 로그인': 'Brity Messenger',
       '드라이브 파일 공유': 'Brity Drive',
-      '코파일럿 메일 요약': 'Brity Copilot',
+      '코파일럿 메일 요약': 'Brity Mail',
     };
 
     for (final item in cases.entries) {

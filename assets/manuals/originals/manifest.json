@@ -114,22 +114,6 @@
     ]
   },
   {
-    "id": "messenger-desktop",
-    "filename": "messenger-desktop.pdf (2020)",
-    "blocks": 28,
-    "files": [
-      "messenger-desktop-000.json"
-    ]
-  },
-  {
-    "id": "messenger-mobile",
-    "filename": "messenger-mobile.pdf (2020)",
-    "blocks": 41,
-    "files": [
-      "messenger-mobile-000.json"
-    ]
-  },
-  {
     "id": "mail-web",
     "filename": "New Brity Mail 공식 웹 원문",
     "blocks": 1195,

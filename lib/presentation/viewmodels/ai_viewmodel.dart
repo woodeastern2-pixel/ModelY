@@ -13,6 +13,7 @@ import '../../domain/repositories/indexed_knowledge_repository.dart';
 import '../../domain/repositories/voc_repository.dart';
 import '../../data/services/ai_service.dart';
 import '../../data/services/local_answer_service.dart';
+import '../../data/services/answer_evidence_selector.dart';
 import '../../data/services/vector_search_service.dart';
 import 'settings_viewmodel.dart';
 
@@ -41,7 +42,6 @@ class AiViewModel extends ChangeNotifier {
   late final AiService _aiService;
   late final VectorSearchService _vectorSearch;
   final LocalAnswerService _localAnswers = LocalAnswerService();
-
   bool _aiConnected = false;
   bool _aiWasConnected = false;
   bool get hasAiConfiguration => _aiWasConnected ||
@@ -501,13 +501,11 @@ class AiViewModel extends ChangeNotifier {
         return null;
       }
       if (requestAi) {
-        final eligible = _similarVocs.where((r) =>
-            r.similarityScore >= 0.40 &&
-            _localAnswers.isAnswerSource(r.knowledgeBase) &&
-            _localAnswers.focusedEvidence(query, r.knowledgeBase)).toList();
-        final hasStrongEvidence = eligible.any((r) => r.similarityScore >= 0.70);
-        final references = eligible.where((r) =>
-            r.similarityScore >= (hasStrongEvidence ? 0.50 : 0.40)).take(3).toList();
+        if (_searchError != null) {
+          _error = _searchError;
+          return null;
+        }
+        final references = AnswerEvidenceSelector.select(query, _similarVocs, maxCharacters: _aiService.evidenceCharacterBudget);
         _suppliedEvidence = List.unmodifiable(references);
         notifyListeners();
         try {
@@ -891,6 +889,10 @@ class AiViewModel extends ChangeNotifier {
     bool includeRegisteredQuestions = false,
     String? excludeVocId,
   }) async {
+    if (includeRegisteredQuestions && _kbRepository is IndexedChatKnowledgeRepository) {
+      return (_kbRepository as IndexedChatKnowledgeRepository)
+          .searchChat(query, preferredVocIds: preferredVocIds);
+    }
     if (!includeRegisteredQuestions && _kbRepository is IndexedKnowledgeRepository) {
       return (_kbRepository as IndexedKnowledgeRepository)
           .searchOffline(query, excludeVocId: excludeVocId);

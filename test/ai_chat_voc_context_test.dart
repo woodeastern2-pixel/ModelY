@@ -109,21 +109,21 @@ void main() {
     expect(service.calls, 2);
   });
 
-  test('search failure does not block AI and remains visible separately', () async {
+  test('search failure blocks ungrounded AI and remains visible separately', () async {
     final settings = SettingsViewModel(_SavedAiSettings());
     await settings.loadSettings();
     final service = _DraftService();
     final vm = AiViewModel(_BrokenKnowledge(), _VocRepository([]), settings, aiService: service);
     addTearDown(vm.dispose);
     addTearDown(settings.dispose);
-    expect(await vm.generateAnswer('쪽지 서식', '보관 기간'), isNotNull);
-    expect(service.calls, 1);
-    expect(vm.error, isNull);
+    expect(await vm.generateAnswer('쪽지 서식', '보관 기간'), isNull);
+    expect(service.calls, 0);
+    expect(vm.error, isNotNull);
     expect(vm.searchError, isNotNull);
     final answer = vm.answerResult;
     await vm.searchSimilarVocs('다시 검색');
     expect(identical(vm.answerResult, answer), isTrue);
-    expect(service.calls, 1);
+    expect(service.calls, 0);
   });
 
   test('explicit local draft never invokes saved AI', () async {

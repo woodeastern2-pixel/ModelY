@@ -9,13 +9,13 @@ void main() {
     final now = DateTime(2026, 10, 21);
     index.put(KnowledgeBaseEntity(
       id: 'existing-manual', question: 'Brity Messenger Desktop 알림',
-      answer: 'Options > Notification. Do Not Disturb Settings turn off alarms.',
+      answer: '환경설정의 알림에서 알림음을 설정합니다. 다른 용무 상태일 때 알림 끄기를 선택할 수 있습니다.',
       category: '시스템매뉴얼', project: 'Brity Messenger',
       resolvedAt: now, createdAt: now,
     ), keys: ['c:messenger', 'c:desktop', 'c:notification', 'c:settings']);
     final result = index.search('Brity Messenger 방해 금지 설정');
     expect(result.map((r) => r.knowledgeBase.id), contains('existing-manual'));
-    expect(result.first.knowledgeBase.answer, contains('Do Not Disturb Settings'));
+    expect(result.first.knowledgeBase.answer, contains('다른 용무'));
   });
   test('approved answer summary ignores formatting instructions and unrelated manuals', () {
     final now = DateTime(2026, 10, 21);

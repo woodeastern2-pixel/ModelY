@@ -4,51 +4,12 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('Brity suite manual seed', () {
-    test('covers all five Brity products with unique source metadata', () {
+    test('only Korean source seeds remain, with unique provenance', () {
       final entries = BritySuiteManualSeed.entries;
-
-      expect(entries.length, greaterThan(450));
-      expect(
-        entries.map((entry) => entry['id']).toSet(),
-        hasLength(entries.length),
-      );
-      expect(
-        BritySuiteManualSeed.projects,
-        equals({
-          'Brity Mail',
-          'Brity Messenger',
-          'Brity Meeting',
-          'Brity Drive',
-          'Brity Copilot',
-        }),
-      );
-      expect(
-        entries.every(
-          (entry) =>
-              (entry['question'] ?? '').isNotEmpty &&
-              (entry['answer'] ?? '').isNotEmpty &&
-              (entry['sourceName'] ?? '').isNotEmpty &&
-              (entry['sourceUrl'] ?? '').startsWith('https://') &&
-              (entry['platform'] ?? '').isNotEmpty,
-        ),
-        isTrue,
-      );
-    });
-
-    test('includes every content page from both Messenger PDFs', () {
-      expect(BrityMessengerManualSeed.entries, hasLength(57));
-      expect(
-        BrityMessengerManualSeed.entries.where(
-          (entry) => entry['platform'] == 'Desktop',
-        ),
-        hasLength(26),
-      );
-      expect(
-        BrityMessengerManualSeed.entries.where(
-          (entry) => entry['platform'] == 'Mobile',
-        ),
-        hasLength(31),
-      );
+      expect(entries, hasLength(268));
+      expect(entries.map((e) => e['id']).toSet(), hasLength(entries.length));
+      expect(entries.every((e) => (e['sourceUrl'] ?? '').contains('/ko/')), isTrue);
+      expect(BrityMessengerManualSeed.entries, isEmpty);
     });
 
     test('Korean queries cover representative product operations', () {
@@ -56,11 +17,8 @@ void main() {
           .map((entry) => entry['question'] ?? '')
           .join('\n');
 
-      expect(questions, contains('화면 공유'));
-      expect(questions, contains('비밀 대화방'));
-      expect(questions, contains('버전 이력'));
-      expect(questions, contains('회의록 초안'));
-      expect(questions, contains('메일 요약'));
+      expect(questions, contains('예약 발송'));
+      expect(questions, contains('Copilot으로 받은 메일을 요약'));
     });
   });
 }

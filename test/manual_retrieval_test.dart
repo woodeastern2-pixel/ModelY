@@ -21,8 +21,8 @@ void main() {
     expect(service.answerForQuery('휴지통 파일 복구 방법', refs), contains('보관 기간'));
     final english = service.rank('비밀번호 설정', [entry('en', 'User Guide',
         'Open Settings and enter your Password. Only administrators can reset another account.')]);
-    expect(english.single.knowledgeBase.id, 'en');
-    expect(service.canAnswer('비밀번호 설정', english), isTrue);
+    expect(english, isEmpty);
+    expect(service.canAnswer('비밀번호 설정', english), isFalse);
     final spaced = service.rank('첨부 파일 다운로드', [entry('space', '운영 가이드',
         '첨부파일을 선택한 다음 다운로드 버튼을 누릅니다.')]);
     expect(service.canAnswer('첨부 파일 다운로드', spaced), isTrue);
@@ -67,14 +67,14 @@ void main() {
     expect(answer, contains('복원 제한 조건'));
     expect(answer, isNot(contains('구버전 절차')));
   });
-  test('complete bundled corpus: old English body and new documents are searchable', () async {
+  test('complete Korean corpus preserves original procedures and restrictions', () async {
     final pack = await BundledManualService.load();
     final rows = [...BritySuiteManualSeed.entries, ...(pack['entries'] as List)];
-    expect(BritySuiteManualSeed.entries.length, 476);
-    expect(rows.length, 1008);
+    expect(BritySuiteManualSeed.entries.length, 268);
+    expect(rows.length, 800);
     final docs = rows.map((r) => entry(r['id'] as String, r['question'] as String,
         r['answer'] as String, source: r['sourceName'] as String?)).toList();
-    // Reproduce the user's title + body, with all 1,008 competing entries.
+    // Reproduce the user's title + body, with all 800 competing entries.
     for (final query in [
       '일정등록 일정 등록 되려면 어떻게 해야하나요?',
       '일정 등록하려면 어떻게 해야 하나요?',
@@ -91,8 +91,8 @@ void main() {
       expect(answer, isNot(contains('근거: 없음')), reason: query);
     }
     final queries = <String, String>{
-      '메신저 제거 후 대화 기록': 'All conversation data',
-      '메신저 데스크톱 바로가기': 'Shortcut',
+      '메신저 메시지 삭제': '다른 사람의 대화창에서는 메시지가 삭제되지 않습니다',
+      '메신저 메시지 예약 발신': '예약',
       '드라이브 다른 사람이 편집 중인 파일 취소': '강제 취소 기능을 제공하지 않습니다',
       '설문 500명': '500명',
     };

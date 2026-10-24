@@ -142,8 +142,8 @@ void main() {
       final originals = await full.query('original_documents');
       final bytes = await KnowledgeArchiveService(full).exportData();
       final backup = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
-      expect(entries.length, greaterThanOrEqualTo(1008));
-      expect(originals.length, greaterThanOrEqualTo(9));
+      expect(entries.length, greaterThanOrEqualTo(800));
+      expect(originals.length, equals(7));
       expect((backup['media'] as Map).length, greaterThanOrEqualTo(911));
       final result = await KnowledgeArchiveService(target).importData(bytes);
       expect(result.added, entries.length);
@@ -154,7 +154,7 @@ void main() {
       expect(await target.query('original_documents'), hasLength(originals.length));
       final records = await target.query('offline_records');
       expect(records.where((r) => (r['id'] as String).startsWith('raw-')).length,
-          greaterThanOrEqualTo(5894));
+          greaterThanOrEqualTo(5825));
       expect(await store.search('메신저 알림 설정 방법'), isNotEmpty);
       for (final item in (backup['media'] as Map).entries) {
         final expected = base64Decode(item.value as String);

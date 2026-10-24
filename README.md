@@ -4,8 +4,10 @@
 
 VOC(Voice of Customer, 고객의 소리)와 매뉴얼을 함께 관리하고, AI(Artificial Intelligence, 인공지능)가 검색한 자료를 바탕으로 답변 초안을 작성합니다. 담당자는 인용된 문서와 원문을 확인한 뒤 답변을 검토·승인합니다. Windows와 Android를 지원합니다.
 
-> **현재 구현 기준: 2026-10-21 · 앱 버전 `1.1.26+28`**  
-> 최신 기능·시연·배포 파일은 [`work/voc-mate-quality-recording`](https://github.com/woodeastern2-pixel/ModelY/tree/work/voc-mate-quality-recording) 브랜치 기준입니다. `main`에는 이 README 안내를 반영했으며, 최신 앱 소스는 위 브랜치에서 확인하거나 내려받아야 합니다.
+> **현재 구현 기준: 2026-10-24 · 앱 버전 `1.1.27+29`**
+> 한국어 매뉴얼 원문 검색 개선 소스는 [`work/korean-manual-retrieval`](https://github.com/woodeastern2-pixel/ModelY/tree/work/korean-manual-retrieval) 브랜치에 있습니다. 기존 배포·시연 링크는 아래에 이전 버전 기록으로 유지합니다.
+
+한국어 원문 7종의 5,825개 구간을 색인으로 검색하며 FAQ 없이도 원문·표·이미지 인식 글자를 찾습니다. 답변 작성과 코파일럿이 같은 검색 색인을 사용하고, 복합 질문에는 여러 근거와 제한 사항을 함께 전달합니다. 영어 원문 2종 및 영어 출처의 파생 자료 208건을 제거하고 기존 설치의 색인도 갱신합니다. 보안 잠금된 메신저 v8.5.5 PDF는 해독하지 않았으며, 기존 한국어 Word 원문을 사용합니다. 자세한 범위와 검증은 [작업 기록](docs/korean-manual-retrieval-scope.md)을 참고하세요.
 
 [배포 파일](#배포-파일과-실행) · [모델 구성](#ai-모델-구성) · [개발 환경](#개발-환경과-빌드) · [검증 기록](#검증-상태) · [운영 문서](#운영-문서와-주요-코드)
 
@@ -82,9 +84,9 @@ ollama pull qwen3:4b-instruct-2507-q4_K_M
 
 같은 PC에서 실행 중인 Ollama의 일반적인 주소는 `http://localhost:11434`입니다. 다른 PC 또는 Android에서 접속한다면 해당 기기의 `localhost`가 아닌 실제 모델 서버 주소를 설정해야 합니다. 최신 시연은 온도 `0.1`, 최대 출력 토큰 `640`을 사용했습니다.
 
-## 최신 전체 시연과 발표 자료
+## 이전 버전 전체 시연과 발표 자료
 
-최신 시연은 **LLM을 적용한 전체 시스템 영상 한 편**입니다. 실제 앱과 Qwen3 4B의 생성 결과를 사용하며, 다음 흐름을 보여 줍니다.
+2026-10-21 버전의 시연은 **LLM을 적용한 전체 시스템 영상 한 편**입니다. 실제 앱과 Qwen3 4B의 생성 결과를 사용하며, 다음 흐름을 보여 줍니다.
 
 1. 운영 현황
 2. 언어 모델 연결
@@ -108,18 +110,18 @@ ollama pull qwen3:4b-instruct-2507-q4_K_M
 
 위 발표·영상 파일은 별도로 전달한 자료이며 이 저장소의 다운로드 항목으로 게시하지 않았습니다. 최종 영상의 SHA-256 해시와 편집·검증 기록은 [한국어 근거 표시 검증 문서](https://github.com/woodeastern2-pixel/ModelY/blob/work/voc-mate-quality-recording/docs/evidence-korean-validation-2026-10-21.md)에 있습니다.
 
-### 한국어 근거 표시 범위
+### 한국어 원문 근거
 
-이번 시연에서 인용한 `brity-messenger-desktop-020`, `raw-messenger-desktop-22` 두 항목에 원문 대조 한국어 번역을 연결했습니다. 정확한 원문 해시가 일치할 때 한국어를 기본 표시하고, 영문 원문·출처·원본 이미지는 펼쳐 확인할 수 있습니다. 저장된 원문과 검색 입력은 유지합니다.
+현재 버전은 한국어 Word 매뉴얼과 한국어 공식 메일 매뉴얼의 원문을 표시합니다. 알림 설정은 `brityworks_매뉴얼3.docx`의 11.2절을 사용하며, 표의 예외 조건과 원본 이미지도 유지합니다. 이전 영상에서 사용했던 영어 원문과 그 번역 표시 기능은 이번 버전에서 제거했습니다.
 
-PDF 도표에서 떨어져 나온 단독 알파벳 표식은 대응 설명을 확인할 수 있는 패턴에서 정리합니다. 일반 목록과 코드는 보존합니다. **전체 영문 매뉴얼의 번역을 완료한 것은 아닙니다.**
+이미지 자동 인식 글자는 본문과 구분하여 원본 대조가 필요함을 표시합니다. 도표의 단독 알파벳 표식은 대응 설명이 있는 경우에만 정리하고 일반 목록과 코드는 보존합니다.
 
 ## 개발 환경과 빌드
 
 아래 명령은 최신 작업 브랜치를 대상으로 합니다. 검증에 사용한 Flutter 버전은 **3.47.2**입니다. Windows 빌드에는 Windows와 해당 네이티브 개발 도구, Android 빌드에는 Android 개발 도구가 필요하며, 검증 워크플로는 Java 21을 사용합니다.
 
 ```bash
-git clone --branch work/voc-mate-quality-recording https://github.com/woodeastern2-pixel/ModelY.git
+git clone --branch work/korean-manual-retrieval https://github.com/woodeastern2-pixel/ModelY.git
 cd ModelY
 flutter doctor
 flutter pub get
@@ -153,7 +155,9 @@ python tool/prepare_bundled_qwen.py build/windows/x64/runner/Release/local_ai
 - Android 설치 파일: `build/app/outputs/flutter-apk/app-release.apk`
 - 기여·검증 규약: [AGENTS.md](https://github.com/woodeastern2-pixel/ModelY/blob/work/voc-mate-quality-recording/AGENTS.md)
 
-## 검증 상태
+## 이전 버전 검증 기록
+
+현재 변경의 검증은 [한국어 원문 검색 작업 기록](docs/korean-manual-retrieval-scope.md)과 [플랫폼 검증 워크플로](https://github.com/woodeastern2-pixel/ModelY/actions/workflows/korean-manual-release.yml)에서 확인할 수 있습니다. 아래는 이전 배포의 기록입니다.
 
 아래는 **2026-10-21 앱 소스 `c1e4d2c` 및 동일 앱 소스를 포함한 배포 빌드 `8e2aa49`의 기록**입니다. 이후 변경의 결과나 모든 업무 질문에 대한 정확도 보장을 뜻하지 않습니다.
 

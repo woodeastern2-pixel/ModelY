@@ -1,7 +1,7 @@
 name: ai_voc_assistant
 description: VoC Mate - 지식 기반 고객 문의 응대 도우미
 publish_to: 'none'
-version: 1.1.26+28
+version: 1.1.27+29
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
