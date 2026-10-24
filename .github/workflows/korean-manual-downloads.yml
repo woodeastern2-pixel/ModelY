@@ -1,0 +1,99 @@
+name: Publish verified Korean manual downloads
+on:
+  push:
+    branches: [work/korean-manual-downloads]
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: write
+concurrency:
+  group: korean-manual-downloads-1.1.27
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: woodeastern2-pixel/ModelY
+      SOURCE_SHA: 28fa72bc4c5a9dbaa1ec8b280b4e4c1a0455b291
+      BUILD_RUN: '40103482277'
+      RELEASE_TAG: v1.1.27-build29-korean-manuals
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require successful builds for the exact source
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib, subprocess, time
+          for attempt in range(30):
+              raw = subprocess.check_output(['gh', 'api', f"repos/{os.environ['GH_REPO']}/actions/runs/{os.environ['BUILD_RUN']}"])
+              r = json.loads(raw)
+              if r['status'] == 'completed':
+                  pathlib.Path('build-run.json').write_bytes(raw)
+                  break
+              time.sleep(10)
+          assert r['head_sha'] == os.environ['SOURCE_SHA']
+          assert r['status'] == 'completed' and r['conclusion'] == 'success', r['conclusion']
+          PY
+      - name: Download verified build outputs
+        run: |
+          gh run download "$BUILD_RUN" -n voc-mate-korean-windows -D downloaded/windows
+          gh run download "$BUILD_RUN" -n voc-mate-korean-android -D downloaded/android
+      - name: Verify and prepare direct downloads
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, pathlib, shutil
+          root = pathlib.Path('downloaded')
+          out = pathlib.Path('release'); out.mkdir()
+          exe, = (root/'windows').rglob('*.exe')
+          expected = pathlib.Path(str(exe)+'.sha256').read_text(encoding='utf-8-sig').split()[0]
+          with exe.open('rb') as f:
+              assert hashlib.file_digest(f, 'sha256').hexdigest() == expected
+          assert exe.open('rb').read(2) == b'MZ'
+          apk, = (root/'android').rglob('*.apk')
+          with apk.open('rb') as f:
+              assert hashlib.file_digest(f, 'sha256').hexdigest() == '0bffffdca4f81310d3fd4c2f5779b267a08215d16e13d1aa8f8ac95d5125cc69'
+          shutil.copy2(exe, out/exe.name)
+          shutil.copy2(apk, out/'VoC-Mate-v1.1.27-build29.apk')
+          for name in ('bundled-qwen-smoke.json', 'korean-manual-runtime-windows.json', 'korean-manual-runtime-android.json'):
+              source, = root.rglob(name)
+              shutil.copy2(source, out/name)
+          checksums = []
+          for path in sorted(out.iterdir()):
+              with path.open('rb') as f: digest = hashlib.file_digest(f, 'sha256').hexdigest()
+              checksums.append(f'{digest}  {path.name}')
+          (out/'SHA256SUMS.txt').write_text('\n'.join(checksums)+'\n')
+          PY
+          cat > release-notes.md <<'NOTES'
+          한국어 매뉴얼 원문 우선 검색 배포본입니다.
+
+          소스: 28fa72bc4c5a9dbaa1ec8b280b4e4c1a0455b291 (1.1.27+29)
+          검증: https://github.com/woodeastern2-pixel/ModelY/actions/runs/40103482277
+
+          - 전체 자동 검사 239건과 화면 비교 통과.
+          - 한국어 원문 7종·5,825개 구간 유지. 영어 원문과 영어 출처 파생 지식 제외.
+          - Windows VM 및 Android API 35 에뮬레이터에서 FAQ 없이 원문 검색 검증.
+          - Windows 내장 Qwen의 한국어 원문 답변·출처 및 근거 없는 정책 거절 검증.
+          - Windows EXE는 Qwen 모델을 포함합니다. Android APK는 기존 debug 서명 설정을 유지한 내부 설치용 release 빌드입니다.
+          - 잠긴 NASCA v8.5.5 PDF 대신 기존 한국어 Word 자료를 사용했습니다.
+
+          설치 파일과 SHA256SUMS.txt를 함께 제공합니다. 실기기 검증은 수행하지 않았습니다.
+          NOTES
+      - name: Publish immutable files as a prerelease
+        run: |
+          if gh release view "$RELEASE_TAG" --json tagName >/dev/null 2>&1; then
+            echo 'Release tag already exists; refusing to replace files.' >&2
+            exit 1
+          fi
+          gh release create "$RELEASE_TAG" --target "$SOURCE_SHA" --draft --prerelease --latest=false --title 'VoC Mate 1.1.27 · 한국어 원문 검색' --notes-file release-notes.md
+          gh release upload "$RELEASE_TAG" release/*
+          gh release edit "$RELEASE_TAG" --draft=false
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: voc-mate-korean-release-reports
+          path: |
+            release/*.json
+            release/SHA256SUMS.txt
+            build-run.json
+          if-no-files-found: error
